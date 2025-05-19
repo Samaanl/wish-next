@@ -1,0 +1,100 @@
+import { NextRequest, NextResponse } from "next/server";
+import { recordPurchase } from "@/utils/creditService";
+import { CREDIT_PACKAGES } from "@/utils/paymentService";
+import axios from "axios";
+
+// Lemon Squeezy API configuration
+const LEMON_SQUEEZY_API_KEY = process.env.LEMON_SQUEEZY_API_KEY;
+const LEMON_SQUEEZY_STORE_ID = process.env.LEMON_SQUEEZY_STORE_ID;
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    // Log the request body for debugging
+    console.log("Received checkout request:", JSON.stringify(body, null, 2));
+    
+    const { packageId, userId, userEmail, custom } = body;
+
+    // Log each field individually
+    console.log("packageId:", packageId);
+    console.log("userId:", userId);
+    console.log("userEmail:", userEmail);
+    console.log("custom:", custom);
+
+    if (!packageId || !userId || !userEmail) {
+      console.error("Missing required fields:", { packageId, userId, userEmail });
+      return NextResponse.json(
+        { error: "Missing required fields" },
+        { status: 400 }
+      );
+    }
+
+    if (!LEMON_SQUEEZY_API_KEY || !LEMON_SQUEEZY_STORE_ID) {
+      console.error("Missing Lemon Squeezy configuration");
+      return NextResponse.json(
+        { error: "Payment service not properly configured" },
+        { status: 500 }
+      );
+    }
+
+    try {
+      const response = await axios.post(
+        "https://api.lemonsqueezy.com/v1/checkouts",
+        {
+          data: {
+            type: "checkouts",
+            attributes: {
+              store_id: parseInt(LEMON_SQUEEZY_STORE_ID),
+              variant_id: parseInt(packageId), // Convert to number
+              custom_price: null, // Use the product's default price
+              checkout_data: {
+                email: userEmail,
+                custom: {
+                  user_id: userId,
+                  package_id: custom.package_id,
+                  credits: custom.credits,
+                },
+              },
+              product_options: {
+                redirect_url: `${process.env.NEXT_PUBLIC_URL}/thank-you?session_id={checkout_session_id}`,
+              },
+            },
+          },
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${LEMON_SQUEEZY_API_KEY}`,
+            Accept: "application/vnd.api+json",
+            "Content-Type": "application/vnd.api+json",
+          },
+        }
+      );
+
+      // Return the checkout URL
+      if (response.data?.data?.attributes?.url) {
+        return NextResponse.json({ url: response.data.data.attributes.url });
+      } else {
+        console.error("Invalid response from Lemon Squeezy:", response.data);
+        return NextResponse.json(
+          { error: "Invalid response from payment provider" },
+          { status: 500 }
+        );
+      }
+    } catch (error: any) {
+      console.error("Error creating checkout:", error.message);
+      if (error.response) {
+        console.error("Response error:", error.response.data);
+      }
+      return NextResponse.json(
+        { error: "Failed to create checkout session" },
+        { status: 500 }
+      );
+    }
+  } catch (error) {
+    console.error("Error processing request:", error);
+    return NextResponse.json(
+      { error: "Failed to process request" },
+      { status: 500 }
+    );
+  }
+}

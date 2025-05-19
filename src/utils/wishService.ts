@@ -1,5 +1,6 @@
 import { functions } from "./appwrite";
 import { ExecutionMethod } from "appwrite";
+import { hasEnoughCredits, deductCredits } from "./creditService";
 
 export interface WishInputs {
   occasion: string;
@@ -11,11 +12,26 @@ export interface WishInputs {
   age?: string;
 }
 
-export const generateWish = async (inputs: WishInputs) => {
+export interface WishResult {
+  wish: string;
+  creditsRemaining: number;
+}
+
+export const generateWish = async (
+  inputs: WishInputs,
+  userId: string
+): Promise<WishResult> => {
   try {
+    // First check if user has enough credits
+    const hasCredits = await hasEnoughCredits(userId);
+
+    if (!hasCredits) {
+      throw new Error("INSUFFICIENT_CREDITS");
+    }
+
     // Call the Appwrite function that will handle the Gemini API
     const execution = await functions.createExecution(
-      "682abef000096a085636", // Replace with your Appwrite Function ID
+      process.env.NEXT_PUBLIC_APPWRITE_FUNCTION_ID || "682abef000096a085636",
       JSON.stringify(inputs), // body
       false, // async
       "/wish-generator", // path
@@ -24,7 +40,14 @@ export const generateWish = async (inputs: WishInputs) => {
     );
 
     if (execution.status === "completed") {
-      return JSON.parse(execution.responseBody);
+      // Deduct a credit for successful generation
+      const creditsRemaining = await deductCredits(userId);
+
+      const result = JSON.parse(execution.responseBody);
+      return {
+        wish: result.wish,
+        creditsRemaining,
+      };
     } else {
       throw new Error("Wish generation failed: " + execution.status);
     }
