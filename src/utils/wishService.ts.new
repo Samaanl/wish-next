@@ -1,0 +1,35 @@
+import { functions } from "./appwrite";
+import { ExecutionMethod } from "appwrite";
+
+export interface WishInputs {
+  occasion: string;
+  tone: string;
+  recipientName: string;
+  relationship: string;
+  memorableEvent?: string;
+  hobby?: string;
+  age?: string;
+}
+
+export const generateWish = async (inputs: WishInputs) => {
+  try {
+    // Call the Appwrite function that will handle the Gemini API
+    const execution = await functions.createExecution(
+      "682abef000096a085636", // Replace with your Appwrite Function ID
+      JSON.stringify(inputs), // body
+      false, // async
+      "/wish-generator", // path
+      ExecutionMethod.POST, // method
+      { "Content-Type": "application/json" } // headers
+    );
+    
+    if (execution.status === "completed") {
+      return JSON.parse(execution.responseBody);
+    } else {
+      throw new Error("Wish generation failed: " + execution.status);
+    }
+  } catch (error) {
+    console.error("Error generating wish:", error);
+    throw error;
+  }
+};
