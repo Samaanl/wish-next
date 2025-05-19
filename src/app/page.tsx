@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
 import WishForm from "@/components/WishForm";
 import WishDisplay from "@/components/WishDisplay";
 import { generateWish, WishInputs } from "@/utils/wishService";
