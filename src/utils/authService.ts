@@ -5,21 +5,28 @@ import {
   DATABASE_ID,
   USERS_COLLECTION_ID,
 } from "./appwrite";
-
-// Default number of free credits for new users
-const DEFAULT_FREE_CREDITS = 3;
+import { OAuthProvider } from "appwrite";
+import { DEFAULT_FREE_CREDITS } from "./constants";
 
 export interface UserData {
   id: string;
   email: string;
-  name: string;
+  name?: string;
   credits: number;
+}
+
+export interface AppwriteUser {
+  $id: string;
+  email: string;
+  name?: string;
+  providers?: string[];
 }
 
 // Authentication functions
 export const getCurrentUser = async (): Promise<UserData | null> => {
   try {
     const user = await account.get();
+    console.log("Raw Appwrite user:", user);
 
     // Try to get user data from database
     try {
@@ -28,6 +35,38 @@ export const getCurrentUser = async (): Promise<UserData | null> => {
         USERS_COLLECTION_ID,
         user.$id
       );
+
+      // If user has no email but is authenticated with Google
+      if (
+        !user.email &&
+        (user as unknown as AppwriteUser).providers?.includes("google")
+      ) {
+        // Get the user's email from Google session
+        const session = await account.getSession("current");
+        console.log("Google session:", session);
+
+        // Update the user's email in Appwrite
+        if (session?.providerUid) {
+          await account.updateEmail(session.providerUid, "");
+          // Update the user in the database
+          await databases.updateDocument(
+            DATABASE_ID,
+            USERS_COLLECTION_ID,
+            user.$id,
+            {
+              email: session.providerUid,
+              name: user.name || session.providerUid.split("@")[0],
+            }
+          );
+          return {
+            id: user.$id,
+            email: session.providerUid,
+            name: user.name || session.providerUid.split("@")[0],
+            credits: userData.credits,
+          };
+        }
+      }
+
       return {
         id: user.$id,
         email: user.email,
@@ -36,12 +75,16 @@ export const getCurrentUser = async (): Promise<UserData | null> => {
       };
     } catch {
       // User exists in auth but not in database - create record
-      await createUserInDatabase(user.$id, user.email, user.name);
+      const email =
+        user.email ||
+        (user as AppwriteUser).providers?.[0] ||
+        "user@example.com";
+      await createUserInDatabase(user.$id, email, user.name || "User");
 
       return {
         id: user.$id,
-        email: user.email,
-        name: user.name,
+        email,
+        name: user.name || "User",
         credits: DEFAULT_FREE_CREDITS,
       };
     }
@@ -59,7 +102,7 @@ export const createUserInDatabase = async (
   return await databases.createDocument(
     DATABASE_ID,
     USERS_COLLECTION_ID,
-    userId, // Use user ID as document ID
+    userId,
     {
       email,
       name,
@@ -67,6 +110,22 @@ export const createUserInDatabase = async (
       created_at: new Date(),
     }
   );
+};
+
+export const signInWithGoogle = async () => {
+  try {
+    const session = await account.createOAuth2Session(
+      OAuthProvider.Google,
+      `${window.location.origin}/auth/callback`,
+      `${window.location.origin}/auth/callback`
+    );
+    return session;
+  } catch (error: Error | unknown) {
+    console.error("Google sign in error:", error);
+    throw error instanceof Error
+      ? error
+      : new Error("Failed to sign in with Google");
+  }
 };
 
 export const signInWithEmail = async (email: string, password: string) => {

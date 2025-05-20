@@ -11,6 +11,8 @@ import NotEnoughCredits from "@/components/NotEnoughCredits";
 import CreditDisplay from "@/components/CreditDisplay";
 import Header from "@/components/Header";
 import Banner from "@/components/Banner";
+import { getCurrentUser } from "@/utils/authService";
+import { initializeCheckout } from "@/utils/paymentService";
 
 export default function Home() {
   const { currentUser } = useAuth();
@@ -18,8 +20,8 @@ export default function Home() {
   const [generatedWish, setGeneratedWish] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [authModalOpen, setAuthModalOpen] = useState(false);
-  const [purchaseModalOpen, setPurchaseModalOpen] = useState(false);
   const [insufficientCredits, setInsufficientCredits] = useState(false);
+  const [showPurchaseModal, setShowPurchaseModal] = useState(false);
 
   const handleGenerateWish = async (inputs: WishInputs) => {
     setIsLoading(true);
@@ -55,8 +57,47 @@ export default function Home() {
     if (!currentUser) {
       setAuthModalOpen(true);
     } else {
-      setPurchaseModalOpen(true);
+      setShowPurchaseModal(true);
     }
+  };
+
+  const handlePurchase = async (packageId: string) => {
+    try {
+      setIsLoading(true);
+      setError("");
+
+      const currentUser = await getCurrentUser();
+      if (!currentUser || !currentUser.id) {
+        throw new Error("You must be logged in to purchase credits");
+      }
+
+      const checkoutUrl = await initializeCheckout(
+        packageId,
+        currentUser.id,
+        currentUser.email
+      );
+
+      if (!checkoutUrl) {
+        throw new Error("Failed to create checkout session");
+      }
+
+      // Redirect to Lemon Squeezy checkout
+      window.location.href = checkoutUrl;
+    } catch (err: Error | unknown) {
+      console.error("Purchase error:", err);
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to process purchase. Please try again."
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleAuthSuccess = async () => {
+    setAuthModalOpen(false);
+    setShowPurchaseModal(true);
   };
 
   return (
@@ -106,12 +147,14 @@ export default function Home() {
       <AuthModal
         isOpen={authModalOpen}
         onClose={() => setAuthModalOpen(false)}
+        onSuccess={handleAuthSuccess}
       />
 
       {/* Purchase Modal */}
       <PurchaseModal
-        isOpen={purchaseModalOpen}
-        onClose={() => setPurchaseModalOpen(false)}
+        isOpen={showPurchaseModal}
+        onClose={() => setShowPurchaseModal(false)}
+        onPurchase={handlePurchase}
       />
     </div>
   );

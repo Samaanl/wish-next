@@ -15,7 +15,6 @@ export async function POST(request: NextRequest) {
     console.log("Raw request body:", JSON.stringify(body));
 
     const { packageId, userId, userEmail, custom } = body;
-
     console.log("Parsed data:", {
       packageId:
         typeof packageId === "string" ? packageId : "undefined/invalid",
@@ -59,8 +58,8 @@ export async function POST(request: NextRequest) {
                 email: userEmail,
                 custom: {
                   user_id: userId,
-                  package_id: custom.package_id,
-                  credits: custom.credits,
+                  package_id: custom?.package_id || packageId,
+                  credits: custom?.credits || 0,
                 },
               },
               product_options: {
