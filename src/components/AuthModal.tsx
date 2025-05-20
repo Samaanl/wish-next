@@ -22,7 +22,6 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     e.preventDefault();
     setIsLoading(true);
     setError("");
-
     try {
       if (isLogin) {
         await signIn(email, password);
@@ -30,8 +29,12 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
         await signUp(email, password, name);
       }
       onClose();
-    } catch (error: any) {
-      setError(error.message || "An error occurred. Please try again.");
+    } catch (error: unknown) {
+      setError(
+        error instanceof Error
+          ? error.message
+          : "An error occurred. Please try again."
+      );
     } finally {
       setIsLoading(false);
     }
@@ -40,12 +43,15 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
   const handleAnonymousLogin = async () => {
     setIsLoading(true);
     setError("");
-
     try {
       await signInAnon();
       onClose();
-    } catch (error: any) {
-      setError(error.message || "An error occurred. Please try again.");
+    } catch (error: unknown) {
+      setError(
+        error instanceof Error
+          ? error.message
+          : "An error occurred. Please try again."
+      );
     } finally {
       setIsLoading(false);
     }

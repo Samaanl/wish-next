@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { recordPurchase } from "@/utils/creditService";
-import { CREDIT_PACKAGES } from "@/utils/paymentService";
 import axios from "axios";
 
 // Lemon Squeezy API configuration
@@ -15,14 +13,16 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     console.log("Raw request body:", JSON.stringify(body));
-    
+
     const { packageId, userId, userEmail, custom } = body;
 
     console.log("Parsed data:", {
-      packageId: typeof packageId === 'string' ? packageId : 'undefined/invalid',
-      userId: typeof userId === 'string' ? userId : 'undefined/invalid',
-      userEmail: typeof userEmail === 'string' ? userEmail : 'undefined/invalid',
-      custom: custom ? 'present' : 'missing'
+      packageId:
+        typeof packageId === "string" ? packageId : "undefined/invalid",
+      userId: typeof userId === "string" ? userId : "undefined/invalid",
+      userEmail:
+        typeof userEmail === "string" ? userEmail : "undefined/invalid",
+      custom: custom ? "present" : "missing",
     });
 
     if (!packageId || !userId || !userEmail) {
@@ -88,10 +88,16 @@ export async function POST(request: NextRequest) {
           { status: 500 }
         );
       }
-    } catch (error: any) {
-      console.error("Error creating checkout:", error.message);
-      if (error.response) {
-        console.error("Response error:", error.response.data);
+    } catch (error: unknown) {
+      console.error(
+        "Error creating checkout:",
+        error instanceof Error ? error.message : String(error)
+      );
+      if (error && typeof error === "object" && "response" in error) {
+        console.error(
+          "Response error:",
+          (error as { response?: { data: unknown } }).response?.data
+        );
       }
       return NextResponse.json(
         { error: "Failed to create checkout session" },

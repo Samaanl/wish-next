@@ -13,7 +13,7 @@ import Header from "@/components/Header";
 import Banner from "@/components/Banner";
 
 export default function Home() {
-  const { currentUser, isLoading: authLoading } = useAuth();
+  const { currentUser } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [generatedWish, setGeneratedWish] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -31,13 +31,12 @@ export default function Home() {
       setIsLoading(false);
       return;
     }
-
     try {
       const result = await generateWish(inputs, currentUser.id);
       setGeneratedWish(result.wish);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error generating wish:", error);
-      if (error.message === "INSUFFICIENT_CREDITS") {
+      if (error instanceof Error && error.message === "INSUFFICIENT_CREDITS") {
         setInsufficientCredits(true);
       } else {
         setError("Failed to generate wish. Please try again.");

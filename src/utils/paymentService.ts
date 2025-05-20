@@ -79,13 +79,18 @@ export const initializeCheckout = async (
     if (!response.data.url) {
       throw new Error("Failed to get checkout URL from payment provider");
     }
-
     return response.data.url;
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error initializing checkout:", error);
-    if (error.response) {
-      console.error("Response error data:", error.response.data);
-      throw new Error(error.response.data.error || "Payment service error");
+    if (error && typeof error === "object" && "response" in error) {
+      console.error(
+        "Response error data:",
+        (error as { response?: { data?: { error?: string } } }).response?.data
+      );
+      throw new Error(
+        (error as { response?: { data?: { error?: string } } }).response?.data
+          ?.error || "Payment service error"
+      );
     }
     throw error;
   }

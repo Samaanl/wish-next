@@ -31,13 +31,15 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({ isOpen, onClose }) => {
 
       if (!checkoutUrl) {
         throw new Error("Failed to create checkout session");
-      }
-
-      // Redirect to Lemon Squeezy checkout
+      } // Redirect to Lemon Squeezy checkout
       window.location.href = checkoutUrl;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Purchase error:", error);
-      setError(error.message || "Failed to process payment. Please try again.");
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Failed to process payment. Please try again."
+      );
       setIsLoading(false);
     }
   };

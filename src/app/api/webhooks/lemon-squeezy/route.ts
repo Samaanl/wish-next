@@ -6,7 +6,7 @@ import crypto from "crypto";
 const WEBHOOK_SECRET = process.env.LEMON_SQUEEZY_WEBHOOK_SECRET;
 
 // Verify webhook signature
-function verifySignature(payload: any, signature: string): boolean {
+function verifySignature(payload: unknown, signature: string): boolean {
   try {
     if (!WEBHOOK_SECRET) {
       console.warn(

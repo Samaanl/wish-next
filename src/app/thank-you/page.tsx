@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import CelebrationEffects from "@/components/CelebrationEffects";
 
-export default function ThankYouPage() {
+function ThankYouContent() {
   const { currentUser, refreshUserCredits } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -65,16 +65,13 @@ export default function ThankYouPage() {
             </svg>
           </div>
         </div>
-
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
           Thank You for Your Purchase!
         </h1>
-
         <p className="text-lg text-gray-600 dark:text-gray-300 mb-6">
           Your credits have been added to your account. You can now create more
           amazing wishes!
         </p>
-
         <div className="mb-8 py-4 px-6 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg">
           <p className="text-gray-700 dark:text-gray-200">
             Current Balance:
@@ -83,14 +80,30 @@ export default function ThankYouPage() {
             </span>
           </p>
         </div>
-
         <Link
           href="/"
           className="inline-block px-6 py-3 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors"
         >
           Create a New Wish
-        </Link>
+        </Link>{" "}
       </div>
     </div>
+  );
+}
+
+// Loading fallback UI
+function LoadingFallback() {
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
+    </div>
+  );
+}
+
+export default function ThankYouPage() {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <ThankYouContent />
+    </Suspense>
   );
 }

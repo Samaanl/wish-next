@@ -5,7 +5,6 @@ import {
   DATABASE_ID,
   USERS_COLLECTION_ID,
 } from "./appwrite";
-import { Models } from "appwrite";
 
 // Default number of free credits for new users
 const DEFAULT_FREE_CREDITS = 3;
@@ -29,14 +28,13 @@ export const getCurrentUser = async (): Promise<UserData | null> => {
         USERS_COLLECTION_ID,
         user.$id
       );
-
       return {
         id: user.$id,
         email: user.email,
         name: user.name,
         credits: userData.credits,
       };
-    } catch (error) {
+    } catch {
       // User exists in auth but not in database - create record
       await createUserInDatabase(user.$id, user.email, user.name);
 
