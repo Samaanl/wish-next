@@ -18,6 +18,16 @@ export const CREDIT_PACKAGES = [
   },
 ];
 
+// Log environment variables for debugging
+console.log(
+  "NEXT_PUBLIC_LS_BASIC_PACKAGE_ID:",
+  process.env.NEXT_PUBLIC_LS_BASIC_PACKAGE_ID
+);
+console.log(
+  "NEXT_PUBLIC_LS_PREMIUM_PACKAGE_ID:",
+  process.env.NEXT_PUBLIC_LS_PREMIUM_PACKAGE_ID
+);
+
 // Initialize Lemon Squeezy checkout
 export const initializeCheckout = async (
   packageId: string,
@@ -25,8 +35,15 @@ export const initializeCheckout = async (
   userEmail: string
 ): Promise<string> => {
   try {
+    console.log("Initialize checkout with params:", {
+      packageId,
+      userId,
+      userEmail,
+    });
+
     // Find the package
     const selectedPackage = CREDIT_PACKAGES.find((pkg) => pkg.id === packageId);
+    console.log("Selected package:", selectedPackage);
 
     if (!selectedPackage) {
       throw new Error("Invalid package selected");
@@ -35,9 +52,8 @@ export const initializeCheckout = async (
     if (!selectedPackage.lemonSqueezyId) {
       throw new Error("Lemon Squeezy variant ID not configured");
     }
-    
-    // Add console logs for debugging
-    console.log("Initializing checkout with data:", {
+
+    console.log("Making API request with:", {
       packageId: selectedPackage.lemonSqueezyId,
       userId,
       userEmail,
@@ -45,7 +61,7 @@ export const initializeCheckout = async (
         user_id: userId,
         package_id: packageId,
         credits: selectedPackage.credits,
-      }
+      },
     });
 
     // Create checkout URL with Lemon Squeezy via our API route

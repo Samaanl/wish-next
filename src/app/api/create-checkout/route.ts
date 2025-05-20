@@ -7,22 +7,30 @@ import axios from "axios";
 const LEMON_SQUEEZY_API_KEY = process.env.LEMON_SQUEEZY_API_KEY;
 const LEMON_SQUEEZY_STORE_ID = process.env.LEMON_SQUEEZY_STORE_ID;
 
+// Log environment variables status (without revealing the actual API key)
+console.log("API key exists:", !!LEMON_SQUEEZY_API_KEY);
+console.log("Store ID:", LEMON_SQUEEZY_STORE_ID);
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    // Log the request body for debugging
-    console.log("Received checkout request:", JSON.stringify(body, null, 2));
+    console.log("Raw request body:", JSON.stringify(body));
     
     const { packageId, userId, userEmail, custom } = body;
 
-    // Log each field individually
-    console.log("packageId:", packageId);
-    console.log("userId:", userId);
-    console.log("userEmail:", userEmail);
-    console.log("custom:", custom);
+    console.log("Parsed data:", {
+      packageId: typeof packageId === 'string' ? packageId : 'undefined/invalid',
+      userId: typeof userId === 'string' ? userId : 'undefined/invalid',
+      userEmail: typeof userEmail === 'string' ? userEmail : 'undefined/invalid',
+      custom: custom ? 'present' : 'missing'
+    });
 
     if (!packageId || !userId || !userEmail) {
-      console.error("Missing required fields:", { packageId, userId, userEmail });
+      console.error("Missing required fields:", {
+        packageId: !!packageId,
+        userId: !!userId,
+        userEmail: !!userEmail,
+      });
       return NextResponse.json(
         { error: "Missing required fields" },
         { status: 400 }
