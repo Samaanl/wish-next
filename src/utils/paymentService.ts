@@ -35,16 +35,6 @@ export const CREDIT_PACKAGES: CreditPackage[] = [
   },
 ];
 
-// Log environment variables for debugging
-console.log(
-  "NEXT_PUBLIC_LS_BASIC_PACKAGE_ID:",
-  process.env.NEXT_PUBLIC_LS_BASIC_PACKAGE_ID
-);
-console.log(
-  "NEXT_PUBLIC_LS_PREMIUM_PACKAGE_ID:",
-  process.env.NEXT_PUBLIC_LS_PREMIUM_PACKAGE_ID
-);
-
 // Initialize Lemon Squeezy checkout
 export const initializeCheckout = async (
   packageId: string,
