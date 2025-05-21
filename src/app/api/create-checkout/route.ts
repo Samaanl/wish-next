@@ -69,8 +69,6 @@ export async function POST(request: NextRequest) {
         data: {
           type: "checkouts",
           attributes: {
-            store_id: parseInt(LEMON_SQUEEZY_STORE_ID),
-            variant_id: parseInt(packageId), // Convert to number
             custom_price: null, // Use the product's default price
             checkout_data: {
               email: userEmail,
@@ -84,6 +82,20 @@ export async function POST(request: NextRequest) {
               redirect_url: `${
                 process.env.NEXT_PUBLIC_URL || "https://wish-next.vercel.app"
               }/thank-you?session_id={checkout_session_id}`,
+            },
+          },
+          relationships: {
+            store: {
+              data: {
+                type: "stores",
+                id: LEMON_SQUEEZY_STORE_ID,
+              },
+            },
+            variant: {
+              data: {
+                type: "variants",
+                id: packageId,
+              },
             },
           },
         },

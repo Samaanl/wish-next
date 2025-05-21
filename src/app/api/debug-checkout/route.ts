@@ -10,12 +10,12 @@ export async function GET() {
     const variantId =
       process.env.NEXT_PUBLIC_LEMON_SQUEEZY_BASIC_ID || "813864";
 
+    const storeId = LEMON_SQUEEZY_STORE_ID || "182277";
+
     const checkoutPayload = {
       data: {
         type: "checkouts",
         attributes: {
-          store_id: parseInt(LEMON_SQUEEZY_STORE_ID || "182277"),
-          variant_id: parseInt(variantId),
           custom_price: null,
           checkout_data: {
             email: "test@example.com", // Test email
@@ -29,6 +29,20 @@ export async function GET() {
             redirect_url: `${
               process.env.NEXT_PUBLIC_URL || "https://wish-next.vercel.app"
             }/thank-you?session_id={checkout_session_id}`,
+          },
+        },
+        relationships: {
+          store: {
+            data: {
+              type: "stores",
+              id: storeId,
+            },
+          },
+          variant: {
+            data: {
+              type: "variants",
+              id: variantId,
+            },
           },
         },
       },
