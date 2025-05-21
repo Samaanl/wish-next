@@ -5,8 +5,24 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import CelebrationEffects from "@/components/CelebrationEffects";
-import axios from "axios";
+import axios, { AxiosError } from "axios";
 import { CREDIT_PACKAGES } from "@/utils/paymentService";
+
+// Define types
+interface ErrorDetails {
+  message: string;
+  response?: unknown;
+  stack?: string;
+}
+
+interface DebugInfo {
+  userId?: string;
+  userEmail?: string;
+  packageId: string;
+  packageName?: string;
+  packageCredits: number;
+  sessionId: string | null;
+}
 
 function ThankYouContent() {
   const { currentUser, refreshUserCredits } = useAuth();
@@ -17,6 +33,12 @@ function ThankYouContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [creditsRefreshed, setCreditsRefreshed] = useState(false);
   const [processingStatus, setProcessingStatus] = useState<string | null>(null);
+  const [errorDetails, setErrorDetails] = useState<ErrorDetails | null>(null);
+  const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null);
+
+  // Track credit updates
+  const [initialCredits, setInitialCredits] = useState<number | null>(null);
+  const [finalCredits, setFinalCredits] = useState<number | null>(null);
 
   useEffect(() => {
     // If there's no session ID or user, redirect to homepage
@@ -25,9 +47,23 @@ function ThankYouContent() {
       return;
     }
 
+    // Store initial credits
+    if (initialCredits === null && currentUser?.credits !== undefined) {
+      setInitialCredits(currentUser.credits);
+    }
+
     // Find the corresponding package
     const selectedPackage = CREDIT_PACKAGES.find((pkg) => pkg.id === packageId);
     const packageCredits = selectedPackage?.credits || 10; // Default to 10 if package not found
+
+    setDebugInfo({
+      userId: currentUser?.id,
+      userEmail: currentUser?.email,
+      packageId,
+      packageName: selectedPackage?.name,
+      packageCredits,
+      sessionId,
+    });
 
     // Refresh the user's credits to show the new balance
     const updateCredits = async () => {
@@ -35,35 +71,56 @@ function ThankYouContent() {
         // Only try to refresh once to prevent infinite loops
         if (!creditsRefreshed) {
           setCreditsRefreshed(true);
+          setProcessingStatus("Checking for updated credits...");
 
           // First try to refresh credits from Appwrite directly
           await refreshUserCredits();
 
-          // If credits are still the default of 3, try to manually process
-          if (currentUser?.credits === 3) {
-            setProcessingStatus("Manually applying credits...");
+          // If no change in credits, try manual processing
+          if (currentUser?.credits === initialCredits) {
+            setProcessingStatus("Manually processing your purchase...");
 
-            // Call manual processing endpoint
-            const response = await axios.post("/api/process-purchase", {
-              userId: currentUser.id,
-              packageId: packageId,
-              amount: selectedPackage?.price || 1,
-              credits: packageCredits,
-            });
+            try {
+              // Call manual processing endpoint
+              const response = await axios.post("/api/process-purchase", {
+                userId: currentUser.id,
+                packageId: packageId,
+                amount: selectedPackage?.price || 1,
+                credits: packageCredits,
+              });
 
-            if (response.data.success) {
-              setProcessingStatus("Credits applied successfully!");
-              // Refresh again to get updated balance
-              await refreshUserCredits();
+              if (response.data.success) {
+                setProcessingStatus("Credits added successfully!");
+                // Refresh again to get updated balance
+                await refreshUserCredits();
+                setFinalCredits(currentUser?.credits || 0);
+              } else {
+                throw new Error(response.data.error || "Unknown error");
+              }
+            } catch (error: unknown) {
+              const err = error as AxiosError;
+              console.error("Error processing purchase:", err);
+              setProcessingStatus("Error processing credits.");
+              setErrorDetails({
+                message: err.message,
+                response: (err as AxiosError).response?.data,
+              });
             }
+          } else {
+            // Credits updated via webhook
+            setProcessingStatus("Credits have been added to your account!");
+            setFinalCredits(currentUser?.credits || 0);
           }
         }
         setIsLoading(false);
-      } catch (error) {
-        console.error("Error refreshing credits:", error);
-        setProcessingStatus(
-          "Error processing credits. Please contact support."
-        );
+      } catch (error: unknown) {
+        const err = error as Error;
+        console.error("Error refreshing credits:", err);
+        setProcessingStatus("Error updating your account.");
+        setErrorDetails({
+          message: err.message,
+          stack: err.stack,
+        });
         setIsLoading(false);
       }
     };
@@ -71,7 +128,7 @@ function ThankYouContent() {
     // Add a small delay to allow processing time
     const timer = setTimeout(() => {
       updateCredits();
-    }, 1000);
+    }, 1500);
 
     return () => clearTimeout(timer);
   }, [
@@ -81,7 +138,44 @@ function ThankYouContent() {
     router,
     refreshUserCredits,
     creditsRefreshed,
+    initialCredits,
   ]);
+
+  const handleRetry = async () => {
+    try {
+      setProcessingStatus("Retrying credit update...");
+
+      // Call manual processing with more details
+      const selectedPackage = CREDIT_PACKAGES.find(
+        (pkg) => pkg.id === packageId
+      );
+      const packageCredits = selectedPackage?.credits || 10;
+
+      const response = await axios.post("/api/process-purchase", {
+        userId: currentUser?.id,
+        packageId: packageId,
+        amount: selectedPackage?.price || 1,
+        credits: packageCredits,
+        isRetry: true,
+      });
+
+      if (response.data.success) {
+        setProcessingStatus("Credits added successfully on retry!");
+        // Refresh again to get updated balance
+        await refreshUserCredits();
+        setFinalCredits(currentUser?.credits || 0);
+      } else {
+        throw new Error(response.data.error || "Unknown error");
+      }
+    } catch (error: unknown) {
+      const err = error as Error;
+      setProcessingStatus("Retry failed. Please contact support.");
+      setErrorDetails({
+        message: err.message,
+        response: (error as AxiosError).response?.data,
+      });
+    }
+  };
 
   if (isLoading) {
     return (
@@ -118,14 +212,38 @@ function ThankYouContent() {
           Thank You for Your Purchase!
         </h1>
         <p className="text-lg text-gray-600 dark:text-gray-300 mb-6">
-          Your credits have been added to your account. You can now create more
-          amazing wishes!
+          Your payment has been processed successfully.
         </p>
+
         {processingStatus && (
-          <div className="mb-4 px-4 py-2 bg-blue-50 text-blue-700 rounded-lg">
+          <div
+            className={`mb-4 px-4 py-2 rounded-lg ${
+              processingStatus.includes("Error")
+                ? "bg-red-50 text-red-700"
+                : "bg-blue-50 text-blue-700"
+            }`}
+          >
             {processingStatus}
+            {errorDetails && (
+              <button
+                onClick={() => console.log("Error details:", errorDetails)}
+                className="block mt-1 text-xs underline"
+              >
+                See console for error details
+              </button>
+            )}
+
+            {processingStatus.includes("Error") && (
+              <button
+                onClick={handleRetry}
+                className="mt-2 px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
+              >
+                Retry Credit Update
+              </button>
+            )}
           </div>
         )}
+
         <div className="mb-8 py-4 px-6 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg">
           <p className="text-gray-700 dark:text-gray-200">
             Current Balance:
@@ -133,13 +251,31 @@ function ThankYouContent() {
               {currentUser?.credits || 0} Credits
             </span>
           </p>
+
+          {initialCredits !== null && finalCredits !== null && (
+            <p className="text-sm text-gray-500 mt-1">
+              {finalCredits > initialCredits
+                ? `+${finalCredits - initialCredits} credits have been added`
+                : "No credits have been added yet"}
+            </p>
+          )}
         </div>
+
         <Link
           href="/"
           className="inline-block px-6 py-3 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors"
         >
           Create a New Wish
-        </Link>{" "}
+        </Link>
+
+        {debugInfo && (
+          <details className="mt-8 text-left text-xs text-gray-400">
+            <summary className="cursor-pointer">Debug Information</summary>
+            <pre className="mt-2 p-2 bg-gray-100 dark:bg-gray-700 overflow-auto rounded">
+              {JSON.stringify(debugInfo, null, 2)}
+            </pre>
+          </details>
+        )}
       </div>
     </div>
   );
