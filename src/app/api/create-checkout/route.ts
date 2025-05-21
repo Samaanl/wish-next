@@ -82,6 +82,7 @@ export async function POST(request: NextRequest) {
                 credits: credits,
               },
             },
+
             product_options: {
               redirect_url: `${
                 process.env.NEXT_PUBLIC_URL || "https://wish-next.vercel.app"
