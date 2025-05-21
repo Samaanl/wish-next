@@ -7,12 +7,27 @@ import { useAuth } from "@/contexts/AuthContext";
 import CelebrationEffects from "@/components/CelebrationEffects";
 import axios, { AxiosError } from "axios";
 import { CREDIT_PACKAGES } from "@/utils/paymentService";
+import { getCurrentUser } from "@/utils/authService";
 
 // Define types
 interface ErrorDetails {
   message: string;
   response?: unknown;
   stack?: string;
+}
+
+// Define auth info structure
+interface AuthInfo {
+  authenticated: boolean;
+  user: {
+    id: string;
+    email: string;
+    name?: string;
+  } | null;
+  userData?: unknown;
+  session?: unknown;
+  cookiesPresent?: Record<string, string>;
+  headers?: Record<string, string>;
 }
 
 interface DebugInfo {
@@ -22,10 +37,11 @@ interface DebugInfo {
   packageName?: string;
   packageCredits: number;
   sessionId: string | null;
+  authInfo?: AuthInfo;
 }
 
 function ThankYouContent() {
-  const { currentUser, refreshUserCredits } = useAuth();
+  const { currentUser, refreshUserCredits, refreshUserSession } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const sessionId = searchParams.get("session_id");
@@ -41,118 +57,192 @@ function ThankYouContent() {
   const [finalCredits, setFinalCredits] = useState<number | null>(null);
 
   useEffect(() => {
-    // If there's no session ID or user, redirect to homepage
-    if (!sessionId || !currentUser) {
+    // If there's no session ID, redirect to homepage
+    if (!sessionId) {
       router.push("/");
       return;
     }
 
-    // Store initial credits
-    if (initialCredits === null && currentUser?.credits !== undefined) {
-      setInitialCredits(currentUser.credits);
-    }
-
-    // Find the corresponding package
-    const selectedPackage = CREDIT_PACKAGES.find((pkg) => pkg.id === packageId);
-    const packageCredits = selectedPackage?.credits || 10; // Default to 10 if package not found
-
-    setDebugInfo({
-      userId: currentUser?.id,
-      userEmail: currentUser?.email,
-      packageId,
-      packageName: selectedPackage?.name,
-      packageCredits,
-      sessionId,
-    });
-
-    // Refresh the user's credits to show the new balance
-    const updateCredits = async () => {
+    // First verify authentication status
+    const checkAuth = async () => {
       try {
-        // Only try to refresh once to prevent infinite loops
-        if (!creditsRefreshed) {
-          setCreditsRefreshed(true);
-          setProcessingStatus("Checking for updated credits...");
+        setProcessingStatus("Checking authentication status...");
 
-          // First try to refresh credits from Appwrite directly
-          await refreshUserCredits();
+        // Try to refresh the session first
+        await refreshUserSession();
 
-          // If no change in credits, try manual processing
-          if (currentUser?.credits === initialCredits) {
-            setProcessingStatus("Manually processing your purchase...");
+        // Check current auth status via API
+        const authResponse = await axios.get("/api/check-auth");
+        console.log("Auth check result:", authResponse.data);
 
-            try {
-              // Call manual processing endpoint
-              const response = await axios.post("/api/process-purchase", {
-                userId: currentUser.id,
-                packageId: packageId,
-                amount: selectedPackage?.price || 1,
-                credits: packageCredits,
-              });
+        // Update debug info with auth information
+        if (debugInfo) {
+          setDebugInfo({
+            ...debugInfo,
+            authInfo: authResponse.data,
+          });
+        } else {
+          // Initialize with basic info
+          setDebugInfo({
+            packageId: packageId,
+            sessionId: sessionId,
+            packageCredits: 0, // Will be updated later
+            authInfo: authResponse.data,
+          });
+        }
 
-              if (response.data.success) {
-                setProcessingStatus("Credits added successfully!");
-                // Refresh again to get updated balance
-                await refreshUserCredits();
-                setFinalCredits(currentUser?.credits || 0);
-              } else {
-                throw new Error(response.data.error || "Unknown error");
-              }
-            } catch (error: unknown) {
-              const err = error as AxiosError;
-              console.error("Error processing purchase:", err);
-              setProcessingStatus("Error processing credits.");
-              setErrorDetails({
-                message: err.message,
-                response: (err as AxiosError).response?.data,
-              });
-            }
-          } else {
-            // Credits updated via webhook
-            setProcessingStatus("Credits have been added to your account!");
-            setFinalCredits(currentUser?.credits || 0);
+        // If not authenticated, try another refresh or show error
+        if (!authResponse.data.authenticated) {
+          console.warn("Not authenticated, trying to refresh session again");
+          await refreshUserSession();
+
+          // If still not authenticated after refresh, show error
+          if (!currentUser || currentUser.isGuest) {
+            setProcessingStatus(
+              "Authentication error. Please try signing in again."
+            );
+            setErrorDetails({
+              message: "Session expired or not authenticated",
+              response: authResponse.data,
+            });
+            setIsLoading(false);
+            return;
           }
         }
-        setIsLoading(false);
-      } catch (error: unknown) {
-        const err = error as Error;
-        console.error("Error refreshing credits:", err);
-        setProcessingStatus("Error updating your account.");
+
+        // Continue with credit processing
+        await processCredits();
+      } catch (error) {
+        console.error("Auth check error:", error);
+        setProcessingStatus(
+          "Authentication error. Please try signing in again."
+        );
         setErrorDetails({
-          message: err.message,
-          stack: err.stack,
+          message: error instanceof Error ? error.message : "Unknown error",
+          response: error instanceof AxiosError ? error.response?.data : null,
         });
         setIsLoading(false);
       }
     };
 
-    // Add a small delay to allow processing time
-    const timer = setTimeout(() => {
-      updateCredits();
-    }, 1500);
+    // Process credits after authentication is confirmed
+    const processCredits = async () => {
+      try {
+        // Get fresh user data
+        const user = await getCurrentUser();
+        console.log("Fresh user data:", user);
 
-    return () => clearTimeout(timer);
+        if (!user) {
+          throw new Error("Failed to get user data");
+        }
+
+        // Store initial credits if not already set
+        if (initialCredits === null) {
+          setInitialCredits(user.credits);
+        }
+
+        // Find the corresponding package
+        const selectedPackage = CREDIT_PACKAGES.find(
+          (pkg) => pkg.id === packageId
+        );
+        const packageCredits = selectedPackage?.credits || 10;
+
+        // Update debug info with complete information
+        setDebugInfo({
+          userId: user.id,
+          userEmail: user.email,
+          packageId: packageId,
+          packageName: selectedPackage?.name,
+          packageCredits: packageCredits,
+          sessionId: sessionId,
+          authInfo: debugInfo?.authInfo,
+        });
+
+        // Only process once
+        if (!creditsRefreshed) {
+          setCreditsRefreshed(true);
+          setProcessingStatus("Processing your purchase...");
+
+          // Check if credits need to be added manually
+          if (user.credits === initialCredits) {
+            console.log("Credits unchanged, processing manually");
+
+            // Call manual processing endpoint
+            const response = await axios.post("/api/process-purchase", {
+              userId: user.id,
+              packageId: packageId,
+              amount: selectedPackage?.price || 1,
+              credits: packageCredits,
+            });
+
+            if (response.data.success) {
+              setProcessingStatus("Credits added successfully!");
+
+              // Refresh user data again
+              await refreshUserCredits();
+
+              // Get fresh credits
+              const updatedUser = await getCurrentUser();
+              setFinalCredits(updatedUser?.credits || 0);
+            } else {
+              throw new Error(response.data.error || "Unknown error");
+            }
+          } else {
+            // Credits already updated via webhook
+            setProcessingStatus("Credits have been added to your account!");
+            setFinalCredits(user.credits);
+          }
+        }
+
+        setIsLoading(false);
+      } catch (error: unknown) {
+        const err = error as Error;
+        console.error("Error processing credits:", err);
+        setProcessingStatus("Error updating your account.");
+        setErrorDetails({
+          message: err.message,
+          stack: err.stack,
+          response: error instanceof AxiosError ? error.response?.data : null,
+        });
+        setIsLoading(false);
+      }
+    };
+
+    // Start the authentication check
+    checkAuth();
   }, [
     sessionId,
-    currentUser,
     packageId,
     router,
     refreshUserCredits,
-    creditsRefreshed,
+    refreshUserSession,
+    currentUser,
     initialCredits,
+    creditsRefreshed,
+    debugInfo,
   ]);
 
   const handleRetry = async () => {
     try {
       setProcessingStatus("Retrying credit update...");
 
-      // Call manual processing with more details
+      // First refresh auth
+      await refreshUserSession();
+
+      // Get fresh user for retry
+      const freshUser = await getCurrentUser();
+      if (!freshUser || freshUser.isGuest) {
+        throw new Error("You must be logged in to complete this purchase");
+      }
+
+      // Call manual processing with explicit user data
       const selectedPackage = CREDIT_PACKAGES.find(
         (pkg) => pkg.id === packageId
       );
       const packageCredits = selectedPackage?.credits || 10;
 
       const response = await axios.post("/api/process-purchase", {
-        userId: currentUser?.id,
+        userId: freshUser.id,
         packageId: packageId,
         amount: selectedPackage?.price || 1,
         credits: packageCredits,
@@ -163,7 +253,8 @@ function ThankYouContent() {
         setProcessingStatus("Credits added successfully on retry!");
         // Refresh again to get updated balance
         await refreshUserCredits();
-        setFinalCredits(currentUser?.credits || 0);
+        const updatedUser = await getCurrentUser();
+        setFinalCredits(updatedUser?.credits || 0);
       } else {
         throw new Error(response.data.error || "Unknown error");
       }
@@ -181,6 +272,9 @@ function ThankYouContent() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
+        <span className="ml-3 text-indigo-600">
+          {processingStatus || "Loading..."}
+        </span>
       </div>
     );
   }

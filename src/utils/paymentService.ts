@@ -1,4 +1,5 @@
 import axios from "axios";
+import { getCurrentUser } from "./authService";
 
 export interface CreditPackage {
   id: string;
@@ -48,6 +49,30 @@ export const initializeCheckout = async (
       userEmail,
     });
 
+    // Add extra verification to ensure we have a valid user ID
+    let finalUserId = userId;
+    let finalUserEmail = userEmail;
+
+    // If user ID looks like a guest ID, double-check with getCurrentUser
+    if (userId.startsWith("guest-")) {
+      console.log("Guest user ID detected, double-checking authentication...");
+      try {
+        const currentUser = await getCurrentUser();
+        console.log("getCurrentUser result:", currentUser);
+
+        if (currentUser && !currentUser.isGuest) {
+          console.log("Found authenticated user, using instead of guest!");
+          finalUserId = currentUser.id;
+          finalUserEmail = currentUser.email;
+        } else {
+          throw new Error("Please sign up or log in to purchase credits");
+        }
+      } catch (authError) {
+        console.error("Auth verification error:", authError);
+        throw new Error("Authentication error. Please try signing in again.");
+      }
+    }
+
     // Find the package
     const selectedPackage = CREDIT_PACKAGES.find((pkg) => pkg.id === packageId);
     console.log("Selected package:", selectedPackage);
@@ -68,17 +93,17 @@ export const initializeCheckout = async (
       );
     }
 
-    // Check if this is a guest user
-    if (userId.startsWith("guest-")) {
+    // Final check for guest users
+    if (finalUserId.startsWith("guest-")) {
       throw new Error("Please sign up or log in to purchase credits");
     }
 
     console.log("Making API request with:", {
       packageId: selectedPackage.lemonSqueezyId,
-      userId,
-      userEmail,
+      userId: finalUserId,
+      userEmail: finalUserEmail,
       custom: {
-        user_id: userId,
+        user_id: finalUserId,
         package_id: packageId,
         credits: String(selectedPackage.credits),
       },
@@ -87,10 +112,10 @@ export const initializeCheckout = async (
     // Create checkout URL with Lemon Squeezy via our API route
     const response = await axios.post("/api/create-checkout", {
       packageId: selectedPackage.lemonSqueezyId,
-      userId,
-      userEmail,
+      userId: finalUserId,
+      userEmail: finalUserEmail,
       custom: {
-        user_id: userId,
+        user_id: finalUserId,
         package_id: packageId,
         credits: String(selectedPackage.credits),
       },
