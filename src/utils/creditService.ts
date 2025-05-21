@@ -157,3 +157,39 @@ export const recordPurchase = async (
     throw error;
   }
 };
+
+// Handle refunds
+export const refundPurchase = async (
+  userId: string,
+  packageId: string,
+  amount: number,
+  credits: number
+) => {
+  // Guest users can't receive refunds
+  if (userId.startsWith("guest-")) {
+    throw new Error("Guest users are not eligible for refunds");
+  }
+
+  try {
+    // Record the refund
+    await databases.createDocument(
+      DATABASE_ID,
+      PURCHASES_COLLECTION_ID,
+      "unique()",
+      {
+        user_id: userId,
+        package_id: packageId,
+        amount: -amount, // Negative amount to indicate refund
+        credits: -credits, // Negative credits to indicate refund
+        created_at: new Date(),
+        type: "refund",
+      }
+    );
+
+    // Deduct the credits from the user's account
+    return await deductCredits(userId, credits);
+  } catch (error) {
+    console.error("Error processing refund:", error);
+    throw error;
+  }
+};

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { recordPurchase } from "@/utils/creditService";
+import { recordPurchase, refundPurchase } from "@/utils/creditService";
 import crypto from "crypto";
 
 // Webhook secret from Lemon Squeezy dashboard
@@ -35,10 +35,15 @@ export async function POST(request: NextRequest) {
 
     // Log the webhook data for debugging (remove in production)
     console.log("Webhook received:", JSON.stringify(body, null, 2));
+    console.log("Signature:", signature);
+    console.log("Webhook secret configured:", !!WEBHOOK_SECRET);
 
     // Verify webhook signature
     if (!verifySignature(body, signature)) {
-      console.error("Invalid webhook signature");
+      console.error("Invalid webhook signature", {
+        receivedSignature: signature,
+        hasSecret: !!WEBHOOK_SECRET,
+      });
       return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
     }
 
@@ -46,39 +51,86 @@ export async function POST(request: NextRequest) {
     const { meta, data } = body;
     const eventName = meta?.event_name;
 
-    if (eventName === "order_created") {
-      // Extract data from the webhook
-      const customData = data?.meta?.custom_data;
+    console.log("Processing webhook event:", eventName);
 
-      if (
-        !customData ||
-        !customData.user_id ||
-        !customData.package_id ||
-        !customData.credits
-      ) {
-        console.error("Missing required custom data", customData);
-        return NextResponse.json(
-          { error: "Missing required custom data" },
-          { status: 400 }
-        );
-      }
+    // Extract common data
+    const customData = data?.meta?.custom_data;
+    const total = data?.attributes?.total || 0;
 
-      // Get the total amount from the order
-      const total = data?.attributes?.total || 0;
-
-      // Record the purchase and add credits
-      await recordPurchase(
-        customData.user_id,
-        customData.package_id,
-        total,
-        customData.credits
+    // Validate custom data
+    if (
+      !customData ||
+      !customData.user_id ||
+      !customData.package_id ||
+      !customData.credits
+    ) {
+      console.error("Missing required custom data", {
+        customData,
+        eventName,
+        data,
+      });
+      return NextResponse.json(
+        { error: "Missing required custom data" },
+        { status: 400 }
       );
-
-      return NextResponse.json({ success: true });
     }
 
-    // For other types of events
-    return NextResponse.json({ received: true });
+    switch (eventName) {
+      case "order_created":
+        console.log("Processing new purchase:", {
+          userId: customData.user_id,
+          packageId: customData.package_id,
+          credits: customData.credits,
+          total,
+        });
+
+        await recordPurchase(
+          customData.user_id,
+          customData.package_id,
+          total,
+          customData.credits
+        );
+        break;
+
+      case "order_refunded":
+        console.log("Processing refund:", {
+          userId: customData.user_id,
+          packageId: customData.package_id,
+          credits: customData.credits,
+          total,
+        });
+
+        await refundPurchase(
+          customData.user_id,
+          customData.package_id,
+          total,
+          customData.credits
+        );
+        break;
+
+      case "subscription_payment_failed":
+        console.log("Subscription payment failed:", {
+          userId: customData.user_id,
+          packageId: customData.package_id,
+        });
+        // Handle failed payment (e.g., notify user)
+        break;
+
+      case "subscription_payment_success":
+        console.log("Subscription payment successful:", {
+          userId: customData.user_id,
+          packageId: customData.package_id,
+          credits: customData.credits,
+        });
+        // Handle successful subscription payment
+        break;
+
+      default:
+        console.log("Unhandled webhook event:", eventName);
+        return NextResponse.json({ received: true });
+    }
+
+    return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error processing webhook:", error);
     return NextResponse.json(
@@ -86,4 +138,18 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+// Add a GET endpoint for webhook testing
+export async function GET() {
+  return NextResponse.json({
+    status: "Webhook endpoint is active",
+    hasSecret: !!WEBHOOK_SECRET,
+    supportedEvents: [
+      "order_created",
+      "order_refunded",
+      "subscription_payment_failed",
+      "subscription_payment_success",
+    ],
+  });
 }
