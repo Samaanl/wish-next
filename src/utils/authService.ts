@@ -13,6 +13,7 @@ export interface UserData {
   email: string;
   name?: string;
   credits: number;
+  isGuest?: boolean;
 }
 
 export interface AppwriteUser {
@@ -21,6 +22,36 @@ export interface AppwriteUser {
   name?: string;
   providers?: string[];
 }
+
+// Local storage key for guest user
+export const GUEST_USER_KEY = "wishmaker_guest_user";
+
+// Creates a guest user with default credits
+export const createGuestUser = (): UserData => {
+  const guestId = `guest-${Date.now()}-${Math.random()
+    .toString(36)
+    .substring(2, 9)}`;
+  const guestUser = {
+    id: guestId,
+    email: `guest-${guestId}@example.com`,
+    name: "Guest User",
+    credits: DEFAULT_FREE_CREDITS,
+    isGuest: true,
+  };
+
+  // Save to local storage
+  localStorage.setItem(GUEST_USER_KEY, JSON.stringify(guestUser));
+  return guestUser;
+};
+
+// Gets guest user from local storage or creates a new one
+export const getGuestUser = (): UserData | null => {
+  const storedUser = localStorage.getItem(GUEST_USER_KEY);
+  if (storedUser) {
+    return JSON.parse(storedUser);
+  }
+  return createGuestUser();
+};
 
 // Authentication functions
 export const getCurrentUser = async (): Promise<UserData | null> => {
@@ -90,6 +121,18 @@ export const getCurrentUser = async (): Promise<UserData | null> => {
     }
   } catch (error) {
     console.error("Error getting current user:", error);
+
+    // Check if this is a permissions error for guest users
+    if (
+      error instanceof Error &&
+      (error.message.includes("missing scope") ||
+        error.message.includes("role: guests"))
+    ) {
+      console.log("Using guest user mode");
+      // Use local guest user with default credits
+      return getGuestUser();
+    }
+
     return null;
   }
 };
@@ -182,6 +225,17 @@ export const signInAnonymously = async () => {
     return await getCurrentUser();
   } catch (error) {
     console.error("Error during anonymous sign in:", error);
+
+    // If permission error, fall back to guest user
+    if (
+      error instanceof Error &&
+      (error.message.includes("missing scope") ||
+        error.message.includes("role: guests"))
+    ) {
+      console.log("Using guest user mode instead of anonymous auth");
+      return getGuestUser();
+    }
+
     throw error;
   }
 };

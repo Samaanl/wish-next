@@ -7,7 +7,11 @@ import {
   signInAnonymously,
   UserData,
   getUserById,
+  createGuestUser,
+  getGuestUser,
+  GUEST_USER_KEY,
 } from "@/utils/authService";
+import { shouldUseAppwrite } from "@/utils/appwrite";
 
 interface AuthContextType {
   currentUser: UserData | null;
@@ -58,11 +62,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     const checkUser = async () => {
       setIsLoading(true);
       try {
-        const user = await getCurrentUser();
-        setCurrentUser(user);
+        // Always create a guest user first if needed
+        if (!localStorage.getItem(GUEST_USER_KEY)) {
+          const newGuestUser = getGuestUser();
+          setCurrentUser(newGuestUser);
+          setIsLoading(false);
+          return;
+        }
+
+        // Check if we should try Appwrite auth or just use guest user
+        if (shouldUseAppwrite()) {
+          try {
+            const user = await getCurrentUser();
+            if (user) {
+              setCurrentUser(user);
+            } else {
+              // Fall back to guest user
+              const guestUser = getGuestUser();
+              setCurrentUser(guestUser);
+            }
+          } catch (error) {
+            console.error("Error with Appwrite auth:", error);
+            // Fall back to guest user
+            const guestUser = getGuestUser();
+            setCurrentUser(guestUser);
+          }
+        } else {
+          // Use guest user from storage
+          const guestUser = getGuestUser();
+          setCurrentUser(guestUser);
+        }
       } catch (error) {
         console.error("Error checking user session:", error);
-        setCurrentUser(null);
+        // Fall back to guest user
+        const guestUser = getGuestUser();
+        setCurrentUser(guestUser);
       } finally {
         setIsLoading(false);
       }
@@ -97,7 +131,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     setIsLoading(true);
     try {
       await signOut();
-      setCurrentUser(null);
+      // After logging out, create a new guest user
+      const guestUser = createGuestUser();
+      setCurrentUser(guestUser);
       return true;
     } catch (error) {
       console.error("Error signing out:", error);
@@ -117,6 +153,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       setIsLoading(false);
     }
   };
+
   const updateCurrentUser = (user: UserData) => {
     setCurrentUser(user);
   };
@@ -124,6 +161,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const refreshUserCredits = async () => {
     if (!currentUser) return;
 
+    // For guest users, just get the current state from localStorage
+    if (currentUser.isGuest) {
+      const updatedGuestUser = getGuestUser();
+      if (updatedGuestUser) {
+        setCurrentUser(updatedGuestUser);
+      }
+      return;
+    }
+
+    // For regular users, get from Appwrite
     try {
       const user = await getUserById(currentUser.id);
       if (user) {

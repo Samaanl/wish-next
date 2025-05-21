@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import CreditDisplay from "./CreditDisplay";
 
@@ -9,6 +9,7 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({ onLogin, onBuyCredits }) => {
   const { currentUser, logOut } = useAuth();
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   return (
     <header className="py-4 px-6 flex justify-between items-center">
@@ -23,8 +24,11 @@ const Header: React.FC<HeaderProps> = ({ onLogin, onBuyCredits }) => {
           <>
             <CreditDisplay onBuyCredits={onBuyCredits} />
 
-            <div className="relative group">
-              <button className="flex items-center space-x-2 text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400">
+            <div className="relative">
+              <button
+                className="flex items-center space-x-2 text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400"
+                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              >
                 <span>{currentUser.name}</span>
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -40,21 +44,26 @@ const Header: React.FC<HeaderProps> = ({ onLogin, onBuyCredits }) => {
                 </svg>
               </button>
 
-              <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg py-1 z-10 hidden group-hover:block">
-                <button
-                  onClick={onBuyCredits}
-                  className="block w-full text-left px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                >
-                  Buy Credits
-                </button>
+              {isDropdownOpen && (
+                <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg py-1 z-10">
+                  <button
+                    onClick={onBuyCredits}
+                    className="block w-full text-left px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                  >
+                    Buy Credits
+                  </button>
 
-                <button
-                  onClick={() => logOut()}
-                  className="block w-full text-left px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                >
-                  Sign Out
-                </button>
-              </div>
+                  <button
+                    onClick={() => {
+                      logOut();
+                      setIsDropdownOpen(false);
+                    }}
+                    className="block w-full text-left px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                  >
+                    Sign Out
+                  </button>
+                </div>
+              )}
             </div>
           </>
         ) : (
