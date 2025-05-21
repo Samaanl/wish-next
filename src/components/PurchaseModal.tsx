@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { CREDIT_PACKAGES } from "@/utils/paymentService";
 import { initializeCheckout } from "@/utils/paymentService";
 import { useAuth } from "@/contexts/AuthContext";
@@ -16,17 +16,38 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
   onPurchase,
 }) => {
   const { currentUser, refreshUserCredits } = useAuth();
-  const [isLoading, setIsLoading] = React.useState(false);
-  const [error, setError] = React.useState("");
-  const [showAuthModal, setShowAuthModal] = React.useState(false);
-  const [pendingPackageId, setPendingPackageId] = React.useState<string | null>(
-    null
-  );
-
-  if (!isOpen) return null;
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [pendingPackageId, setPendingPackageId] = useState<string | null>(null);
+  const [authSuccess, setAuthSuccess] = useState(false);
 
   // Check if user is a guest
   const isGuestUser = currentUser?.id?.startsWith("guest-");
+
+  // Handle auth success and process purchase
+  useEffect(() => {
+    const handlePendingPurchase = async () => {
+      // Only proceed if we had an auth success and have a pending package
+      if (
+        authSuccess &&
+        pendingPackageId &&
+        currentUser &&
+        !currentUser.id.startsWith("guest-")
+      ) {
+        setAuthSuccess(false); // Reset the auth success flag
+
+        if (onPurchase) {
+          onPurchase(pendingPackageId);
+        } else {
+          await processPurchase(pendingPackageId);
+        }
+        setPendingPackageId(null);
+      }
+    };
+
+    handlePendingPurchase();
+  }, [authSuccess, currentUser, pendingPackageId, onPurchase]);
 
   const handlePurchase = async (packageId: string) => {
     // Clear previous errors
@@ -84,53 +105,31 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
 
   const handleAuthClose = () => {
     setShowAuthModal(false);
-
-    // After auth modal closes, check if user is logged in and has pending package
-    setTimeout(() => {
-      const currentUserState = currentUser; // Use the current state value
-      if (
-        currentUserState &&
-        currentUserState.email &&
-        pendingPackageId &&
-        !currentUserState.id.startsWith("guest-")
-      ) {
-        processPurchase(pendingPackageId);
-        setPendingPackageId(null);
-      }
-    }, 100);
   };
 
   const handleAuthSuccess = async () => {
-    // After successful auth, refresh user info
+    // After successful auth, refresh user info and set success flag
     await refreshUserCredits();
-
-    // Process purchase if there's a pending package
-    if (
-      currentUser &&
-      currentUser.email &&
-      pendingPackageId &&
-      !currentUser.id.startsWith("guest-")
-    ) {
-      processPurchase(pendingPackageId);
-      setPendingPackageId(null);
-    }
+    setAuthSuccess(true);
+    setShowAuthModal(false);
   };
+
+  if (!isOpen) return null;
 
   return (
     <>
-      {showAuthModal && (
-        <AuthModal
-          isOpen={showAuthModal}
-          onClose={handleAuthClose}
-          onSuccess={handleAuthSuccess}
-        />
-      )}
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={handleAuthClose}
+        onSuccess={handleAuthSuccess}
+      />
 
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-8 max-w-md w-full">
           <h2 className="text-2xl font-bold mb-6 text-center text-gray-900 dark:text-white">
             Buy Credits
           </h2>
+
           {isGuestUser && (
             <div className="mb-4 p-3 bg-blue-50 text-blue-700 border border-blue-100 rounded">
               <p className="font-medium">Sign in required</p>
@@ -139,11 +138,13 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
               </p>
             </div>
           )}
+
           {error && (
             <div className="mb-4 p-3 bg-red-100 text-red-700 rounded">
               {error}
             </div>
-          )}{" "}
+          )}
+
           <div className="space-y-4">
             {CREDIT_PACKAGES.map((pkg) => (
               <div
@@ -179,9 +180,11 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
               </div>
             ))}
           </div>
+
           <div className="mt-6 text-center text-xs text-gray-500 dark:text-gray-400">
             Secure payment powered by Lemon Squeezy. All purchases are final.
           </div>
+
           <button
             onClick={onClose}
             className="absolute top-2 right-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
