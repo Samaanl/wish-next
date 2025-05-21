@@ -25,6 +25,11 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
   // Check if user is a guest
   const isGuestUser = currentUser?.id?.startsWith("guest-");
 
+  // Log for debugging
+  useEffect(() => {
+    console.log("Auth modal visibility:", showAuthModal);
+  }, [showAuthModal]);
+
   // Handle auth success and process purchase
   useEffect(() => {
     const handlePendingPurchase = async () => {
@@ -55,8 +60,11 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
 
     // If user is not authenticated or is a guest user, show auth modal
     if (!currentUser || isGuestUser) {
+      console.log("Guest user detected, showing auth modal...");
       setPendingPackageId(packageId);
+      // Ensure we update the state
       setShowAuthModal(true);
+      console.log("Auth modal state set to:", true);
       return;
     }
 
@@ -104,10 +112,12 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
   };
 
   const handleAuthClose = () => {
+    console.log("Auth modal close triggered");
     setShowAuthModal(false);
   };
 
   const handleAuthSuccess = async () => {
+    console.log("Auth success triggered");
     // After successful auth, refresh user info and set success flag
     await refreshUserCredits();
     setAuthSuccess(true);
@@ -116,15 +126,32 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
 
   if (!isOpen) return null;
 
+  // Direct signin button for testing
+  const openSignInModal = () => {
+    console.log("Opening auth modal directly");
+    setShowAuthModal(true);
+  };
+
   return (
     <>
+      {/* Debugging button */}
+      <div className="fixed top-4 left-4 z-50">
+        <button
+          onClick={openSignInModal}
+          className="bg-red-500 text-white px-4 py-1 rounded text-sm"
+        >
+          Debug: Open Auth
+        </button>
+      </div>
+
+      {/* Force the AuthModal to always be in the DOM, just control visibility with isOpen prop */}
       <AuthModal
         isOpen={showAuthModal}
         onClose={handleAuthClose}
         onSuccess={handleAuthSuccess}
       />
 
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-10">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-8 max-w-md w-full">
           <h2 className="text-2xl font-bold mb-6 text-center text-gray-900 dark:text-white">
             Buy Credits
@@ -136,6 +163,12 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
               <p className="text-sm">
                 Please sign in or create an account to purchase credits.
               </p>
+              <button
+                onClick={() => setShowAuthModal(true)}
+                className="mt-2 w-full bg-blue-600 text-white py-1 px-2 rounded text-sm"
+              >
+                Sign in now
+              </button>
             </div>
           )}
 

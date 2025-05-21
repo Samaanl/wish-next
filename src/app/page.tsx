@@ -86,8 +86,16 @@ export default function Home() {
       setError("");
 
       const currentUser = await getCurrentUser();
-      if (!currentUser || !currentUser.id) {
-        throw new Error("You must be logged in to purchase credits");
+      // Check if this is a guest user
+      if (
+        !currentUser ||
+        !currentUser.id ||
+        currentUser.id.startsWith("guest-")
+      ) {
+        console.log("Guest user attempting to purchase, showing auth modal");
+        setAuthModalOpen(true);
+        setIsLoading(false);
+        return;
       }
 
       const checkoutUrl = await initializeCheckout(
