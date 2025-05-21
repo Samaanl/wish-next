@@ -25,9 +25,15 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
 
   if (!isOpen) return null;
 
+  // Check if user is a guest
+  const isGuestUser = currentUser?.id?.startsWith("guest-");
+
   const handlePurchase = async (packageId: string) => {
-    // If user is not authenticated or has no email, show auth modal
-    if (!currentUser || !currentUser.email) {
+    // Clear previous errors
+    setError("");
+
+    // If user is not authenticated or is a guest user, show auth modal
+    if (!currentUser || isGuestUser) {
       setPendingPackageId(packageId);
       setShowAuthModal(true);
       return;
@@ -48,7 +54,7 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
     setError("");
 
     try {
-      if (!currentUser || !currentUser.email) {
+      if (!currentUser || !currentUser.email || isGuestUser) {
         throw new Error(
           "You must be logged in with a valid email to purchase credits"
         );
@@ -81,7 +87,13 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
 
     // After auth modal closes, check if user is logged in and has pending package
     setTimeout(() => {
-      if (currentUser && currentUser.email && pendingPackageId) {
+      const currentUserState = currentUser; // Use the current state value
+      if (
+        currentUserState &&
+        currentUserState.email &&
+        pendingPackageId &&
+        !currentUserState.id.startsWith("guest-")
+      ) {
         processPurchase(pendingPackageId);
         setPendingPackageId(null);
       }
@@ -89,8 +101,16 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
   };
 
   const handleAuthSuccess = async () => {
-    if (currentUser && currentUser.email && pendingPackageId) {
-      await refreshUserCredits();
+    // After successful auth, refresh user info
+    await refreshUserCredits();
+
+    // Process purchase if there's a pending package
+    if (
+      currentUser &&
+      currentUser.email &&
+      pendingPackageId &&
+      !currentUser.id.startsWith("guest-")
+    ) {
       processPurchase(pendingPackageId);
       setPendingPackageId(null);
     }
@@ -111,6 +131,14 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
           <h2 className="text-2xl font-bold mb-6 text-center text-gray-900 dark:text-white">
             Buy Credits
           </h2>
+          {isGuestUser && (
+            <div className="mb-4 p-3 bg-blue-50 text-blue-700 border border-blue-100 rounded">
+              <p className="font-medium">Sign in required</p>
+              <p className="text-sm">
+                Please sign in or create an account to purchase credits.
+              </p>
+            </div>
+          )}
           {error && (
             <div className="mb-4 p-3 bg-red-100 text-red-700 rounded">
               {error}
@@ -134,7 +162,7 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
                 </div>
 
                 <div className="text-gray-500 dark:text-gray-400 text-sm mb-4">
-                  Best for users who need occasional wishes.
+                  {pkg.description}
                 </div>
 
                 <button
@@ -142,7 +170,11 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
                   disabled={isLoading}
                   className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded font-medium transition disabled:opacity-50 cursor-pointer"
                 >
-                  {isLoading ? "Processing..." : "Buy Now"}
+                  {isLoading
+                    ? "Processing..."
+                    : isGuestUser
+                    ? "Sign in to Buy"
+                    : "Buy Now"}
                 </button>
               </div>
             ))}

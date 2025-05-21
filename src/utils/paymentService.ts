@@ -68,6 +68,11 @@ export const initializeCheckout = async (
       );
     }
 
+    // Check if this is a guest user
+    if (userId.startsWith("guest-")) {
+      throw new Error("Please sign up or log in to purchase credits");
+    }
+
     console.log("Making API request with:", {
       packageId: selectedPackage.lemonSqueezyId,
       userId,
@@ -98,13 +103,24 @@ export const initializeCheckout = async (
   } catch (error: unknown) {
     console.error("Error initializing checkout:", error);
     if (error && typeof error === "object" && "response" in error) {
-      console.error(
-        "Response error data:",
-        (error as { response?: { data?: { error?: string } } }).response?.data
-      );
+      const responseError = error as {
+        response?: {
+          data?: {
+            error?: string;
+            isGuestUser?: boolean;
+          };
+        };
+      };
+
+      console.error("Response error data:", responseError.response?.data);
+
+      // Handle guest user error - throw specific error
+      if (responseError.response?.data?.isGuestUser) {
+        throw new Error("Please sign up or log in to purchase credits");
+      }
+
       throw new Error(
-        (error as { response?: { data?: { error?: string } } }).response?.data
-          ?.error || "Payment service error"
+        responseError.response?.data?.error || "Payment service error"
       );
     }
     throw error;

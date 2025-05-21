@@ -36,6 +36,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Check if this is a guest user
+    if (userId.startsWith("guest-")) {
+      console.error("Guest user attempted to make a purchase:", userId);
+      return NextResponse.json(
+        {
+          error:
+            "Guest users cannot make purchases. Please sign up or log in to purchase credits.",
+          isGuestUser: true,
+        },
+        { status: 403 }
+      );
+    }
+
     if (!LEMON_SQUEEZY_API_KEY || !LEMON_SQUEEZY_STORE_ID) {
       console.error("Missing Lemon Squeezy configuration");
       return NextResponse.json(
