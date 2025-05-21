@@ -65,6 +65,9 @@ export async function POST(request: NextRequest) {
     }
 
     try {
+      // Make sure any credits value is converted to a string
+      const credits = custom?.credits ? String(custom.credits) : "0";
+
       const checkoutPayload = {
         data: {
           type: "checkouts",
@@ -75,7 +78,7 @@ export async function POST(request: NextRequest) {
               custom: {
                 user_id: userId,
                 package_id: custom?.package_id || packageId,
-                credits: custom?.credits || 0,
+                credits: credits,
               },
             },
             product_options: {

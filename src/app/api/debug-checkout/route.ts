@@ -22,7 +22,7 @@ export async function GET() {
             custom: {
               user_id: "test_user_id",
               package_id: "basic",
-              credits: 10,
+              credits: "10",
             },
           },
           product_options: {

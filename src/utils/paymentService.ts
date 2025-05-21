@@ -80,7 +80,7 @@ export const initializeCheckout = async (
       custom: {
         user_id: userId,
         package_id: packageId,
-        credits: selectedPackage.credits,
+        credits: String(selectedPackage.credits),
       },
     });
 
@@ -92,7 +92,7 @@ export const initializeCheckout = async (
       custom: {
         user_id: userId,
         package_id: packageId,
-        credits: selectedPackage.credits,
+        credits: String(selectedPackage.credits),
       },
     });
 
@@ -140,7 +140,7 @@ export const processSuccessfulPurchase = async (
       userId,
       packageId,
       amount,
-      credits,
+      credits: String(credits),
     });
 
     return response.data;
