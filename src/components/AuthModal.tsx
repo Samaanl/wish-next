@@ -64,9 +64,12 @@ const AuthModal: React.FC<AuthModalProps> = ({
     setIsLoading(true);
 
     try {
+      console.log("Starting Google sign-in flow");
       await signInWithGoogle();
-      // Note: The success callback will happen after redirect
+      // Note: The browser will be redirected by signInWithGoogle,
+      // so the following code will not execute unless there's an error
     } catch (err: Error | unknown) {
+      console.error("Google authentication failed locally:", err);
       setError(
         err instanceof Error
           ? err.message

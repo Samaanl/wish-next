@@ -30,54 +30,6 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
     console.log("Auth modal visibility:", showAuthModal);
   }, [showAuthModal]);
 
-  // Handle auth success and process purchase
-  useEffect(() => {
-    const handlePendingPurchase = async () => {
-      // Only proceed if we had an auth success and have a pending package
-      if (
-        authSuccess &&
-        pendingPackageId &&
-        currentUser &&
-        !currentUser.id.startsWith("guest-")
-      ) {
-        setAuthSuccess(false); // Reset the auth success flag
-
-        if (onPurchase) {
-          onPurchase(pendingPackageId);
-        } else {
-          await processPurchase(pendingPackageId);
-        }
-        setPendingPackageId(null);
-      }
-    };
-
-    handlePendingPurchase();
-  }, [authSuccess, currentUser, pendingPackageId, onPurchase]);
-
-  const handlePurchase = async (packageId: string) => {
-    // Clear previous errors
-    setError("");
-
-    // If user is not authenticated or is a guest user, show auth modal
-    if (!currentUser || isGuestUser) {
-      console.log("Guest user detected, showing auth modal...");
-      setPendingPackageId(packageId);
-      // Ensure we update the state
-      setShowAuthModal(true);
-      console.log("Auth modal state set to:", true);
-      return;
-    }
-
-    // If parent component provided an onPurchase handler, use it
-    if (onPurchase) {
-      onPurchase(packageId);
-      return;
-    }
-
-    // Otherwise use the default processing
-    await processPurchase(packageId);
-  };
-
   const processPurchase = async (packageId: string) => {
     setIsLoading(true);
     setError("");
@@ -109,6 +61,54 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
       );
       setIsLoading(false);
     }
+  };
+
+  // Handle auth success and process purchase
+  useEffect(() => {
+    const handlePendingPurchase = async () => {
+      // Only proceed if we had an auth success and have a pending package
+      if (
+        authSuccess &&
+        pendingPackageId &&
+        currentUser &&
+        !currentUser.id.startsWith("guest-")
+      ) {
+        setAuthSuccess(false); // Reset the auth success flag
+
+        if (onPurchase) {
+          onPurchase(pendingPackageId);
+        } else {
+          await processPurchase(pendingPackageId);
+        }
+        setPendingPackageId(null);
+      }
+    };
+
+    handlePendingPurchase();
+  }, [authSuccess, currentUser, pendingPackageId, onPurchase, processPurchase]);
+
+  const handlePurchase = async (packageId: string) => {
+    // Clear previous errors
+    setError("");
+
+    // If user is not authenticated or is a guest user, show auth modal
+    if (!currentUser || isGuestUser) {
+      console.log("Guest user detected, showing auth modal...");
+      setPendingPackageId(packageId);
+      // Ensure we update the state
+      setShowAuthModal(true);
+      console.log("Auth modal state set to:", true);
+      return;
+    }
+
+    // If parent component provided an onPurchase handler, use it
+    if (onPurchase) {
+      onPurchase(packageId);
+      return;
+    }
+
+    // Otherwise use the default processing
+    await processPurchase(packageId);
   };
 
   const handleAuthClose = () => {

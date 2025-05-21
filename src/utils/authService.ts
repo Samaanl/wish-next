@@ -157,12 +157,22 @@ export const createUserInDatabase = async (
 
 export const signInWithGoogle = async () => {
   try {
-    const session = await account.createOAuth2Session(
+    console.log("Starting Google OAuth flow");
+    // Remove any previous guest user when starting OAuth flow
+    localStorage.removeItem(GUEST_USER_KEY);
+
+    const callbackUrl = `${window.location.origin}/auth/callback`;
+    console.log("OAuth callback URL:", callbackUrl);
+
+    // Start the OAuth flow - this will redirect the browser
+    await account.createOAuth2Session(
       OAuthProvider.Google,
-      `${window.location.origin}/auth/callback`,
-      `${window.location.origin}/auth/callback`
+      callbackUrl,
+      `${window.location.origin}/auth/callback?error=failed`
     );
-    return session;
+
+    // This will never be reached in normal flow since the browser redirects
+    return true;
   } catch (error: Error | unknown) {
     console.error("Google sign in error:", error);
     throw error instanceof Error

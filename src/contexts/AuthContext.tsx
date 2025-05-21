@@ -26,6 +26,7 @@ interface AuthContextType {
   signInAnon: () => Promise<UserData | null>;
   updateCurrentUser: (user: UserData) => void;
   refreshUserCredits: () => Promise<void>;
+  refreshUserSession: () => Promise<UserData | null>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -47,6 +48,10 @@ const AuthContext = createContext<AuthContextType>({
   updateCurrentUser: () => {},
   refreshUserCredits: async () => {
     throw new Error("Not implemented");
+  },
+  refreshUserSession: async () => {
+    throw new Error("Not implemented");
+    return null;
   },
 });
 
@@ -181,6 +186,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
+  // Force refresh the entire user session - useful after OAuth login
+  const refreshUserSession = async () => {
+    setIsLoading(true);
+    try {
+      console.log("Refreshing user session after OAuth...");
+
+      // Force a fresh fetch of user data from Appwrite
+      const user = await getCurrentUser();
+      console.log("Refreshed user data:", user);
+
+      if (user && !user.isGuest) {
+        // Remove guest user from localStorage when we get a valid logged in user
+        localStorage.removeItem(GUEST_USER_KEY);
+
+        // Update state with the newly fetched user
+        setCurrentUser(user);
+        console.log("User session updated with:", user.name || user.email);
+        return user;
+      } else {
+        // If we didn't get a valid user, keep existing user or fall back to guest
+        console.warn("OAuth refresh did not return a valid user");
+        if (!currentUser) {
+          const guestUser = getGuestUser();
+          setCurrentUser(guestUser);
+        }
+        return null;
+      }
+    } catch (error) {
+      console.error("Error refreshing user session:", error);
+      // Fall back to guest user on error
+      const guestUser = getGuestUser();
+      setCurrentUser(guestUser);
+      return null;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const value = {
     currentUser,
     isLoading,
@@ -190,6 +233,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     signInAnon,
     updateCurrentUser,
     refreshUserCredits,
+    refreshUserSession,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

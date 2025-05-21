@@ -7,19 +7,20 @@ import { useAuth } from "@/contexts/AuthContext";
 export default function AuthCallback() {
   const [status, setStatus] = useState("Loading...");
   const router = useRouter();
-  const { currentUser } = useAuth();
+  const { refreshUserSession } = useAuth();
 
   useEffect(() => {
     const handleCallback = async () => {
       try {
-        // No need to do anything here, Appwrite automatically handles the session
-        // Just wait for the currentUser to be set in the AuthContext
-        if (currentUser) {
-          setStatus("Authentication successful! Redirecting...");
-          setTimeout(() => {
-            router.push("/");
-          }, 1000);
-        }
+        setStatus("Processing authentication...");
+
+        // Force refresh the user session to get the latest data after OAuth login
+        await refreshUserSession();
+
+        setStatus("Authentication successful! Redirecting...");
+        setTimeout(() => {
+          router.push("/");
+        }, 1000);
       } catch (error) {
         console.error("Auth callback error:", error);
         setStatus("Authentication failed. Redirecting to homepage...");
@@ -30,7 +31,7 @@ export default function AuthCallback() {
     };
 
     handleCallback();
-  }, [currentUser, router]);
+  }, [router, refreshUserSession]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
