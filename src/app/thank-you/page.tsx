@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useState, Suspense, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import CelebrationEffects from "@/components/CelebrationEffects";
 import axios, { AxiosError } from "axios";
-import { CREDIT_PACKAGES } from "@/utils/paymentService";
+import { CREDIT_PACKAGES, getStoredCheckoutInfo } from "@/utils/paymentService";
 import { getCurrentUser } from "@/utils/authService";
 
 // Define types
@@ -38,7 +38,64 @@ interface DebugInfo {
   packageCredits: number;
   sessionId: string | null;
   authInfo?: AuthInfo;
+  manualProcessAttempted?: boolean;
+  manualProcessResult?: {
+    success: boolean;
+    newBalance?: number;
+    message?: string;
+    [key: string]: unknown;
+  };
 }
+
+// Add a helper function to make authenticated API calls with user ID in header
+const makeAuthenticatedRequest = async (
+  url: string,
+  data: Record<string, unknown> | null = null,
+  method: string = "GET"
+) => {
+  // Get user ID from wherever available
+  let userId = null;
+
+  // Try from currentUser context
+  const currentUserObj = window.localStorage.getItem("currentUser");
+  if (currentUserObj) {
+    try {
+      const user = JSON.parse(currentUserObj);
+      userId = user.id;
+    } catch (_) {
+      // Ignore parsing errors
+    }
+  }
+
+  // Try from checkoutUserInfo if available
+  const checkoutInfo = window.localStorage.getItem("checkoutUserInfo");
+  if (checkoutInfo && !userId) {
+    try {
+      const info = JSON.parse(checkoutInfo);
+      userId = info.id;
+    } catch (_) {
+      // Ignore parsing errors
+    }
+  }
+
+  // Create request config
+  const config = {
+    headers: userId ? { "x-user-id": userId } : {},
+    method,
+    ...(data && method !== "GET" ? { data } : {}),
+  };
+
+  console.log(
+    `Making ${method} request to ${url} with user ID: ${userId || "none"}`
+  );
+
+  // Make the request
+  if (method === "GET") {
+    return axios.get(url, config);
+  } else {
+    return axios.post(url, data, config);
+  }
+};
 
 function ThankYouContent() {
   const { currentUser, refreshUserCredits, refreshUserSession } = useAuth();
@@ -56,6 +113,117 @@ function ThankYouContent() {
   const [initialCredits, setInitialCredits] = useState<number | null>(null);
   const [finalCredits, setFinalCredits] = useState<number | null>(null);
 
+  // Direct update function - doesn't require authentication check first
+  const directCreditUpdate = useCallback(async () => {
+    try {
+      setProcessingStatus("Directly processing purchase...");
+
+      // Find the corresponding package first
+      const selectedPackage = CREDIT_PACKAGES.find(
+        (pkg) => pkg.id === packageId
+      );
+      const packageCredits = selectedPackage?.credits || 10;
+
+      // Get user data - either from context, localStorage checkout info, or general localStorage as fallback
+      let userId = currentUser?.id;
+      let userEmail = currentUser?.email;
+
+      if (!userId) {
+        // First try to get from checkout-specific localStorage
+        const checkoutInfo = getStoredCheckoutInfo();
+        if (checkoutInfo && checkoutInfo.id) {
+          console.log("Using stored checkout info:", checkoutInfo);
+          userId = checkoutInfo.id;
+          userEmail = checkoutInfo.email;
+        } else {
+          // Try to get from general localStorage as fallback
+          const storedUser = localStorage.getItem("currentUser");
+          if (storedUser) {
+            try {
+              const parsedUser = JSON.parse(storedUser);
+              userId = parsedUser.id;
+              userEmail = parsedUser.email;
+            } catch (_) {
+              // Ignore parsing errors
+            }
+          }
+        }
+      }
+
+      if (!userId) {
+        throw new Error("Cannot identify user for credit update");
+      }
+
+      console.log("Attempting direct credit update for user:", userId);
+
+      // Call manual processing endpoint with direct user ID
+      const response = await makeAuthenticatedRequest(
+        "/api/process-purchase",
+        {
+          userId,
+          userEmail,
+          packageId,
+          amount: selectedPackage?.price || 1,
+          credits: packageCredits,
+          directUpdate: true, // Signal this is a direct update
+        } as Record<string, unknown>,
+        "POST"
+      );
+
+      // Update debug info
+      setDebugInfo((prev) => ({
+        ...(prev || {
+          packageId,
+          sessionId,
+          packageCredits: packageCredits,
+        }),
+        userId,
+        userEmail,
+        manualProcessAttempted: true,
+        manualProcessResult: response.data,
+      }));
+
+      if (response.data.success) {
+        setProcessingStatus("Credits added successfully!");
+
+        // Refresh user data
+        await refreshUserCredits();
+
+        // Get fresh user data
+        const updatedUser = await getCurrentUser();
+        if (updatedUser) {
+          setFinalCredits(updatedUser.credits);
+        }
+
+        setIsLoading(false);
+      } else {
+        throw new Error(response.data.error || "Unknown error");
+      }
+    } catch (error) {
+      const err = error as Error;
+      console.error("Direct credit update failed:", err);
+      setProcessingStatus(
+        "Error updating credits. Please try the Retry button."
+      );
+      setErrorDetails({
+        message: err.message,
+        stack: err.stack,
+        response: error instanceof AxiosError ? error.response?.data : null,
+      });
+      setIsLoading(false);
+    }
+  }, [
+    currentUser,
+    packageId,
+    sessionId,
+    refreshUserCredits,
+    setDebugInfo,
+    setErrorDetails,
+    setFinalCredits,
+    setIsLoading,
+    setProcessingStatus,
+  ]);
+
   useEffect(() => {
     // If there's no session ID, redirect to homepage
     if (!sessionId) {
@@ -72,7 +240,7 @@ function ThankYouContent() {
         await refreshUserSession();
 
         // Check current auth status via API
-        const authResponse = await axios.get("/api/check-auth");
+        const authResponse = await makeAuthenticatedRequest("/api/check-auth");
         console.log("Auth check result:", authResponse.data);
 
         // Update debug info with auth information
@@ -91,37 +259,33 @@ function ThankYouContent() {
           });
         }
 
-        // If not authenticated, try another refresh or show error
+        // If not authenticated, try direct update without authentication
         if (!authResponse.data.authenticated) {
-          console.warn("Not authenticated, trying to refresh session again");
-          await refreshUserSession();
-
-          // If still not authenticated after refresh, show error
-          if (!currentUser || currentUser.isGuest) {
-            setProcessingStatus(
-              "Authentication error. Please try signing in again."
-            );
-            setErrorDetails({
-              message: "Session expired or not authenticated",
-              response: authResponse.data,
-            });
-            setIsLoading(false);
-            return;
-          }
+          console.warn("Not authenticated, trying direct credit update");
+          await directCreditUpdate();
+          return;
         }
 
         // Continue with credit processing
         await processCredits();
       } catch (error) {
         console.error("Auth check error:", error);
-        setProcessingStatus(
-          "Authentication error. Please try signing in again."
-        );
-        setErrorDetails({
-          message: error instanceof Error ? error.message : "Unknown error",
-          response: error instanceof AxiosError ? error.response?.data : null,
-        });
-        setIsLoading(false);
+
+        // Try direct update as fallback
+        try {
+          console.log("Auth check failed, trying direct update as fallback");
+          await directCreditUpdate();
+        } catch (_) {
+          // Authentication error fallback
+          setProcessingStatus(
+            "Authentication error. Please try signing in again."
+          );
+          setErrorDetails({
+            message: error instanceof Error ? error.message : "Unknown error",
+            response: error instanceof AxiosError ? error.response?.data : null,
+          });
+          setIsLoading(false);
+        }
       }
     };
 
@@ -163,34 +327,33 @@ function ThankYouContent() {
           setCreditsRefreshed(true);
           setProcessingStatus("Processing your purchase...");
 
-          // Check if credits need to be added manually
-          if (user.credits === initialCredits) {
-            console.log("Credits unchanged, processing manually");
+          // Force manual processing regardless of current credits
+          console.log("Processing credits manually");
 
-            // Call manual processing endpoint
-            const response = await axios.post("/api/process-purchase", {
+          // Call manual processing endpoint
+          const response = await makeAuthenticatedRequest(
+            "/api/process-purchase",
+            {
               userId: user.id,
               packageId: packageId,
               amount: selectedPackage?.price || 1,
               credits: packageCredits,
-            });
+              forceUpdate: true,
+            },
+            "POST"
+          );
 
-            if (response.data.success) {
-              setProcessingStatus("Credits added successfully!");
+          if (response.data.success) {
+            setProcessingStatus("Credits added successfully!");
 
-              // Refresh user data again
-              await refreshUserCredits();
+            // Refresh user data again
+            await refreshUserCredits();
 
-              // Get fresh credits
-              const updatedUser = await getCurrentUser();
-              setFinalCredits(updatedUser?.credits || 0);
-            } else {
-              throw new Error(response.data.error || "Unknown error");
-            }
+            // Get fresh credits
+            const updatedUser = await getCurrentUser();
+            setFinalCredits(updatedUser?.credits || 0);
           } else {
-            // Credits already updated via webhook
-            setProcessingStatus("Credits have been added to your account!");
-            setFinalCredits(user.credits);
+            throw new Error(response.data.error || "Unknown error");
           }
         }
 
@@ -220,6 +383,7 @@ function ThankYouContent() {
     initialCredits,
     creditsRefreshed,
     debugInfo,
+    directCreditUpdate,
   ]);
 
   const handleRetry = async () => {
@@ -231,23 +395,56 @@ function ThankYouContent() {
 
       // Get fresh user for retry
       const freshUser = await getCurrentUser();
-      if (!freshUser || freshUser.isGuest) {
-        throw new Error("You must be logged in to complete this purchase");
-      }
 
-      // Call manual processing with explicit user data
+      // Find the package
       const selectedPackage = CREDIT_PACKAGES.find(
         (pkg) => pkg.id === packageId
       );
       const packageCredits = selectedPackage?.credits || 10;
 
-      const response = await axios.post("/api/process-purchase", {
-        userId: freshUser.id,
-        packageId: packageId,
-        amount: selectedPackage?.price || 1,
-        credits: packageCredits,
-        isRetry: true,
-      });
+      // Try direct update with localStorage fallback
+      let userId = freshUser?.id;
+      let userEmail = freshUser?.email;
+
+      if (!userId) {
+        // First try to get from checkout-specific localStorage
+        const checkoutInfo = getStoredCheckoutInfo();
+        if (checkoutInfo && checkoutInfo.id) {
+          console.log("Using stored checkout info for retry:", checkoutInfo);
+          userId = checkoutInfo.id;
+          userEmail = checkoutInfo.email;
+        } else {
+          // Try to get from localStorage as general fallback
+          const storedUser = localStorage.getItem("currentUser");
+          if (storedUser) {
+            try {
+              const parsedUser = JSON.parse(storedUser);
+              userId = parsedUser.id;
+              userEmail = parsedUser.email;
+            } catch (e) {
+              console.error("Failed to parse stored user:", e);
+            }
+          }
+        }
+      }
+
+      if (!userId) {
+        throw new Error("You must be logged in to complete this purchase");
+      }
+
+      const response = await makeAuthenticatedRequest(
+        "/api/process-purchase",
+        {
+          userId: userId,
+          userEmail: userEmail,
+          packageId: packageId,
+          amount: selectedPackage?.price || 1,
+          credits: packageCredits,
+          isRetry: true,
+          forceUpdate: true,
+        },
+        "POST"
+      );
 
       if (response.data.success) {
         setProcessingStatus("Credits added successfully on retry!");

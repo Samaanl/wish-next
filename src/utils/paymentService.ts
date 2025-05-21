@@ -98,6 +98,24 @@ export const initializeCheckout = async (
       throw new Error("Please sign up or log in to purchase credits");
     }
 
+    // Save user info to localStorage for after-checkout recovery
+    try {
+      localStorage.setItem(
+        "checkoutUserInfo",
+        JSON.stringify({
+          id: finalUserId,
+          email: finalUserEmail,
+          package: packageId,
+          credits: selectedPackage.credits,
+          timestamp: new Date().toISOString(),
+        })
+      );
+      console.log("Saved checkout info to localStorage for recovery");
+    } catch (storageError) {
+      console.error("Failed to save to localStorage:", storageError);
+      // Non-critical error, continue with checkout
+    }
+
     console.log("Making API request with:", {
       packageId: selectedPackage.lemonSqueezyId,
       userId: finalUserId,
@@ -173,4 +191,17 @@ export const processSuccessfulPurchase = async (
     console.error("Error processing purchase:", error);
     throw error;
   }
+};
+
+// Get user info from localStorage if available (for recovery after payment)
+export const getStoredCheckoutInfo = () => {
+  try {
+    const storedInfo = localStorage.getItem("checkoutUserInfo");
+    if (storedInfo) {
+      return JSON.parse(storedInfo);
+    }
+  } catch (e) {
+    console.error("Failed to retrieve checkout info:", e);
+  }
+  return null;
 };
