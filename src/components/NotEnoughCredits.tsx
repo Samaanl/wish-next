@@ -17,7 +17,7 @@ const NotEnoughCredits: React.FC<NotEnoughCreditsProps> = ({
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 md:p-8 text-center">
       <div className="text-5xl mb-4">😢</div>
       <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-4">
-        You've Run Out of Credits
+        You&apos;ve Run Out of Credits
       </h2>
 
       {isGuestUser ? (

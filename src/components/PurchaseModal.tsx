@@ -15,7 +15,7 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
   onClose,
   onPurchase,
 }) => {
-  const { currentUser } = useAuth();
+  const { currentUser, refreshUserCredits } = useAuth();
   const [isLoading, setIsLoading] = React.useState(false);
   const [error, setError] = React.useState("");
   const [showAuthModal, setShowAuthModal] = React.useState(false);
@@ -75,17 +75,25 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
       setIsLoading(false);
     }
   };
+
   const handleAuthClose = () => {
     setShowAuthModal(false);
 
     // After auth modal closes, check if user is logged in and has pending package
     setTimeout(() => {
-      const updatedUser = useAuth().currentUser;
-      if (updatedUser && updatedUser.email && pendingPackageId) {
+      if (currentUser && currentUser.email && pendingPackageId) {
         processPurchase(pendingPackageId);
         setPendingPackageId(null);
       }
     }, 100);
+  };
+
+  const handleAuthSuccess = async () => {
+    if (currentUser && currentUser.email && pendingPackageId) {
+      await refreshUserCredits();
+      processPurchase(pendingPackageId);
+      setPendingPackageId(null);
+    }
   };
 
   return (
@@ -94,13 +102,7 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
         <AuthModal
           isOpen={showAuthModal}
           onClose={handleAuthClose}
-          onSuccess={() => {
-            const updatedUser = useAuth().currentUser;
-            if (updatedUser && updatedUser.email && pendingPackageId) {
-              processPurchase(pendingPackageId);
-              setPendingPackageId(null);
-            }
-          }}
+          onSuccess={handleAuthSuccess}
         />
       )}
 
