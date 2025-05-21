@@ -156,6 +156,11 @@ function ThankYouContent() {
 
       console.log("Attempting direct credit update for user:", userId);
 
+      // Generate a transaction ID using sessionId + packageId and timestamp to ensure uniqueness
+      const transactionId = `tx_${
+        sessionId || "unknown"
+      }_${packageId}_${Date.now()}`;
+
       // Call manual processing endpoint with direct user ID
       const response = await makeAuthenticatedRequest(
         "/api/process-purchase",
@@ -165,7 +170,8 @@ function ThankYouContent() {
           packageId,
           amount: selectedPackage?.price || 1,
           credits: packageCredits,
-          directUpdate: true, // Signal this is a direct update
+          directUpdate: true,
+          transactionId, // Add transaction ID for idempotency
         } as Record<string, unknown>,
         "POST"
       );
@@ -330,6 +336,11 @@ function ThankYouContent() {
           // Force manual processing regardless of current credits
           console.log("Processing credits manually");
 
+          // Generate a transaction ID using sessionId + packageId and timestamp to ensure uniqueness
+          const transactionId = `tx_${
+            sessionId || "unknown"
+          }_${packageId}_${Date.now()}`;
+
           // Call manual processing endpoint
           const response = await makeAuthenticatedRequest(
             "/api/process-purchase",
@@ -339,6 +350,7 @@ function ThankYouContent() {
               amount: selectedPackage?.price || 1,
               credits: packageCredits,
               forceUpdate: true,
+              transactionId, // Add transaction ID for idempotency
             },
             "POST"
           );
@@ -432,6 +444,11 @@ function ThankYouContent() {
         throw new Error("You must be logged in to complete this purchase");
       }
 
+      // Generate a transaction ID using sessionId + packageId and timestamp to ensure uniqueness
+      const transactionId = `tx_retry_${
+        sessionId || "unknown"
+      }_${packageId}_${Date.now()}`;
+
       const response = await makeAuthenticatedRequest(
         "/api/process-purchase",
         {
@@ -442,6 +459,7 @@ function ThankYouContent() {
           credits: packageCredits,
           isRetry: true,
           forceUpdate: true,
+          transactionId, // Add transaction ID for idempotency
         },
         "POST"
       );

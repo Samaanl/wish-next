@@ -67,6 +67,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     const checkUser = async () => {
       setIsLoading(true);
       try {
+        // First try to get the stored user from localStorage
+        const storedUserJson = localStorage.getItem("currentUser");
+        let storedUser = null;
+
+        if (storedUserJson) {
+          try {
+            storedUser = JSON.parse(storedUserJson);
+            console.log("Found user in localStorage:", storedUser.email);
+          } catch (e) {
+            console.error("Error parsing stored user:", e);
+          }
+        }
+
+        // If we have a stored non-guest user, verify it still exists in Appwrite
+        if (storedUser && !storedUser.isGuest) {
+          try {
+            // Verify this user with Appwrite
+            const appwriteUser = await getCurrentUser();
+
+            if (appwriteUser && appwriteUser.id === storedUser.id) {
+              console.log(
+                "Verified stored user with Appwrite:",
+                appwriteUser.email
+              );
+              setCurrentUser(appwriteUser);
+              setIsLoading(false);
+              return;
+            }
+          } catch (error) {
+            console.warn("Could not verify stored user with Appwrite:", error);
+            // Will continue to fallback methods
+          }
+        }
+
         // Always create a guest user first if needed
         if (!localStorage.getItem(GUEST_USER_KEY)) {
           const newGuestUser = getGuestUser();

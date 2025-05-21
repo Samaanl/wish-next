@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { addCredits, recordPurchase } from "@/utils/creditService";
 import { databases, DATABASE_ID, USERS_COLLECTION_ID } from "@/utils/appwrite";
-import { ID } from "appwrite";
+import { ID, Query } from "appwrite";
 
 // Define error type
 interface AppError extends Error {
@@ -51,7 +51,8 @@ async function recordPurchaseInDatabase(
   userId: string,
   packageId: string,
   amount: number,
-  credits: number
+  credits: number,
+  transactionId?: string
 ) {
   const PURCHASES_COLLECTION_ID = "purchases";
 
@@ -61,25 +62,90 @@ async function recordPurchaseInDatabase(
       packageId,
       amount,
       credits,
+      transactionId,
     });
 
-    // Create a purchase record
-    const purchase = await databases.createDocument(
-      DATABASE_ID,
-      PURCHASES_COLLECTION_ID,
-      ID.unique(),
-      {
-        user_id: userId,
-        package_id: packageId,
-        amount: amount,
-        credits: credits,
-        timestamp: new Date().toISOString(),
-        status: "completed",
-      }
-    );
+    // Use provided transaction ID or generate a unique one
+    const purchaseId =
+      transactionId ||
+      `purchase_${userId}_${Date.now()}_${Math.random()
+        .toString(36)
+        .substring(2, 7)}`;
 
-    console.log("Purchase record created:", purchase.$id);
-    return purchase;
+    // First check if this purchase already exists to avoid conflicts
+    try {
+      // We'll query for documents with this user and similar timestamp
+      const existingPurchases = await databases.listDocuments(
+        DATABASE_ID,
+        PURCHASES_COLLECTION_ID,
+        [
+          // Use user ID to filter purchases
+          Query.equal("user_id", userId),
+          // Use packageId to filter purchases
+          Query.equal("package_id", packageId),
+          // Sort by created date to get the most recent purchase
+          Query.orderDesc("$createdAt"),
+          // Limit to 5 most recent purchases
+          Query.limit(5),
+        ]
+      );
+
+      // If recent purchases exist, check if one of them is a duplicate
+      if (existingPurchases.total > 0) {
+        // Check the most recent purchase to see if it's very recent (last 10 minutes)
+        const mostRecentPurchase = existingPurchases.documents[0];
+        const purchaseTime = new Date(mostRecentPurchase.$createdAt).getTime();
+        const currentTime = Date.now();
+        const timeDiff = currentTime - purchaseTime;
+
+        // If purchase exists in the last 10 minutes, don't create another one
+        if (timeDiff < 10 * 60 * 1000) {
+          console.log(
+            "Found recent purchase, skipping duplicate:",
+            mostRecentPurchase.$id
+          );
+          return mostRecentPurchase;
+        }
+      }
+    } catch (error) {
+      console.log("Error checking for existing purchases:", error);
+      // Continue with purchase creation even if check fails
+    }
+
+    // Create a purchase record with the unique ID
+    try {
+      const purchase = await databases.createDocument(
+        DATABASE_ID,
+        PURCHASES_COLLECTION_ID,
+        purchaseId,
+        {
+          user_id: userId,
+          package_id: packageId,
+          amount: Math.round(amount), // Convert to integer as the field is integer type
+          credits: credits,
+          // Don't include timestamp as the collection uses created_at datetime field
+          // Don't include status as it doesn't exist in the collection
+          // Don't include transaction_id as it doesn't exist in the collection
+        }
+      );
+
+      console.log("Purchase record created:", purchase.$id);
+      return purchase;
+    } catch (error) {
+      // Handle document ID conflict specifically
+      if (
+        error &&
+        typeof error === "object" &&
+        "code" in error &&
+        error.code === 409
+      ) {
+        console.log("Purchase record already exists with ID:", purchaseId);
+        // Not a critical error for the overall flow
+        return { $id: purchaseId, status: "already_exists" };
+      }
+
+      throw error;
+    }
   } catch (error) {
     console.error("Failed to record purchase:", error);
     // Non-critical error, don't throw
@@ -103,7 +169,13 @@ export async function POST(request: NextRequest) {
       forceUpdate,
       directUpdate,
       isRetry,
+      transactionId,
     } = body;
+
+    // Generate or use transaction ID for idempotency
+    const processingId =
+      transactionId || `tx_${userId}_${packageId}_${Date.now()}`;
+
     console.log("Purchase details:", {
       userId,
       userEmail,
@@ -113,6 +185,7 @@ export async function POST(request: NextRequest) {
       forceUpdate: !!forceUpdate,
       directUpdate: !!directUpdate,
       isRetry: !!isRetry,
+      processingId,
       bodyType: typeof body,
       userIdType: typeof userId,
       creditsType: typeof credits,
@@ -138,6 +211,32 @@ export async function POST(request: NextRequest) {
       amountNumber,
       userId: typeof userId === "string" ? userId : String(userId),
     });
+
+    // Check if this transaction has already been processed to prevent duplicates
+    try {
+      // Try to fetch user data first to check current credits
+      const user = await databases.getDocument(
+        DATABASE_ID,
+        USERS_COLLECTION_ID,
+        userId
+      );
+
+      // If this is a retry and credits are already high, assume it was processed
+      if (isRetry && user.credits >= creditsNumber) {
+        console.log("Credits already added, skipping duplicate processing");
+        return NextResponse.json({
+          success: true,
+          newBalance: user.credits,
+          message: "Credits were already added (duplicate avoided)",
+          wasAlreadyProcessed: true,
+        });
+      }
+    } catch (error) {
+      console.log(
+        "Error checking user credits, will continue with processing:",
+        error
+      );
+    }
 
     // Create debug object to track each step
     const debug = {
@@ -175,7 +274,8 @@ export async function POST(request: NextRequest) {
         userId,
         packageId,
         amountNumber,
-        creditsNumber
+        creditsNumber,
+        processingId
       );
 
       return NextResponse.json({
@@ -215,7 +315,8 @@ export async function POST(request: NextRequest) {
           userId,
           packageId,
           amountNumber,
-          creditsNumber
+          creditsNumber,
+          processingId
         );
 
         return NextResponse.json({
@@ -256,7 +357,8 @@ export async function POST(request: NextRequest) {
             userId,
             packageId,
             amountNumber,
-            creditsNumber
+            creditsNumber,
+            processingId
           );
 
           return NextResponse.json({
