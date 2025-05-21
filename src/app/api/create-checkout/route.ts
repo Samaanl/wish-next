@@ -67,6 +67,7 @@ export async function POST(request: NextRequest) {
     try {
       // Make sure any credits value is converted to a string
       const credits = custom?.credits ? String(custom.credits) : "0";
+      const originalPackageId = custom?.package_id || "basic";
 
       const checkoutPayload = {
         data: {
@@ -77,14 +78,14 @@ export async function POST(request: NextRequest) {
               email: userEmail,
               custom: {
                 user_id: userId,
-                package_id: custom?.package_id || packageId,
+                package_id: originalPackageId,
                 credits: credits,
               },
             },
             product_options: {
               redirect_url: `${
                 process.env.NEXT_PUBLIC_URL || "https://wish-next.vercel.app"
-              }/thank-you?session_id={checkout_session_id}`,
+              }/thank-you?session_id={checkout_session_id}&package_id=${originalPackageId}`,
             },
           },
           relationships: {

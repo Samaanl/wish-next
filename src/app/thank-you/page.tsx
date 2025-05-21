@@ -5,13 +5,18 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import CelebrationEffects from "@/components/CelebrationEffects";
+import axios from "axios";
+import { CREDIT_PACKAGES } from "@/utils/paymentService";
 
 function ThankYouContent() {
   const { currentUser, refreshUserCredits } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const sessionId = searchParams.get("session_id");
+  const packageId = searchParams.get("package_id") || "basic"; // Default to basic if not specified
   const [isLoading, setIsLoading] = useState(true);
+  const [creditsRefreshed, setCreditsRefreshed] = useState(false);
+  const [processingStatus, setProcessingStatus] = useState<string | null>(null);
 
   useEffect(() => {
     // If there's no session ID or user, redirect to homepage
@@ -20,19 +25,63 @@ function ThankYouContent() {
       return;
     }
 
+    // Find the corresponding package
+    const selectedPackage = CREDIT_PACKAGES.find((pkg) => pkg.id === packageId);
+    const packageCredits = selectedPackage?.credits || 10; // Default to 10 if package not found
+
     // Refresh the user's credits to show the new balance
     const updateCredits = async () => {
       try {
-        await refreshUserCredits();
+        // Only try to refresh once to prevent infinite loops
+        if (!creditsRefreshed) {
+          setCreditsRefreshed(true);
+
+          // First try to refresh credits from Appwrite directly
+          await refreshUserCredits();
+
+          // If credits are still the default of 3, try to manually process
+          if (currentUser?.credits === 3) {
+            setProcessingStatus("Manually applying credits...");
+
+            // Call manual processing endpoint
+            const response = await axios.post("/api/process-purchase", {
+              userId: currentUser.id,
+              packageId: packageId,
+              amount: selectedPackage?.price || 1,
+              credits: packageCredits,
+            });
+
+            if (response.data.success) {
+              setProcessingStatus("Credits applied successfully!");
+              // Refresh again to get updated balance
+              await refreshUserCredits();
+            }
+          }
+        }
         setIsLoading(false);
       } catch (error) {
         console.error("Error refreshing credits:", error);
+        setProcessingStatus(
+          "Error processing credits. Please contact support."
+        );
         setIsLoading(false);
       }
     };
 
-    updateCredits();
-  }, [sessionId, currentUser, router, refreshUserCredits]);
+    // Add a small delay to allow processing time
+    const timer = setTimeout(() => {
+      updateCredits();
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [
+    sessionId,
+    currentUser,
+    packageId,
+    router,
+    refreshUserCredits,
+    creditsRefreshed,
+  ]);
 
   if (isLoading) {
     return (
@@ -72,6 +121,11 @@ function ThankYouContent() {
           Your credits have been added to your account. You can now create more
           amazing wishes!
         </p>
+        {processingStatus && (
+          <div className="mb-4 px-4 py-2 bg-blue-50 text-blue-700 rounded-lg">
+            {processingStatus}
+          </div>
+        )}
         <div className="mb-8 py-4 px-6 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg">
           <p className="text-gray-700 dark:text-gray-200">
             Current Balance:
