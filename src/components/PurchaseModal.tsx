@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { CREDIT_PACKAGES } from "@/utils/paymentService";
 import { initializeCheckout } from "@/utils/paymentService";
 import { useAuth } from "@/contexts/AuthContext";
@@ -30,38 +30,41 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
     console.log("Auth modal visibility:", showAuthModal);
   }, [showAuthModal]);
 
-  const processPurchase = async (packageId: string) => {
-    setIsLoading(true);
-    setError("");
+  const processPurchase = useCallback(
+    async (packageId: string) => {
+      setIsLoading(true);
+      setError("");
 
-    try {
-      if (!currentUser || !currentUser.email || isGuestUser) {
-        throw new Error(
-          "You must be logged in with a valid email to purchase credits"
+      try {
+        if (!currentUser || !currentUser.email || isGuestUser) {
+          throw new Error(
+            "You must be logged in with a valid email to purchase credits"
+          );
+        }
+
+        const checkoutUrl = await initializeCheckout(
+          packageId,
+          currentUser.id,
+          currentUser.email
         );
-      }
 
-      const checkoutUrl = await initializeCheckout(
-        packageId,
-        currentUser.id,
-        currentUser.email
-      );
-
-      if (!checkoutUrl) {
-        throw new Error("Failed to create checkout session");
+        if (!checkoutUrl) {
+          throw new Error("Failed to create checkout session");
+        }
+        // Redirect to Lemon Squeezy checkout
+        window.location.href = checkoutUrl;
+      } catch (error: unknown) {
+        console.error("Purchase error:", error);
+        setError(
+          error instanceof Error
+            ? error.message
+            : "Failed to process payment. Please try again."
+        );
+        setIsLoading(false);
       }
-      // Redirect to Lemon Squeezy checkout
-      window.location.href = checkoutUrl;
-    } catch (error: unknown) {
-      console.error("Purchase error:", error);
-      setError(
-        error instanceof Error
-          ? error.message
-          : "Failed to process payment. Please try again."
-      );
-      setIsLoading(false);
-    }
-  };
+    },
+    [currentUser, isGuestUser, setIsLoading, setError]
+  );
 
   // Handle auth success and process purchase
   useEffect(() => {

@@ -7,6 +7,7 @@ const LEMON_SQUEEZY_STORE_ID = process.env.LEMON_SQUEEZY_STORE_ID;
 
 // Log environment variables status (without revealing the actual API key)
 console.log("API key exists:", !!LEMON_SQUEEZY_API_KEY);
+console.log("API key length:", LEMON_SQUEEZY_API_KEY?.length || 0);
 console.log("Store ID:", LEMON_SQUEEZY_STORE_ID);
 
 export async function POST(request: NextRequest) {
@@ -52,35 +53,50 @@ export async function POST(request: NextRequest) {
     if (!LEMON_SQUEEZY_API_KEY || !LEMON_SQUEEZY_STORE_ID) {
       console.error("Missing Lemon Squeezy configuration");
       return NextResponse.json(
-        { error: "Payment service not properly configured" },
+        {
+          error: "Payment service not properly configured",
+          details: {
+            api_key_exists: !!LEMON_SQUEEZY_API_KEY,
+            store_id_exists: !!LEMON_SQUEEZY_STORE_ID,
+          },
+        },
         { status: 500 }
       );
     }
 
     try {
-      const response = await axios.post(
-        "https://api.lemonsqueezy.com/v1/checkouts",
-        {
-          data: {
-            type: "checkouts",
-            attributes: {
-              store_id: parseInt(LEMON_SQUEEZY_STORE_ID),
-              variant_id: parseInt(packageId), // Convert to number
-              custom_price: null, // Use the product's default price
-              checkout_data: {
-                email: userEmail,
-                custom: {
-                  user_id: userId,
-                  package_id: custom?.package_id || packageId,
-                  credits: custom?.credits || 0,
-                },
+      const checkoutPayload = {
+        data: {
+          type: "checkouts",
+          attributes: {
+            store_id: parseInt(LEMON_SQUEEZY_STORE_ID),
+            variant_id: parseInt(packageId), // Convert to number
+            custom_price: null, // Use the product's default price
+            checkout_data: {
+              email: userEmail,
+              custom: {
+                user_id: userId,
+                package_id: custom?.package_id || packageId,
+                credits: custom?.credits || 0,
               },
-              product_options: {
-                redirect_url: `${process.env.NEXT_PUBLIC_URL}/thank-you?session_id={checkout_session_id}`,
-              },
+            },
+            product_options: {
+              redirect_url: `${
+                process.env.NEXT_PUBLIC_URL || "https://wish-next.vercel.app"
+              }/thank-you?session_id={checkout_session_id}`,
             },
           },
         },
+      };
+
+      console.log(
+        "Sending checkout request to Lemon Squeezy:",
+        JSON.stringify(checkoutPayload)
+      );
+
+      const response = await axios.post(
+        "https://api.lemonsqueezy.com/v1/checkouts",
+        checkoutPayload,
         {
           headers: {
             Authorization: `Bearer ${LEMON_SQUEEZY_API_KEY}`,
@@ -106,9 +122,19 @@ export async function POST(request: NextRequest) {
         error instanceof Error ? error.message : String(error)
       );
       if (error && typeof error === "object" && "response" in error) {
-        console.error(
-          "Response error:",
-          (error as { response?: { data: unknown } }).response?.data
+        const errorResponse = (
+          error as { response?: { data: unknown; status: number } }
+        ).response;
+        console.error("Response error data:", errorResponse?.data);
+
+        // Return more detailed error information
+        return NextResponse.json(
+          {
+            error: "Failed to create checkout session",
+            status: errorResponse?.status,
+            details: errorResponse?.data,
+          },
+          { status: 500 }
         );
       }
       return NextResponse.json(
