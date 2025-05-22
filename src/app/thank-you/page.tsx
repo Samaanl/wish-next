@@ -9,7 +9,7 @@ import axios, { AxiosError } from "axios";
 import { CREDIT_PACKAGES, getStoredCheckoutInfo } from "@/utils/paymentService";
 import { getCurrentUser } from "@/utils/authService";
 
-// Define types
+// Defines types
 interface ErrorDetails {
   message: string;
   response?: unknown;
