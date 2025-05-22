@@ -34,7 +34,7 @@ export const shouldUseAppwrite = () => {
   const guestUser = localStorage.getItem("wishmaker_guest_user");
 
   if (!guestUser) {
-    // First visit, don't try Appwrite yet
+    // First visit don't try Appwrite yet
     return false;
   }
 
