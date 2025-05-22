@@ -399,16 +399,14 @@ export async function POST(request: NextRequest) {
         }
       }
     }
-  } catch (error: unknown) {
+  } catch (error) {
     const err = error as AppError;
-    console.error(
-      "Fatal error in process-purchase API route:",
-      err?.message || "Unknown error"
-    );
+    console.error("Unexpected error in POST handler:", err.message || error);
+
     return NextResponse.json(
       {
-        error: "Internal server error",
-        details: err?.message || "Unknown processing error",
+        error: "Unexpected server error",
+        details: err.message || "Unknown server error",
       },
       { status: 500 }
     );

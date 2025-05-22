@@ -188,7 +188,6 @@ function ThankYouContent() {
         manualProcessAttempted: true,
         manualProcessResult: response.data,
       }));
-
       if (response.data.success) {
         setProcessingStatus("Credits added successfully!");
 
@@ -200,6 +199,10 @@ function ThankYouContent() {
         if (updatedUser) {
           setFinalCredits(updatedUser.credits);
         }
+
+        // Mark this purchase as processed in this session to prevent duplicate processing
+        const sessionKey = `processed_${sessionId}_${packageId}`;
+        sessionStorage.setItem(sessionKey, "true");
 
         setIsLoading(false);
       } else {
@@ -229,11 +232,23 @@ function ThankYouContent() {
     setIsLoading,
     setProcessingStatus,
   ]);
-
   useEffect(() => {
     // If there's no session ID, redirect to homepage
     if (!sessionId) {
       router.push("/");
+      return;
+    }
+
+    // Check if this purchase has already been processed during this session
+    // to prevent multiple processing of the same transaction
+    const sessionKey = `processed_${sessionId}_${packageId}`;
+    const alreadyProcessed = sessionStorage.getItem(sessionKey);
+
+    if (alreadyProcessed) {
+      console.log(
+        "Purchase already processed in this session, skipping processing"
+      );
+      setIsLoading(false);
       return;
     }
 
@@ -354,7 +369,6 @@ function ThankYouContent() {
             },
             "POST"
           );
-
           if (response.data.success) {
             setProcessingStatus("Credits added successfully!");
 
@@ -364,6 +378,13 @@ function ThankYouContent() {
             // Get fresh credits
             const updatedUser = await getCurrentUser();
             setFinalCredits(updatedUser?.credits || 0);
+
+            // Mark this purchase as processed in this session to prevent duplicate processing
+            const sessionKey = `processed_${sessionId}_${packageId}`;
+            sessionStorage.setItem(sessionKey, "true");
+
+            // Clear dependency cycle to stop infinite updates
+            setCreditsRefreshed(true);
           } else {
             throw new Error(response.data.error || "Unknown error");
           }
@@ -381,26 +402,29 @@ function ThankYouContent() {
         });
         setIsLoading(false);
       }
-    };
-
-    // Start the authentication check
+    }; // Start the authentication check
     checkAuth();
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     sessionId,
     packageId,
-    router,
-    refreshUserCredits,
-    refreshUserSession,
-    currentUser,
-    initialCredits,
-    creditsRefreshed,
-    debugInfo,
-    directCreditUpdate,
+    // Intentionally NOT including these dependencies to prevent infinite refresh:
+    // refreshUserCredits,
+    // refreshUserSession,
+    // currentUser,
+    // directCreditUpdate
   ]);
-
   const handleRetry = async () => {
     try {
       setProcessingStatus("Retrying credit update...");
+
+      // First check if it was already successfully processed
+      const sessionKey = `processed_${sessionId}_${packageId}`;
+      if (sessionStorage.getItem(sessionKey)) {
+        setProcessingStatus("Credits were already successfully added");
+        return;
+      }
 
       // First refresh auth
       await refreshUserSession();
@@ -463,13 +487,16 @@ function ThankYouContent() {
         },
         "POST"
       );
-
       if (response.data.success) {
         setProcessingStatus("Credits added successfully on retry!");
         // Refresh again to get updated balance
         await refreshUserCredits();
         const updatedUser = await getCurrentUser();
         setFinalCredits(updatedUser?.credits || 0);
+
+        // Mark as processed
+        const sessionKey = `processed_${sessionId}_${packageId}`;
+        sessionStorage.setItem(sessionKey, "true");
       } else {
         throw new Error(response.data.error || "Unknown error");
       }
