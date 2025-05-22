@@ -49,7 +49,7 @@ export async function GET() {
     };
 
     try {
-      console.log("Debug checkout payload:", JSON.stringify(checkoutPayload));
+      console.log("Debugs checkout payload:", JSON.stringify(checkoutPayload));
 
       const response = await axios.post(
         "https://api.lemonsqueezy.com/v1/checkouts",
