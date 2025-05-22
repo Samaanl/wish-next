@@ -12,7 +12,7 @@ function verifySignature(payload: unknown, signature: string): boolean {
       console.warn(
         "No webhook secret configured, skipping signature verification"
       );
-      return true; // For development only - remove in production
+      return true; // For development only -> remove in production
     }
 
     const hmac = crypto.createHmac("sha256", WEBHOOK_SECRET);
