@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   signInWithEmail,
   signUpWithEmail,
@@ -25,7 +25,15 @@ const AuthModal: React.FC<AuthModalProps> = ({
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
+  // Debug log when modal opens/closes
+  useEffect(() => {
+    console.log("AuthModal isOpen state changed to:", isOpen);
+  }, [isOpen]);
+
+  // Don't render anything if not open
   if (!isOpen) return null;
+
+  console.log("Rendering AuthModal component");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,9 +64,12 @@ const AuthModal: React.FC<AuthModalProps> = ({
     setIsLoading(true);
 
     try {
+      console.log("Starting Google sign-in flow");
       await signInWithGoogle();
-      // Note: The success callback will happen after redirect
+      // Note: The browser will be redirected by signInWithGoogle,
+      // so the following code will not execute unless there's an error
     } catch (err: Error | unknown) {
+      console.error("Google authentication failed locally:", err);
       setError(
         err instanceof Error
           ? err.message
@@ -69,7 +80,10 @@ const AuthModal: React.FC<AuthModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100]"
+      style={{ zIndex: 9999 }}
+    >
       <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold text-gray-900">
@@ -78,6 +92,7 @@ const AuthModal: React.FC<AuthModalProps> = ({
           <button
             onClick={onClose}
             className="text-gray-500 hover:text-gray-700"
+            type="button"
           >
             ✕
           </button>
@@ -88,6 +103,7 @@ const AuthModal: React.FC<AuthModalProps> = ({
           onClick={handleGoogleSignIn}
           disabled={isLoading}
           className="w-full flex justify-center items-center bg-white border border-gray-300 rounded-md py-2 px-4 text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 mb-4"
+          type="button"
         >
           <svg className="h-5 w-5 mr-2" viewBox="0 0 24 24">
             <path
@@ -173,6 +189,7 @@ const AuthModal: React.FC<AuthModalProps> = ({
           <button
             onClick={() => setIsSignUp(!isSignUp)}
             className="text-blue-600 hover:text-blue-800"
+            type="button"
           >
             {isSignUp
               ? "Already have an account? Sign In"

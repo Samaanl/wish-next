@@ -1,4 +1,5 @@
 import axios from "axios";
+import { getCurrentUser } from "./authService";
 
 export interface CreditPackage {
   id: string;
@@ -48,6 +49,30 @@ export const initializeCheckout = async (
       userEmail,
     });
 
+    // Add extra verification to ensure we have a valid user ID
+    let finalUserId = userId;
+    let finalUserEmail = userEmail;
+
+    // If user ID looks like a guest ID, double-check with getCurrentUser
+    if (userId.startsWith("guest-")) {
+      console.log("Guest user ID detected, double-checking authentication...");
+      try {
+        const currentUser = await getCurrentUser();
+        console.log("getCurrentUser result:", currentUser);
+
+        if (currentUser && !currentUser.isGuest) {
+          console.log("Found authenticated user, using instead of guest!");
+          finalUserId = currentUser.id;
+          finalUserEmail = currentUser.email;
+        } else {
+          throw new Error("Please sign up or log in to purchase credits");
+        }
+      } catch (authError) {
+        console.error("Auth verification error:", authError);
+        throw new Error("Authentication error. Please try signing in again.");
+      }
+    }
+
     // Find the package
     const selectedPackage = CREDIT_PACKAGES.find((pkg) => pkg.id === packageId);
     console.log("Selected package:", selectedPackage);
@@ -68,26 +93,49 @@ export const initializeCheckout = async (
       );
     }
 
+    // Final check for guest users
+    if (finalUserId.startsWith("guest-")) {
+      throw new Error("Please sign up or log in to purchase credits");
+    }
+
+    // Save user info to localStorage for after-checkout recovery
+    try {
+      localStorage.setItem(
+        "checkoutUserInfo",
+        JSON.stringify({
+          id: finalUserId,
+          email: finalUserEmail,
+          package: packageId,
+          credits: selectedPackage.credits,
+          timestamp: new Date().toISOString(),
+        })
+      );
+      console.log("Saved checkout info to localStorage for recovery");
+    } catch (storageError) {
+      console.error("Failed to save to localStorage:", storageError);
+      // Non-critical error, continue with checkout
+    }
+
     console.log("Making API request with:", {
       packageId: selectedPackage.lemonSqueezyId,
-      userId,
-      userEmail,
+      userId: finalUserId,
+      userEmail: finalUserEmail,
       custom: {
-        user_id: userId,
+        user_id: finalUserId,
         package_id: packageId,
-        credits: selectedPackage.credits,
+        credits: String(selectedPackage.credits),
       },
     });
 
     // Create checkout URL with Lemon Squeezy via our API route
     const response = await axios.post("/api/create-checkout", {
       packageId: selectedPackage.lemonSqueezyId,
-      userId,
-      userEmail,
+      userId: finalUserId,
+      userEmail: finalUserEmail,
       custom: {
-        user_id: userId,
+        user_id: finalUserId,
         package_id: packageId,
-        credits: selectedPackage.credits,
+        credits: String(selectedPackage.credits),
       },
     });
 
@@ -98,13 +146,24 @@ export const initializeCheckout = async (
   } catch (error: unknown) {
     console.error("Error initializing checkout:", error);
     if (error && typeof error === "object" && "response" in error) {
-      console.error(
-        "Response error data:",
-        (error as { response?: { data?: { error?: string } } }).response?.data
-      );
+      const responseError = error as {
+        response?: {
+          data?: {
+            error?: string;
+            isGuestUser?: boolean;
+          };
+        };
+      };
+
+      console.error("Response error data:", responseError.response?.data);
+
+      // Handle guest user error - throw specific error
+      if (responseError.response?.data?.isGuestUser) {
+        throw new Error("Please sign up or log in to purchase credits");
+      }
+
       throw new Error(
-        (error as { response?: { data?: { error?: string } } }).response?.data
-          ?.error || "Payment service error"
+        responseError.response?.data?.error || "Payment service error"
       );
     }
     throw error;
@@ -124,7 +183,7 @@ export const processSuccessfulPurchase = async (
       userId,
       packageId,
       amount,
-      credits,
+      credits: String(credits),
     });
 
     return response.data;
@@ -132,4 +191,17 @@ export const processSuccessfulPurchase = async (
     console.error("Error processing purchase:", error);
     throw error;
   }
+};
+
+// Get user info from localStorage if available (for recovery after payment)
+export const getStoredCheckoutInfo = () => {
+  try {
+    const storedInfo = localStorage.getItem("checkoutUserInfo");
+    if (storedInfo) {
+      return JSON.parse(storedInfo);
+    }
+  } catch (e) {
+    console.error("Failed to retrieve checkout info:", e);
+  }
+  return null;
 };

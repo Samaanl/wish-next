@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { CREDIT_PACKAGES } from "@/utils/paymentService";
 import { initializeCheckout } from "@/utils/paymentService";
 import { useAuth } from "@/contexts/AuthContext";
@@ -16,20 +16,91 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
   onPurchase,
 }) => {
   const { currentUser, refreshUserCredits } = useAuth();
-  const [isLoading, setIsLoading] = React.useState(false);
-  const [error, setError] = React.useState("");
-  const [showAuthModal, setShowAuthModal] = React.useState(false);
-  const [pendingPackageId, setPendingPackageId] = React.useState<string | null>(
-    null
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [pendingPackageId, setPendingPackageId] = useState<string | null>(null);
+  const [authSuccess, setAuthSuccess] = useState(false);
+
+  // Check if user is a guest
+  const isGuestUser = currentUser?.id?.startsWith("guest-");
+
+  // Log for debugging
+  useEffect(() => {
+    console.log("Auth modal visibility:", showAuthModal);
+  }, [showAuthModal]);
+
+  const processPurchase = useCallback(
+    async (packageId: string) => {
+      setIsLoading(true);
+      setError("");
+
+      try {
+        if (!currentUser || !currentUser.email || isGuestUser) {
+          throw new Error(
+            "You must be logged in with a valid email to purchase credits"
+          );
+        }
+
+        const checkoutUrl = await initializeCheckout(
+          packageId,
+          currentUser.id,
+          currentUser.email
+        );
+
+        if (!checkoutUrl) {
+          throw new Error("Failed to create checkout session");
+        }
+        // Redirect to Lemon Squeezy checkout
+        window.location.href = checkoutUrl;
+      } catch (error: unknown) {
+        console.error("Purchase error:", error);
+        setError(
+          error instanceof Error
+            ? error.message
+            : "Failed to process payment. Please try again."
+        );
+        setIsLoading(false);
+      }
+    },
+    [currentUser, isGuestUser, setIsLoading, setError]
   );
 
-  if (!isOpen) return null;
+  // Handle auth success and process purchase
+  useEffect(() => {
+    const handlePendingPurchase = async () => {
+      // Only proceed if we had an auth success and have a pending package
+      if (
+        authSuccess &&
+        pendingPackageId &&
+        currentUser &&
+        !currentUser.id.startsWith("guest-")
+      ) {
+        setAuthSuccess(false); // Reset the auth success flag
+
+        if (onPurchase) {
+          onPurchase(pendingPackageId);
+        } else {
+          await processPurchase(pendingPackageId);
+        }
+        setPendingPackageId(null);
+      }
+    };
+
+    handlePendingPurchase();
+  }, [authSuccess, currentUser, pendingPackageId, onPurchase, processPurchase]);
 
   const handlePurchase = async (packageId: string) => {
-    // If user is not authenticated or has no email, show auth modal
-    if (!currentUser || !currentUser.email) {
+    // Clear previous errors
+    setError("");
+
+    // If user is not authenticated or is a guest user, show auth modal
+    if (!currentUser || isGuestUser) {
+      console.log("Guest user detected, showing auth modal...");
       setPendingPackageId(packageId);
+      // Ensure we update the state
       setShowAuthModal(true);
+      console.log("Auth modal state set to:", true);
       return;
     }
 
@@ -43,79 +114,73 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
     await processPurchase(packageId);
   };
 
-  const processPurchase = async (packageId: string) => {
-    setIsLoading(true);
-    setError("");
-
-    try {
-      if (!currentUser || !currentUser.email) {
-        throw new Error(
-          "You must be logged in with a valid email to purchase credits"
-        );
-      }
-
-      const checkoutUrl = await initializeCheckout(
-        packageId,
-        currentUser.id,
-        currentUser.email
-      );
-
-      if (!checkoutUrl) {
-        throw new Error("Failed to create checkout session");
-      }
-      // Redirect to Lemon Squeezy checkout
-      window.location.href = checkoutUrl;
-    } catch (error: unknown) {
-      console.error("Purchase error:", error);
-      setError(
-        error instanceof Error
-          ? error.message
-          : "Failed to process payment. Please try again."
-      );
-      setIsLoading(false);
-    }
-  };
-
   const handleAuthClose = () => {
+    console.log("Auth modal close triggered");
     setShowAuthModal(false);
-
-    // After auth modal closes, check if user is logged in and has pending package
-    setTimeout(() => {
-      if (currentUser && currentUser.email && pendingPackageId) {
-        processPurchase(pendingPackageId);
-        setPendingPackageId(null);
-      }
-    }, 100);
   };
 
   const handleAuthSuccess = async () => {
-    if (currentUser && currentUser.email && pendingPackageId) {
-      await refreshUserCredits();
-      processPurchase(pendingPackageId);
-      setPendingPackageId(null);
-    }
+    console.log("Auth success triggered");
+    // After successful auth, refresh user info and set success flag
+    await refreshUserCredits();
+    setAuthSuccess(true);
+    setShowAuthModal(false);
+  };
+
+  if (!isOpen) return null;
+
+  // Direct signin button for testing
+  const openSignInModal = () => {
+    console.log("Opening auth modal directly");
+    setShowAuthModal(true);
   };
 
   return (
     <>
-      {showAuthModal && (
-        <AuthModal
-          isOpen={showAuthModal}
-          onClose={handleAuthClose}
-          onSuccess={handleAuthSuccess}
-        />
-      )}
+      {/* Debugging button */}
+      <div className="fixed top-4 left-4 z-50">
+        <button
+          onClick={openSignInModal}
+          className="bg-red-500 text-white px-4 py-1 rounded text-sm"
+        >
+          Debug: Open Auth
+        </button>
+      </div>
 
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      {/* Force the AuthModal to always be in the DOM, just control visibility with isOpen prop */}
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={handleAuthClose}
+        onSuccess={handleAuthSuccess}
+      />
+
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-10">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-8 max-w-md w-full">
           <h2 className="text-2xl font-bold mb-6 text-center text-gray-900 dark:text-white">
             Buy Credits
           </h2>
+
+          {isGuestUser && (
+            <div className="mb-4 p-3 bg-blue-50 text-blue-700 border border-blue-100 rounded">
+              <p className="font-medium">Sign in required</p>
+              <p className="text-sm">
+                Please sign in or create an account to purchase credits.
+              </p>
+              <button
+                onClick={() => setShowAuthModal(true)}
+                className="mt-2 w-full bg-blue-600 text-white py-1 px-2 rounded text-sm"
+              >
+                Sign in now
+              </button>
+            </div>
+          )}
+
           {error && (
             <div className="mb-4 p-3 bg-red-100 text-red-700 rounded">
               {error}
             </div>
-          )}{" "}
+          )}
+
           <div className="space-y-4">
             {CREDIT_PACKAGES.map((pkg) => (
               <div
@@ -134,7 +199,7 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
                 </div>
 
                 <div className="text-gray-500 dark:text-gray-400 text-sm mb-4">
-                  Best for users who need occasional wishes.
+                  {pkg.description}
                 </div>
 
                 <button
@@ -142,14 +207,20 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
                   disabled={isLoading}
                   className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded font-medium transition disabled:opacity-50 cursor-pointer"
                 >
-                  {isLoading ? "Processing..." : "Buy Now"}
+                  {isLoading
+                    ? "Processing..."
+                    : isGuestUser
+                    ? "Sign in to Buy"
+                    : "Buy Now"}
                 </button>
               </div>
             ))}
           </div>
+
           <div className="mt-6 text-center text-xs text-gray-500 dark:text-gray-400">
             Secure payment powered by Lemon Squeezy. All purchases are final.
           </div>
+
           <button
             onClick={onClose}
             className="absolute top-2 right-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"

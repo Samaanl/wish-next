@@ -3,23 +3,56 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
+import { getCurrentUser, storeUserInLocalStorage } from "@/utils/authService";
 
 export default function AuthCallback() {
   const [status, setStatus] = useState("Loading...");
   const router = useRouter();
-  const { currentUser } = useAuth();
+  const { refreshUserSession, updateCurrentUser } = useAuth();
 
   useEffect(() => {
     const handleCallback = async () => {
       try {
-        // No need to do anything here, Appwrite automatically handles the session
-        // Just wait for the currentUser to be set in the AuthContext
-        if (currentUser) {
+        setStatus("Processing authentication...");
+
+        // First try directly getting the current user
+        const user = await getCurrentUser();
+
+        if (user && !user.isGuest) {
+          // Double check we're storing user data in localStorage
+          storeUserInLocalStorage(user);
+
+          // Update auth context with the user
+          updateCurrentUser(user);
+
           setStatus("Authentication successful! Redirecting...");
+          // Try to go back to the original page or default to home
+          const savedRedirect = localStorage.getItem("auth_redirect");
+          const urlParams = new URLSearchParams(window.location.search);
+          const redirectPath =
+            savedRedirect || urlParams.get("redirect") || "/";
+
+          // Clear the saved redirect
+          localStorage.removeItem("auth_redirect");
+
           setTimeout(() => {
-            router.push("/");
+            router.push(redirectPath);
           }, 1000);
+          return;
         }
+
+        // If direct fetch failed, try refreshing session
+        const refreshedUser = await refreshUserSession();
+
+        if (refreshedUser) {
+          setStatus("Authentication successful! Redirecting...");
+        } else {
+          setStatus("Authentication completed. Redirecting...");
+        }
+
+        setTimeout(() => {
+          router.push("/");
+        }, 1000);
       } catch (error) {
         console.error("Auth callback error:", error);
         setStatus("Authentication failed. Redirecting to homepage...");
@@ -30,7 +63,7 @@ export default function AuthCallback() {
     };
 
     handleCallback();
-  }, [currentUser, router]);
+  }, [router, refreshUserSession, updateCurrentUser]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">

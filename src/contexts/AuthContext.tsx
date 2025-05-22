@@ -26,6 +26,7 @@ interface AuthContextType {
   signInAnon: () => Promise<UserData | null>;
   updateCurrentUser: (user: UserData) => void;
   refreshUserCredits: () => Promise<void>;
+  refreshUserSession: () => Promise<UserData | null>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -48,6 +49,10 @@ const AuthContext = createContext<AuthContextType>({
   refreshUserCredits: async () => {
     throw new Error("Not implemented");
   },
+  refreshUserSession: async () => {
+    throw new Error("Not implemented");
+    return null;
+  },
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -62,6 +67,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     const checkUser = async () => {
       setIsLoading(true);
       try {
+        // First try to get the stored user from localStorage
+        const storedUserJson = localStorage.getItem("currentUser");
+        let storedUser = null;
+
+        if (storedUserJson) {
+          try {
+            storedUser = JSON.parse(storedUserJson);
+            console.log("Found user in localStorage:", storedUser.email);
+          } catch (e) {
+            console.error("Error parsing stored user:", e);
+          }
+        }
+
+        // If we have a stored non-guest user, verify it still exists in Appwrite
+        if (storedUser && !storedUser.isGuest) {
+          try {
+            // Verify this user with Appwrite
+            const appwriteUser = await getCurrentUser();
+
+            if (appwriteUser && appwriteUser.id === storedUser.id) {
+              console.log(
+                "Verified stored user with Appwrite:",
+                appwriteUser.email
+              );
+              setCurrentUser(appwriteUser);
+              setIsLoading(false);
+              return;
+            }
+          } catch (error) {
+            console.warn("Could not verify stored user with Appwrite:", error);
+            // Will continue to fallback methods
+          }
+        }
+
         // Always create a guest user first if needed
         if (!localStorage.getItem(GUEST_USER_KEY)) {
           const newGuestUser = getGuestUser();
@@ -181,6 +220,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
+  // Force refresh the entire user session - useful after OAuth login
+  const refreshUserSession = async () => {
+    setIsLoading(true);
+    try {
+      console.log("Refreshing user session after OAuth...");
+
+      // Force a fresh fetch of user data from Appwrite
+      const user = await getCurrentUser();
+      console.log("Refreshed user data:", user);
+
+      if (user && !user.isGuest) {
+        // Remove guest user from localStorage when we get a valid logged in user
+        localStorage.removeItem(GUEST_USER_KEY);
+
+        // Update state with the newly fetched user
+        setCurrentUser(user);
+        console.log("User session updated with:", user.name || user.email);
+        return user;
+      } else {
+        // If we didn't get a valid user, keep existing user or fall back to guest
+        console.warn("OAuth refresh did not return a valid user");
+        if (!currentUser) {
+          const guestUser = getGuestUser();
+          setCurrentUser(guestUser);
+        }
+        return null;
+      }
+    } catch (error) {
+      console.error("Error refreshing user session:", error);
+      // Fall back to guest user on error
+      const guestUser = getGuestUser();
+      setCurrentUser(guestUser);
+      return null;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const value = {
     currentUser,
     isLoading,
@@ -190,6 +267,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     signInAnon,
     updateCurrentUser,
     refreshUserCredits,
+    refreshUserSession,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

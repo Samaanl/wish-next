@@ -53,6 +53,17 @@ export const getGuestUser = (): UserData | null => {
   return createGuestUser();
 };
 
+// Add a new function to store authenticated user in local storage for better persistence
+export const storeUserInLocalStorage = (user: UserData) => {
+  if (!user) return;
+
+  // Don't store guest users with this method
+  if (user.isGuest) return;
+
+  localStorage.setItem("currentUser", JSON.stringify(user));
+  console.log("User data stored in localStorage for persistence");
+};
+
 // Authentication functions
 export const getCurrentUser = async (): Promise<UserData | null> => {
   try {
@@ -89,21 +100,30 @@ export const getCurrentUser = async (): Promise<UserData | null> => {
               name: user.name || session.providerUid.split("@")[0],
             }
           );
-          return {
+
+          const updatedUser = {
             id: user.$id,
             email: session.providerUid,
             name: user.name || session.providerUid.split("@")[0],
             credits: userData.credits,
           };
+
+          // Store in localStorage for persistence
+          storeUserInLocalStorage(updatedUser);
+          return updatedUser;
         }
       }
 
-      return {
+      const authUser = {
         id: user.$id,
         email: user.email,
         name: user.name,
         credits: userData.credits,
       };
+
+      // Store in localStorage for persistence
+      storeUserInLocalStorage(authUser);
+      return authUser;
     } catch {
       // User exists in auth but not in database - create record
       const email =
@@ -112,15 +132,52 @@ export const getCurrentUser = async (): Promise<UserData | null> => {
         "user@example.com";
       await createUserInDatabase(user.$id, email, user.name || "User");
 
-      return {
+      const newUser = {
         id: user.$id,
         email,
         name: user.name || "User",
         credits: DEFAULT_FREE_CREDITS,
       };
+
+      // Store in localStorage for persistence
+      storeUserInLocalStorage(newUser);
+      return newUser;
     }
   } catch (error) {
     console.error("Error getting current user:", error);
+
+    // Try to get user from localStorage if Appwrite auth fails
+    try {
+      const storedUser = localStorage.getItem("currentUser");
+      if (storedUser) {
+        const parsedUser = JSON.parse(storedUser);
+        console.log(
+          "Using stored user data from localStorage:",
+          parsedUser.email
+        );
+
+        // Verify this user exists in the database
+        try {
+          const userData = await databases.getDocument(
+            DATABASE_ID,
+            USERS_COLLECTION_ID,
+            parsedUser.id
+          );
+
+          // If we can fetch the user data, the user is valid
+          return {
+            ...parsedUser,
+            credits: userData.credits, // Use the latest credits from DB
+          };
+        } catch (dbError) {
+          console.warn("Stored user not found in database:", dbError);
+          // Clear invalid stored user
+          localStorage.removeItem("currentUser");
+        }
+      }
+    } catch (storageError) {
+      console.error("Error accessing localStorage:", storageError);
+    }
 
     // Check if this is a permissions error for guest users
     if (
@@ -157,12 +214,28 @@ export const createUserInDatabase = async (
 
 export const signInWithGoogle = async () => {
   try {
-    const session = await account.createOAuth2Session(
+    console.log("Starting Google OAuth flow");
+    // Remove any previous guest user when starting OAuth flow
+    localStorage.removeItem(GUEST_USER_KEY);
+
+    // Save the current page URL to redirect back after auth
+    const currentPath = window.location.pathname;
+    if (currentPath !== "/auth/callback") {
+      localStorage.setItem("auth_redirect", currentPath);
+    }
+
+    const callbackUrl = `${window.location.origin}/auth/callback`;
+    console.log("OAuth callback URL:", callbackUrl);
+
+    // Start the OAuth flow - this will redirect the browser
+    await account.createOAuth2Session(
       OAuthProvider.Google,
-      `${window.location.origin}/auth/callback`,
-      `${window.location.origin}/auth/callback`
+      callbackUrl,
+      `${window.location.origin}/auth/callback?error=failed`
     );
-    return session;
+
+    // This will never be reached in normal flow since the browser redirects
+    return true;
   } catch (error: Error | unknown) {
     console.error("Google sign in error:", error);
     throw error instanceof Error
@@ -203,9 +276,19 @@ export const signUpWithEmail = async (
 export const signOut = async () => {
   try {
     await account.deleteSession("current");
+
+    // Clear user data from localStorage
+    localStorage.removeItem("currentUser");
+    localStorage.removeItem("checkoutUserInfo");
+
     return true;
   } catch (error) {
     console.error("Error during sign out:", error);
+
+    // Still clear localStorage even if Appwrite signout fails
+    localStorage.removeItem("currentUser");
+    localStorage.removeItem("checkoutUserInfo");
+
     return false;
   }
 };
