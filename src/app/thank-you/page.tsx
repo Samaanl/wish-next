@@ -188,7 +188,6 @@ function ThankYouContent() {
         manualProcessAttempted: true,
         manualProcessResult: response.data,
       }));
-
       if (response.data.success) {
         setProcessingStatus("Credits added successfully!");
 
@@ -200,6 +199,13 @@ function ThankYouContent() {
         if (updatedUser) {
           setFinalCredits(updatedUser.credits);
         }
+
+        // Mark this purchase as processed in this session to prevent duplicate processing
+        const sessionKey = `processed_${sessionId}_${packageId}`;
+        sessionStorage.setItem(sessionKey, "true");
+
+        // Mark for home page refresh
+        localStorage.setItem("credits_need_refresh", "true");
 
         setIsLoading(false);
       } else {
@@ -229,7 +235,6 @@ function ThankYouContent() {
     setIsLoading,
     setProcessingStatus,
   ]);
-
   useEffect(() => {
     // If there's no session ID, redirect to homepage
     if (!sessionId) {
@@ -237,13 +242,52 @@ function ThankYouContent() {
       return;
     }
 
+    // Create a flag to track if this component has already started processing the purchase
+    const purchaseKey = `${sessionId}_${packageId}`;
+    const processingKey = `processing_${purchaseKey}`;
+    const alreadyProcessingInThisSession =
+      sessionStorage.getItem(processingKey);
+
+    // Check if this purchase has already been processed during this session
+    const sessionKey = `processed_${purchaseKey}`;
+    const alreadyProcessed = sessionStorage.getItem(sessionKey);
+
+    if (alreadyProcessed) {
+      console.log(
+        "Purchase already processed in this session, skipping processing"
+      );
+      setIsLoading(false);
+
+      // Even if already processed, still mark for refresh on home page
+      localStorage.setItem("credits_need_refresh", "true");
+      return;
+    }
+
+    if (alreadyProcessingInThisSession) {
+      console.log(
+        "Already processing this purchase in this browser session, preventing duplicate"
+      );
+      setIsLoading(false);
+      return;
+    }
+
+    // Mark that we're starting to process this purchase
+    sessionStorage.setItem(processingKey, Date.now().toString());
+
     // First verify authentication status
     const checkAuth = async () => {
       try {
         setProcessingStatus("Checking authentication status...");
 
-        // Try to refresh the session first
-        await refreshUserSession();
+        // Try to refresh the session only once per purchase
+        const sessionRefreshKey = `session_refreshed_${purchaseKey}`;
+        if (!sessionStorage.getItem(sessionRefreshKey)) {
+          console.log("Refreshing user session for purchase");
+          await refreshUserSession();
+          sessionStorage.setItem(sessionRefreshKey, "true");
+        } else {
+          console.log("Session already refreshed for this purchase");
+        }
 
         // Check current auth status via API
         const authResponse = await makeAuthenticatedRequest("/api/check-auth");
@@ -293,9 +337,7 @@ function ThankYouContent() {
           setIsLoading(false);
         }
       }
-    };
-
-    // Process credits after authentication is confirmed
+    }; // Process credits after authentication is confirmed
     const processCredits = async () => {
       try {
         // Get fresh user data
@@ -328,7 +370,7 @@ function ThankYouContent() {
           authInfo: debugInfo?.authInfo,
         });
 
-        // Only process once
+        // Only process once per component lifecycle
         if (!creditsRefreshed) {
           setCreditsRefreshed(true);
           setProcessingStatus("Processing your purchase...");
@@ -364,6 +406,13 @@ function ThankYouContent() {
             // Get fresh credits
             const updatedUser = await getCurrentUser();
             setFinalCredits(updatedUser?.credits || 0);
+
+            // Mark this purchase as processed in this session to prevent duplicate processing
+            const sessionKey = `processed_${sessionId}_${packageId}`;
+            sessionStorage.setItem(sessionKey, "true");
+
+            // Mark for home page refresh
+            localStorage.setItem("credits_need_refresh", "true");
           } else {
             throw new Error(response.data.error || "Unknown error");
           }
@@ -381,20 +430,28 @@ function ThankYouContent() {
         });
         setIsLoading(false);
       }
+    }; // Start the authentication check
+    checkAuth();
+
+    // Cleanup function to remove processing flags on unmount
+    return () => {
+      // If the component unmounts without completing, remove the processing flag
+      // but keep the processed flag if it was set
+      if (!sessionStorage.getItem(`processed_${sessionId}_${packageId}`)) {
+        sessionStorage.removeItem(`processing_${sessionId}_${packageId}`);
+      }
     };
 
-    // Start the authentication check
-    checkAuth();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
+    // Only re-run if these critical values change
     sessionId,
     packageId,
     router,
+    // The following are not expected to change during this component's lifecycle
+    // but are needed for the functions to work
     refreshUserCredits,
     refreshUserSession,
-    currentUser,
-    initialCredits,
-    creditsRefreshed,
-    debugInfo,
     directCreditUpdate,
   ]);
 
@@ -523,7 +580,6 @@ function ThankYouContent() {
         <p className="text-lg text-gray-600 dark:text-gray-300 mb-6">
           Your payment has been processed successfully.
         </p>
-
         {processingStatus && (
           <div
             className={`mb-4 px-4 py-2 rounded-lg ${
@@ -552,7 +608,6 @@ function ThankYouContent() {
             )}
           </div>
         )}
-
         <div className="mb-8 py-4 px-6 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg">
           <p className="text-gray-700 dark:text-gray-200">
             Current Balance:
@@ -568,15 +623,17 @@ function ThankYouContent() {
                 : "No credits have been added yet"}
             </p>
           )}
-        </div>
-
+        </div>{" "}
         <Link
           href="/"
           className="inline-block px-6 py-3 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors"
+          onClick={() => {
+            // Ensure we refresh credits when returning to home
+            localStorage.setItem("credits_need_refresh", "true");
+          }}
         >
           Create a New Wish
         </Link>
-
         {debugInfo && (
           <details className="mt-8 text-left text-xs text-gray-400">
             <summary className="cursor-pointer">Debug Information</summary>

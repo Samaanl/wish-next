@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface CreditDisplayProps {
@@ -6,7 +6,18 @@ interface CreditDisplayProps {
 }
 
 const CreditDisplay: React.FC<CreditDisplayProps> = ({ onBuyCredits }) => {
-  const { currentUser } = useAuth();
+  const { currentUser, refreshUserCredits } = useAuth();
+
+  // Check for and handle credit refresh flag
+  useEffect(() => {
+    const refreshNeeded =
+      localStorage.getItem("credits_need_refresh") === "true";
+    if (refreshNeeded && currentUser) {
+      console.log("Refreshing credits from CreditDisplay component");
+      refreshUserCredits();
+      localStorage.removeItem("credits_need_refresh");
+    }
+  }, [currentUser, refreshUserCredits]);
 
   if (!currentUser) return null;
 

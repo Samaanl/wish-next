@@ -219,9 +219,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       console.error("Error refreshing user credits:", error);
     }
   };
-
   // Force refresh the entire user session - useful after OAuth login
   const refreshUserSession = async () => {
+    // Add throttling to prevent excessive refreshes
+    const lastRefreshTime = parseInt(
+      localStorage.getItem("last_session_refresh") || "0"
+    );
+    const currentTime = Date.now();
+
+    // If we refreshed in the last 5 seconds, skip
+    if (currentTime - lastRefreshTime < 5000) {
+      console.log("Skipping session refresh - too soon since last refresh");
+      return currentUser;
+    }
+
+    localStorage.setItem("last_session_refresh", currentTime.toString());
+
     setIsLoading(true);
     try {
       console.log("Refreshing user session after OAuth...");

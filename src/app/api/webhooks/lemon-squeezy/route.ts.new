@@ -1,0 +1,210 @@
+import { NextRequest, NextResponse } from "next/server";
+import { recordPurchase, refundPurchase } from "@/utils/creditService";
+import crypto from "crypto";
+
+// Webhook secret from Lemon Squeezy dashboard
+const WEBHOOK_SECRET = process.env.LEMON_SQUEEZY_WEBHOOK_SECRET;
+
+// Verify webhook signature
+function verifySignature(payload: unknown, signature: string): boolean {
+  try {
+    if (!WEBHOOK_SECRET) {
+      console.warn("No webhook secret configured, skipping signature verification");
+      return true; // For development only -> remove in production
+    }
+
+    const hmac = crypto.createHmac("sha256", WEBHOOK_SECRET);
+    const digest = hmac.update(JSON.stringify(payload)).digest("hex");
+
+    return crypto.timingSafeEqual(
+      Buffer.from(signature, "hex"),
+      Buffer.from(digest, "hex")
+    );
+  } catch (error) {
+    console.error("Signature verification failed:", error);
+    return false;
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const signature = request.headers.get("X-Signature") || "";
+    const body = await request.json();
+
+    // Comprehensive logging for debugging
+    console.log("Webhook received:", JSON.stringify(body, null, 2));
+    console.log("Signature:", signature);
+    console.log("Webhook secret configured:", !!WEBHOOK_SECRET);
+
+    // For debugging the structure
+    console.log("Body structure:", body ? Object.keys(body) : "No body");
+    
+    if (body.meta) {
+      console.log("Event name:", body.meta.event_name);
+    }
+    
+    if (body.data) {
+      console.log("Data attributes:", body.data.attributes ? "exists" : "missing");
+      console.log("Data meta:", body.data.meta ? "exists" : "missing");
+      
+      // Check where custom data might be located
+      if (body.data.meta && body.data.meta.custom_data) {
+        console.log("Custom data in data.meta:", JSON.stringify(body.data.meta.custom_data));
+      } else if (body.data.attributes && body.data.attributes.custom_data) {
+        console.log("Custom data in attributes:", JSON.stringify(body.data.attributes.custom_data));
+      }
+    }
+
+    // Verify webhook signature
+    if (!verifySignature(body, signature)) {
+      console.error("Invalid webhook signature", {
+        receivedSignature: signature,
+        hasSecret: !!WEBHOOK_SECRET,
+      });
+      return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+    }
+
+    // Extract webhook data safely with fallbacks
+    const eventName = body.meta?.event_name;
+    console.log("Processing webhook event:", eventName);
+
+    // Try to find custom data in different possible locations
+    let customData = null;
+    let total = 0;
+
+    if (body.data?.meta?.custom_data) {
+      customData = body.data.meta.custom_data;
+    } else if (body.data?.attributes?.custom_data) {
+      customData = body.data.attributes.custom_data;
+    } else if (body.data?.attributes?.first_order_item?.custom_data) {
+      customData = body.data.attributes.first_order_item.custom_data;
+    }
+
+    // Try to find the total amount in different possible locations
+    if (body.data?.attributes?.total) {
+      total = body.data.attributes.total;
+    } else if (body.data?.attributes?.first_order_item?.price) {
+      total = body.data.attributes.first_order_item.price;
+    }
+
+    console.log("Extracted custom data:", customData);
+    console.log("Extracted total:", total);
+
+    // Validate custom data
+    if (!customData || !customData.user_id || !customData.package_id) {
+      console.error("Missing required custom data", {
+        customData,
+        eventName,
+        bodyStructure: JSON.stringify(body, null, 2)
+      });
+      return NextResponse.json(
+        { error: "Missing required custom data" },
+        { status: 400 }
+      );
+    }
+
+    // Make sure credits is available and is a number
+    const credits = Number(customData.credits || 0);
+    if (isNaN(credits) || credits <= 0) {
+      console.error("Invalid credits value", {
+        creditsValue: customData.credits,
+        parsed: credits
+      });
+      return NextResponse.json(
+        { error: "Invalid credits value" },
+        { status: 400 }
+      );
+    }
+
+    switch (eventName) {
+      case "order_created":
+        console.log("Processing new purchase:", {
+          userId: customData.user_id,
+          packageId: customData.package_id,
+          credits,
+          total,
+        });
+
+        await recordPurchase(
+          customData.user_id,
+          customData.package_id,
+          total,
+          credits
+        );
+        break;
+
+      case "order_refunded":
+        console.log("Processing refund:", {
+          userId: customData.user_id,
+          packageId: customData.package_id,
+          credits,
+          total,
+        });
+
+        await refundPurchase(
+          customData.user_id,
+          customData.package_id,
+          total,
+          credits
+        );
+        break;
+
+      case "subscription_payment_failed":
+        console.log("Subscription payment failed:", {
+          userId: customData.user_id,
+          packageId: customData.package_id,
+        });
+        // Handle failed payment (e.g., notify user)
+        break;
+
+      case "subscription_payment_success":
+        console.log("Subscription payment successful:", {
+          userId: customData.user_id,
+          packageId: customData.package_id,
+          credits,
+        });
+        
+        // Handle subscription payment like a regular purchase
+        await recordPurchase(
+          customData.user_id,
+          customData.package_id,
+          total,
+          credits
+        );
+        break;
+
+      default:
+        console.log("Unhandled webhook event:", eventName);
+        return NextResponse.json({ received: true, event: eventName });
+    }
+
+    return NextResponse.json({ success: true, event: eventName });
+  } catch (error: any) {
+    console.error("Error processing webhook:", error);
+    
+    // Send detailed error for debugging
+    return NextResponse.json(
+      { 
+        error: "Failed to process webhook",
+        message: error.message,
+        stack: error.stack
+      },
+      { status: 500 }
+    );
+  }
+}
+
+// Add a GET endpoint for webhook testing
+export async function GET() {
+  return NextResponse.json({
+    status: "Webhook endpoint is active",
+    hasSecret: !!WEBHOOK_SECRET,
+    timestamp: new Date().toISOString(),
+    supportedEvents: [
+      "order_created",
+      "order_refunded",
+      "subscription_payment_failed",
+      "subscription_payment_success",
+    ],
+  });
+}

@@ -24,15 +24,28 @@ export default function Home() {
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [insufficientCredits, setInsufficientCredits] = useState(false);
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
-
   // Check if user has returned from checkout
   useEffect(() => {
     const checkPurchaseReturn = async () => {
+      // Check if we just completed a purchase (either from URL or localStorage flag)
       const urlParams = new URLSearchParams(window.location.search);
-      if (urlParams.get("checkout") === "completed" && currentUser) {
+      const needsRefresh =
+        localStorage.getItem("credits_need_refresh") === "true";
+
+      if (
+        (urlParams.get("checkout") === "completed" || needsRefresh) &&
+        currentUser
+      ) {
+        console.log("Refreshing credits after purchase");
         await refreshUserCredits();
-        // Clean the URL
-        window.history.replaceState({}, "", window.location.pathname);
+
+        // Clean up
+        localStorage.removeItem("credits_need_refresh");
+
+        // Clean the URL if needed
+        if (urlParams.get("checkout") === "completed") {
+          window.history.replaceState({}, "", window.location.pathname);
+        }
       }
     };
 
