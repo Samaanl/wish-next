@@ -128,88 +128,139 @@ const TextEditor: React.FC<TextEditorProps> = ({
     };
   }, []); // Initialize canvas with fabric.js when it's loaded
   useEffect(() => {
-    if (!fabric || !canvasRef.current) return;
+    console.log(
+      "[TextEditor DEBUG] Canvas useEffect triggered. Fabric loaded:",
+      !!fabric,
+      "SelectedImage fullUrl:",
+      selectedImage?.fullUrl
+    );
+
+    if (!fabric || !canvasRef.current) {
+      console.log(
+        "[TextEditor DEBUG] Canvas useEffect: fabric or canvasRef not ready, returning."
+      );
+      return;
+    }
+    if (!selectedImage?.fullUrl) {
+      console.log(
+        "[TextEditor DEBUG] Canvas useEffect: selectedImage.fullUrl is missing, returning."
+      );
+      // Optionally, set an error or loading false if this state is unexpected
+      // setError("No image selected to load.");
+      // setLoading(false);
+      return;
+    }
 
     let loadingTimeout: NodeJS.Timeout | null = null;
     let isMounted = true;
 
     const setupCanvas = async () => {
+      console.log(
+        `[TextEditor DEBUG] setupCanvas: Starting. Image URL: ${selectedImage.fullUrl}`
+      );
       try {
         setLoading(true);
-        setError(null);
+        setError(null); // Clear previous specific errors
 
-        // Set a timeout to update the UI if loading takes too long
         loadingTimeout = setTimeout(() => {
           console.log(
-            "Loading is taking longer than expected, showing extended loading message"
+            "[TextEditor DEBUG] setupCanvas: UI Loading timeout (5s) fired."
           );
-          if (isMounted) {
+          if (isMounted && loading && !error) {
+            // Check 'loading' to see if still in initial loading phase
             setError(
               "Loading is taking longer than expected, but we're still trying. Please wait..."
             );
           }
         }, 5000);
 
-        console.log(`Setting up canvas for image: ${selectedImage.fullUrl}`);
-
-        // Initialize canvas
+        console.log(
+          `[TextEditor DEBUG] setupCanvas: Initializing fabric.Canvas for image: ${selectedImage.fullUrl}`
+        );
+        // Ensure existing canvas is disposed if any (though ref.current should handle this)
+        if (fabricCanvasRef.current) {
+          fabricCanvasRef.current.dispose();
+        }
         const fabricCanvas = new fabric.Canvas(canvasRef.current, {
           backgroundColor: "#f0f0f0",
           preserveObjectStacking: true,
         });
 
         if (!isMounted) {
+          console.log(
+            "[TextEditor DEBUG] setupCanvas: Component unmounted during fabric.Canvas init. Disposing."
+          );
           fabricCanvas.dispose();
           return;
         }
-
         fabricCanvasRef.current = fabricCanvas;
 
-        // Load image
-        console.log(`Attempting to download image: ${selectedImage.fullUrl}`);
-        let img;
+        console.log(
+          `[TextEditor DEBUG] setupCanvas: Attempting to download primary image: ${selectedImage.fullUrl}`
+        );
+        let img: HTMLImageElement;
         try {
           img = await downloadImage(selectedImage.fullUrl);
-          console.log("Image downloaded successfully");
+          console.log(
+            "[TextEditor DEBUG] setupCanvas: Primary image downloaded successfully."
+          );
         } catch (imgError) {
-          console.error("Error downloading image:", imgError);
+          console.error(
+            "[TextEditor DEBUG] setupCanvas: Error downloading primary image:",
+            imgError
+          );
+          if (selectedImage.fullUrl.includes("placehold.co")) {
+            console.error(
+              "[TextEditor DEBUG] setupCanvas: Primary image (which was a placeholder) failed. Re-throwing error."
+            );
+            throw imgError; // Re-throw if primary was already a placeholder and failed
+          }
 
-          // Try fallback to placeholder if real image fails
-          if (!selectedImage.fullUrl.includes("placehold.co")) {
-            console.log("Attempting to use placeholder image instead");
-            const placeholderSize = 600;
-            const placeholderUrl = `https://placehold.co/${placeholderSize}x${placeholderSize}?text=${selectedImage.occasion}`;
+          console.log(
+            "[TextEditor DEBUG] setupCanvas: Attempting to download placeholder image due to primary image failure."
+          );
+          const placeholderSize = 600;
+          // Using a slightly different text for fallback to distinguish in network/placehold.co
+          const placeholderUrl = `https://placehold.co/${placeholderSize}x${placeholderSize}?text=${selectedImage.occasion}_fallback`;
+          try {
             img = await downloadImage(placeholderUrl);
-          } else {
-            throw imgError; // Re throw if even the placeholder fails
+            console.log(
+              "[TextEditor DEBUG] setupCanvas: Placeholder image downloaded successfully."
+            );
+          } catch (placeholderError) {
+            console.error(
+              "[TextEditor DEBUG] setupCanvas: Error downloading placeholder image:",
+              placeholderError
+            );
+            throw placeholderError; // This error will be caught by the outer catch
           }
         }
 
         if (!isMounted) {
+          console.log(
+            "[TextEditor DEBUG] setupCanvas: Component unmounted after image download. Disposing canvas."
+          );
           fabricCanvas.dispose();
           return;
         }
+        console.log(
+          "[TextEditor DEBUG] setupCanvas: Image obtained. Proceeding to add to canvas."
+        );
 
-        // Create fabric image and add to canvas
         const fabricImage = new fabric.Image(img, {
           selectable: false,
           evented: false,
         });
 
-        // Scale canvas to match image aspect ratio while maintaining a reasonable size
-        const canvasWidth = Math.min(window.innerWidth - 40, 600);
+        const canvasWidth = Math.min(window.innerWidth - 40, 600); // Or your desired max width
         const scaleFactor = canvasWidth / img.width;
         const canvasHeight = img.height * scaleFactor;
 
         fabricCanvas.setWidth(canvasWidth);
         fabricCanvas.setHeight(canvasHeight);
-
-        // Scale the image to fit the canvas
         fabricImage.scaleToWidth(canvasWidth);
-
         fabricCanvas.add(fabricImage);
 
-        // Add text
         const textOptions: any = {
           left: canvasWidth / 2,
           top: canvasHeight / 2,
@@ -235,45 +286,62 @@ const TextEditor: React.FC<TextEditorProps> = ({
         const text = new fabric.Textbox(wish, textOptions);
         fabricCanvas.add(text);
         fabricCanvas.setActiveObject(text);
-
-        // Render
         fabricCanvas.renderAll();
+        console.log(
+          "[TextEditor DEBUG] setupCanvas: Canvas setup complete, image and text added."
+        );
       } catch (error: any) {
-        console.error("Error setting up canvas:", error);
+        console.error(
+          "[TextEditor DEBUG] setupCanvas: Error during canvas setup:",
+          error
+        );
         if (isMounted) {
           setError(
             `Failed to setup the editor: ${
-              error instanceof Error ? error.message : "Unknown error"
+              error instanceof Error ? error.message : String(error) // Use String(error) for safety
             }. Please try another image.`
           );
         }
       } finally {
+        console.log(
+          "[TextEditor DEBUG] setupCanvas: Entering finally block. isMounted:",
+          isMounted
+        );
         if (loadingTimeout) {
           clearTimeout(loadingTimeout);
         }
         if (isMounted) {
+          console.log(
+            "[TextEditor DEBUG] setupCanvas: Calling setLoading(false) in finally block."
+          );
           setLoading(false);
+        } else {
+          console.log(
+            "[TextEditor DEBUG] setupCanvas: Component not mounted, setLoading(false) skipped in finally block."
+          );
         }
       }
     };
 
     setupCanvas();
 
-    // Clean up on unmount
     return () => {
+      console.log(
+        "[TextEditor DEBUG] Canvas useEffect cleanup. Tearing down. isMounted was true, now false."
+      );
       isMounted = false;
       if (loadingTimeout) {
         clearTimeout(loadingTimeout);
       }
       if (fabricCanvasRef.current) {
+        console.log("[TextEditor DEBUG] Disposing fabric canvas from cleanup.");
         fabricCanvasRef.current.dispose();
         fabricCanvasRef.current = null;
       }
     };
   }, [
     fabric,
-    selectedImage.fullUrl,
-    selectedImage.occasion,
+    selectedImage, // Changed to depend on the whole selectedImage object
     wish,
     fontSize,
     fontFamily,
