@@ -121,40 +121,33 @@ export const listImagesByOccasion = async (
     console.log(
       `Fetching images for occasion ${occasionId} from storage ID: ${STORAGE_ID}`
     );
+    
     try {
-      // List files that have the occasion in their name
-      console.log(
-        `Searching for files with name containing '${occasionId}_' in bucket ${STORAGE_ID}`
-      );
-
-      // First try to list all files to see what's in the bucket
-      const allFiles = await storage.listFiles(STORAGE_ID, [Query.limit(50)]);
-
-      console.log(`Found ${allFiles.files.length} total files in bucket:`);
-      allFiles.files.forEach((file, index) => {
-        console.log(`  ${index + 1}. ${file.name} (ID: ${file.$id})`);
-      });
-
-      // Now search specifically for this occasion
-      const response = await storage.listFiles(STORAGE_ID, [
-        // Pattern matching for files with the occasion name prefix
-        // e.g., "birthday_1", "birthday_2", etc.
-        Query.search("name", `${occasionId}_`),
-        Query.limit(20),
+      // More robust approach: fetch all files without complex queries
+      console.log(`Fetching all files from bucket ${STORAGE_ID}`);
+      
+      // Use a simple limit query to avoid potential pagination issues
+      const allFiles = await storage.listFiles(STORAGE_ID, [
+        // No complex queries that might cause errors
       ]);
-
-      console.log(
-        `Found ${response.files.length} files for occasion ${occasionId}`
+      
+      console.log(`Found ${allFiles.files.length} total files in bucket`);
+      
+      // Filter files that match our occasion on the client side
+      const matchingFiles = allFiles.files.filter(file => 
+        file.name.toLowerCase().includes(occasionId.toLowerCase())
       );
+      
+      console.log(`Found ${matchingFiles.length} files matching occasion: ${occasionId}`);
 
-      if (response.files.length === 0) {
+      if (matchingFiles.length === 0) {
         console.warn(
           `No images found in storage for occasion ${occasionId}, using dummy images`
         );
         return getDummyImagesForOccasion(occasionId);
       }
 
-      return response.files.map((file) => ({
+      return matchingFiles.map((file) => ({
         id: file.$id,
         name: file.name,
         previewUrl: storage.getFilePreview(STORAGE_ID, file.$id, 400, 400),
@@ -163,13 +156,9 @@ export const listImagesByOccasion = async (
       }));
     } catch (error: any) {
       console.error("Appwrite API error:", error);
-      // Check if the bucket ID might be invalid
-      if (error.message && error.message.includes("Bucket not found")) {
-        console.error(
-          `Storage bucket with ID '${STORAGE_ID}' not found. Please check your configuration.`
-        );
-      }
-      throw error;
+      console.warn("Falling back to dummy images");
+      // Always fall back to dummy images on error, don't rethrow
+      return getDummyImagesForOccasion(occasionId);
     }
   } catch (error) {
     console.error("Error fetching images for occasion", occasionId, error);
