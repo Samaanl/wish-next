@@ -223,7 +223,6 @@ export default function WishDisplay({
             wish={wishText}
             selectedImage={selectedImage}
             onBack={handleBackToOccasion}
-            onSave={handleSaveImage}
           />
         </div>
       );

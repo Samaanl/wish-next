@@ -50,14 +50,12 @@ interface TextEditorProps {
   wish: string;
   selectedImage: OccasionImage;
   onBack: () => void;
-  onSave: (dataUrl: string) => void;
 }
 
 const TextEditor: React.FC<TextEditorProps> = ({
   wish,
   selectedImage,
   onBack,
-  onSave,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fabricCanvasRef = useRef<any>(null);
@@ -263,13 +261,23 @@ const TextEditor: React.FC<TextEditorProps> = ({
         const fabricImage = new fabric.Image(imgHtmlElement, {
           selectable: false,
           evented: false,
-        }); // Responsive canvas sizing for better UI/UX
+        }); // Responsive canvas sizing for better mobile UI
         const isMobile = window.innerWidth < 768;
-        const MAX_CANVAS_WIDTH = isMobile ? window.innerWidth - 32 : 500; // Smaller on mobile
-        const canvasWidth = Math.min(
-          window.innerWidth - (isMobile ? 32 : 80),
-          MAX_CANVAS_WIDTH
-        );
+        const isTablet = window.innerWidth >= 768 && window.innerWidth < 1024;
+
+        let canvasWidth;
+        if (isMobile) {
+          // Mobile: Make canvas fill most of screen width but maintain square aspect ratio
+          canvasWidth = Math.min(
+            window.innerWidth - 32,
+            window.innerHeight - 200
+          );
+        } else if (isTablet) {
+          canvasWidth = Math.min(window.innerWidth * 0.6, 500);
+        } else {
+          canvasWidth = Math.min(window.innerWidth * 0.5, 600);
+        }
+
         const scaleFactor = canvasWidth / imgHtmlElement.width;
         const canvasHeight = imgHtmlElement.height * scaleFactor;
 
@@ -451,79 +459,8 @@ const TextEditor: React.FC<TextEditorProps> = ({
     setTextShadow(enabled);
     updateTextProperties("shadow", enabled);
   };
-  const handleSave = async () => {
-    if (!fabricCanvasRef.current || !canvasRef.current) {
-      setError("Canvas not ready for saving.");
-      return;
-    }
-
-    try {
-      setLoading(true);
-
-      // Create high-resolution canvas for export (2048x2048 original quality)
-      const originalImg = new Image();
-      originalImg.crossOrigin = "anonymous";
-
-      await new Promise((resolve, reject) => {
-        originalImg.onload = resolve;
-        originalImg.onerror = reject;
-        originalImg.src = selectedImage.fullUrl;
-      });
-
-      // Use original high resolution for export (2048x2048)
-      const exportCanvas = document.createElement("canvas");
-      const exportCtx = exportCanvas.getContext("2d");
-      exportCanvas.width = originalImg.width; // Full 2048px
-      exportCanvas.height = originalImg.height; // Full 2048px
-
-      if (!exportCtx) throw new Error("Could not create export context");
-
-      // Draw background at full resolution
-      exportCtx.drawImage(originalImg, 0, 0);
-
-      // Calculate scaling factors for text elements
-      const displayCanvas = canvasRef.current;
-      const scaleX = originalImg.width / displayCanvas.width;
-      const scaleY = originalImg.height / displayCanvas.height;
-
-      // Get all fabric objects and draw text at high resolution
-      const objects = fabricCanvasRef.current.getObjects();
-      objects.forEach((obj: any) => {
-        if (obj.type === "textbox" || obj.type === "text") {
-          exportCtx.font = `${obj.fontSize * scaleX}px ${obj.fontFamily}`;
-          exportCtx.fillStyle = obj.fill;
-          exportCtx.textAlign = obj.textAlign || "center";
-
-          // Handle text shadow if present
-          if (obj.shadow) {
-            exportCtx.shadowColor = obj.shadow.color;
-            exportCtx.shadowBlur = obj.shadow.blur * scaleX;
-            exportCtx.shadowOffsetX = obj.shadow.offsetX * scaleX;
-            exportCtx.shadowOffsetY = obj.shadow.offsetY * scaleY;
-          }
-
-          exportCtx.fillText(obj.text, obj.left * scaleX, obj.top * scaleY);
-
-          // Reset shadow
-          exportCtx.shadowColor = "transparent";
-          exportCtx.shadowBlur = 0;
-          exportCtx.shadowOffsetX = 0;
-          exportCtx.shadowOffsetY = 0;
-        }
-      });
-
-      // Export as high-quality PNG (lossless)
-      const dataUrl = exportCanvas.toDataURL("image/png", 1.0);
-      onSave(dataUrl);
-    } catch (err) {
-      console.error("Error saving image:", err);
-      setError("Failed to save image.");
-    } finally {
-      setLoading(false);
-    }
-  };
   const handleDownload = async () => {
-    if (!fabricCanvasRef.current || !canvasRef.current) {
+    if (!fabricCanvasRef.current) {
       setError("Canvas not ready for download.");
       return;
     }
@@ -552,13 +489,17 @@ const TextEditor: React.FC<TextEditorProps> = ({
       // Draw background at full resolution
       exportCtx.drawImage(originalImg, 0, 0);
 
+      // Get fabric canvas dimensions for scaling calculations
+      const fabricCanvas = fabricCanvasRef.current;
+      const canvasWidth = fabricCanvas.getWidth();
+      const canvasHeight = fabricCanvas.getHeight();
+
       // Calculate scaling factors for text elements
-      const displayCanvas = canvasRef.current;
-      const scaleX = originalImg.width / displayCanvas.width;
-      const scaleY = originalImg.height / displayCanvas.height;
+      const scaleX = originalImg.width / canvasWidth;
+      const scaleY = originalImg.height / canvasHeight;
 
       // Get all fabric objects and draw text at high resolution
-      const objects = fabricCanvasRef.current.getObjects();
+      const objects = fabricCanvas.getObjects();
       objects.forEach((obj: any) => {
         if (obj.type === "textbox" || obj.type === "text") {
           exportCtx.font = `${obj.fontSize * scaleX}px ${obj.fontFamily}`;
@@ -680,33 +621,20 @@ const TextEditor: React.FC<TextEditorProps> = ({
                 onClick={onBack}
                 className="px-6 py-3 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors font-medium"
               >
-                ← Back
+                ← Back{" "}
               </button>
               {!loading && !error && canvasReady && (
-                <>
-                  <button
-                    onClick={handleSave}
-                    disabled={loading}
-                    className={`px-6 py-3 rounded-lg font-medium transition-colors ${
-                      loading
-                        ? "bg-indigo-400 cursor-not-allowed text-white"
-                        : "bg-indigo-600 hover:bg-indigo-700 text-white"
-                    }`}
-                  >
-                    {loading ? "Saving..." : "💾 Save"}
-                  </button>
-                  <button
-                    onClick={handleDownload}
-                    disabled={loading}
-                    className={`px-6 py-3 rounded-lg font-medium transition-colors ${
-                      loading
-                        ? "bg-green-400 cursor-not-allowed text-white"
-                        : "bg-green-600 hover:bg-green-700 text-white"
-                    }`}
-                  >
-                    {loading ? "Processing..." : "⬇️ Download"}
-                  </button>
-                </>
+                <button
+                  onClick={handleDownload}
+                  disabled={loading}
+                  className={`px-6 py-3 rounded-lg font-medium transition-colors ${
+                    loading
+                      ? "bg-green-400 cursor-not-allowed text-white"
+                      : "bg-green-600 hover:bg-green-700 text-white"
+                  }`}
+                >
+                  {loading ? "Processing..." : "⬇️ Download"}
+                </button>
               )}
             </div>
           </div>
@@ -873,33 +801,20 @@ const TextEditor: React.FC<TextEditorProps> = ({
             onClick={onBack}
             className="flex-1 px-4 py-3 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors font-medium"
           >
-            ← Back
+            ← Back{" "}
           </button>
           {!loading && !error && canvasReady && (
-            <>
-              <button
-                onClick={handleSave}
-                disabled={loading}
-                className={`flex-1 px-4 py-3 rounded-lg font-medium transition-colors ${
-                  loading
-                    ? "bg-indigo-400 cursor-not-allowed text-white"
-                    : "bg-indigo-600 hover:bg-indigo-700 text-white"
-                }`}
-              >
-                {loading ? "💾..." : "💾 Save"}
-              </button>
-              <button
-                onClick={handleDownload}
-                disabled={loading}
-                className={`flex-1 px-4 py-3 rounded-lg font-medium transition-colors ${
-                  loading
-                    ? "bg-green-400 cursor-not-allowed text-white"
-                    : "bg-green-600 hover:bg-green-700 text-white"
-                }`}
-              >
-                {loading ? "⬇️..." : "⬇️ Download"}
-              </button>
-            </>
+            <button
+              onClick={handleDownload}
+              disabled={loading}
+              className={`flex-1 px-4 py-3 rounded-lg font-medium transition-colors ${
+                loading
+                  ? "bg-green-400 cursor-not-allowed text-white"
+                  : "bg-green-600 hover:bg-green-700 text-white"
+              }`}
+            >
+              {loading ? "⬇️..." : "⬇️ Download"}
+            </button>
           )}
         </div>
         {/* Safe area for mobile devices */}
