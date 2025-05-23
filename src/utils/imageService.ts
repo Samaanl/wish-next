@@ -220,65 +220,99 @@ export const getImageById = async (
 export const downloadImage = async (
   imageUrl: string
 ): Promise<HTMLImageElement> => {
-  console.log(`Attempting to download image from: ${imageUrl}`);
+  console.log(`DIRECT DEBUG - Attempting to download image from: ${imageUrl}`);
 
   return new Promise((resolve, reject) => {
-    // Set a timeout to prevent hanging indefinitely
+    // Set a shorter timeout to prevent hanging indefinitely
     const timeoutId = setTimeout(() => {
-      console.error(`Image load timeout: ${imageUrl}`);
-      reject(new Error("Image load timed out after 10 seconds"));
-    }, 10000);
+      console.error(`Image load timeout after 8 seconds: ${imageUrl}`);
+      reject(new Error("Image load timed out after 8 seconds"));
+    }, 8000);
 
-    // First try loading without crossOrigin
+    // Create a new image
     const img = new Image();
+
+    // Add specific logging to track load progress
+    console.log(`DIRECT DEBUG - Setting up image object for: ${imageUrl}`);
 
     img.onload = () => {
       clearTimeout(timeoutId);
-      console.log(`Image loaded successfully: ${imageUrl}`);
+      console.log(
+        `DIRECT DEBUG - Image loaded successfully: ${imageUrl}, dimensions: ${img.width}x${img.height}`
+      );
       resolve(img);
     };
 
     img.onerror = (e) => {
-      console.error(`Error loading image from: ${imageUrl}`, e);
+      console.error(`DIRECT DEBUG - Error loading image from: ${imageUrl}`, e);
 
-      // Try with crossOrigin as a fallback
-      console.log("Retrying with crossOrigin=anonymous");
+      // Fall back to a known reliable URL for testing
+      const fallbackUrl = "/placeholder-image.jpg"; // A static image in the public folder
+      console.log(
+        `DIRECT DEBUG - Falling back to static placeholder: ${fallbackUrl}`
+      );
+
       const fallbackImg = new Image();
-      fallbackImg.crossOrigin = "anonymous";
-
       fallbackImg.onload = () => {
         clearTimeout(timeoutId);
-        console.log(`Image loaded successfully with crossOrigin: ${imageUrl}`);
+        console.log(`DIRECT DEBUG - Fallback image loaded successfully`);
         resolve(fallbackImg);
       };
 
-      fallbackImg.onerror = (err) => {
-        // If this is a placeholder URL, we can still try without any options
-        if (imageUrl.includes("placehold.co")) {
-          console.log("Retrying placeholder image with third attempt");
-          const lastAttemptImg = new Image();
+      fallbackImg.onerror = () => {
+        clearTimeout(timeoutId);
+        console.error(`DIRECT DEBUG - Even fallback image failed to load`);
 
-          lastAttemptImg.onload = () => {
-            clearTimeout(timeoutId);
-            resolve(lastAttemptImg);
-          };
+        // Last resort - create an in-memory canvas as an image
+        try {
+          console.log(
+            `DIRECT DEBUG - Creating in-memory canvas as last resort`
+          );
+          const canvas = document.createElement("canvas");
+          canvas.width = 600;
+          canvas.height = 400;
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            ctx.fillStyle = "#f0f0f0";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = "#666666";
+            ctx.font = "20px Arial";
+            ctx.textAlign = "center";
+            ctx.fillText(
+              "Image could not be loaded",
+              canvas.width / 2,
+              canvas.height / 2
+            );
 
-          lastAttemptImg.onerror = () => {
-            clearTimeout(timeoutId);
-            reject(new Error(`Failed to load image after multiple attempts`));
-          };
-
-          lastAttemptImg.src = imageUrl;
-        } else {
-          clearTimeout(timeoutId);
-          reject(new Error(`Failed to load image: ${err}`));
+            const dataUrl = canvas.toDataURL();
+            const canvasImg = new Image();
+            canvasImg.src = dataUrl;
+            canvasImg.onload = () => {
+              clearTimeout(timeoutId);
+              console.log(
+                `DIRECT DEBUG - Successfully created canvas fallback`
+              );
+              resolve(canvasImg);
+            };
+            return;
+          }
+        } catch (canvasError) {
+          console.error(`DIRECT DEBUG - Canvas creation failed:`, canvasError);
         }
+
+        reject(new Error(`Failed to load image after all attempts`));
       };
 
-      fallbackImg.src = imageUrl;
+      fallbackImg.src = fallbackUrl;
     };
 
+    // Disable CORS for Appwrite URLs and placeholder URLs
+    if (!imageUrl.includes("placehold.co")) {
+      img.crossOrigin = "anonymous";
+    }
+
     // Set source after setting event handlers
+    console.log(`DIRECT DEBUG - Setting image src to: ${imageUrl}`);
     img.src = imageUrl;
   });
 };
