@@ -223,16 +223,12 @@ export const downloadImage = async (
   console.log(`DIRECT DEBUG - Attempting to download image from: ${imageUrl}`);
 
   return new Promise((resolve, reject) => {
-    // Set a shorter timeout to prevent hanging indefinitely
     const timeoutId = setTimeout(() => {
       console.error(`Image load timeout after 8 seconds: ${imageUrl}`);
-      reject(new Error("Image load timed out after 8 seconds"));
+      reject(new Error(`Image load timed out after 8 seconds: ${imageUrl}`));
     }, 8000);
 
-    // Create a new image
     const img = new Image();
-
-    // Add specific logging to track load progress
     console.log(`DIRECT DEBUG - Setting up image object for: ${imageUrl}`);
 
     img.onload = () => {
@@ -244,74 +240,19 @@ export const downloadImage = async (
     };
 
     img.onerror = (e) => {
+      clearTimeout(timeoutId);
       console.error(`DIRECT DEBUG - Error loading image from: ${imageUrl}`, e);
-
-      // Fall back to a known reliable URL for testing
-      const fallbackUrl = "/placeholder-image.jpg"; // A static image in the public folder
-      console.log(
-        `DIRECT DEBUG - Falling back to static placeholder: ${fallbackUrl}`
+      reject(
+        new Error(
+          `Failed to load image directly: ${imageUrl}. Error: ${e.toString()}`
+        )
       );
-
-      const fallbackImg = new Image();
-      fallbackImg.onload = () => {
-        clearTimeout(timeoutId);
-        console.log(`DIRECT DEBUG - Fallback image loaded successfully`);
-        resolve(fallbackImg);
-      };
-
-      fallbackImg.onerror = () => {
-        clearTimeout(timeoutId);
-        console.error(`DIRECT DEBUG - Even fallback image failed to load`);
-
-        // Last resort - create an in-memory canvas as an image
-        try {
-          console.log(
-            `DIRECT DEBUG - Creating in-memory canvas as last resort`
-          );
-          const canvas = document.createElement("canvas");
-          canvas.width = 600;
-          canvas.height = 400;
-          const ctx = canvas.getContext("2d");
-          if (ctx) {
-            ctx.fillStyle = "#f0f0f0";
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = "#666666";
-            ctx.font = "20px Arial";
-            ctx.textAlign = "center";
-            ctx.fillText(
-              "Image could not be loaded",
-              canvas.width / 2,
-              canvas.height / 2
-            );
-
-            const dataUrl = canvas.toDataURL();
-            const canvasImg = new Image();
-            canvasImg.src = dataUrl;
-            canvasImg.onload = () => {
-              clearTimeout(timeoutId);
-              console.log(
-                `DIRECT DEBUG - Successfully created canvas fallback`
-              );
-              resolve(canvasImg);
-            };
-            return;
-          }
-        } catch (canvasError) {
-          console.error(`DIRECT DEBUG - Canvas creation failed:`, canvasError);
-        }
-
-        reject(new Error(`Failed to load image after all attempts`));
-      };
-
-      fallbackImg.src = fallbackUrl;
     };
 
-    // Disable CORS for Appwrite URLs and placeholder URLs
     if (!imageUrl.includes("placehold.co")) {
       img.crossOrigin = "anonymous";
     }
 
-    // Set source after setting event handlers
     console.log(`DIRECT DEBUG - Setting image src to: ${imageUrl}`);
     img.src = imageUrl;
   });
