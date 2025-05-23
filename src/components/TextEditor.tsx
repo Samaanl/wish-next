@@ -5,14 +5,41 @@ import dynamic from "next/dynamic";
 // Dynamically import fabric to avoid SSR issues
 const loadFabric = async () => {
   try {
-    console.log("Attempting to load fabric.js module");
+    console.log("Attempting to load fabric.js module (v2)");
     const fabricModule = await import("fabric");
-    console.log("Fabric module imported successfully");
-    return fabricModule.default;
+    console.log("Fabric module imported. Keys:", Object.keys(fabricModule));
+
+    let fabricInstance = fabricModule.default;
+
+    // If fabric.default doesn't seem to be it (e.g., no Canvas constructor),
+    // and the module itself has Canvas, then use the module directly.
+    if (
+      !(fabricInstance && typeof fabricInstance.Canvas === "function") &&
+      fabricModule &&
+      typeof (fabricModule as any).Canvas === "function"
+    ) {
+      console.log(
+        "fabricModule.default didn't have .Canvas, trying fabricModule itself."
+      );
+      fabricInstance = fabricModule as any; // Use the module itself
+    }
+
+    if (!(fabricInstance && typeof fabricInstance.Canvas === "function")) {
+      console.error(
+        "Failed to resolve fabric instance with a Canvas constructor.",
+        fabricInstance
+      );
+      throw new Error(
+        "Failed to resolve fabric instance with a Canvas constructor."
+      );
+    }
+
+    console.log("Resolved fabric instance successfully (v2).");
+    return fabricInstance;
   } catch (error) {
-    console.error("Error importing fabric.js module:", error);
+    console.error("Error importing/resolving fabric.js module (v2):", error);
     throw new Error(
-      `Failed to load fabric.js: ${
+      `Failed to load fabric.js (v2): ${
         error instanceof Error ? error.message : "Unknown error"
       }`
     );
@@ -129,15 +156,21 @@ const TextEditor: React.FC<TextEditorProps> = ({
   }, []); // Initialize canvas with fabric.js when it's loaded
   useEffect(() => {
     console.log(
-      "[TextEditor DEBUG] Canvas useEffect triggered. Fabric loaded:",
-      !!fabric,
+      "[TextEditor DEBUG] Canvas useEffect triggered. Fabric object:",
+      fabric, // Log the fabric object directly
+      "Is fabric ready (has .Canvas)?",
+      !!(fabric && fabric.Canvas && typeof fabric.Canvas === "function"), // Stronger check
       "SelectedImage fullUrl:",
       selectedImage?.fullUrl
     );
 
-    if (!fabric || !canvasRef.current) {
+    if (
+      !(fabric && fabric.Canvas && typeof fabric.Canvas === "function") ||
+      !canvasRef.current
+    ) {
+      // Stronger check for fabric.Canvas
       console.log(
-        "[TextEditor DEBUG] Canvas useEffect: fabric or canvasRef not ready, returning."
+        "[TextEditor DEBUG] Canvas useEffect: fabric.Canvas (function) or canvasRef not ready, returning."
       );
       return;
     }
