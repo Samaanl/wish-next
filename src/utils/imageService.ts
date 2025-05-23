@@ -223,10 +223,17 @@ export const downloadImage = async (
   console.log(`Attempting to download image from: ${imageUrl}`);
 
   return new Promise((resolve, reject) => {
+    // Set a timeout to prevent hanging indefinitely
+    const timeoutId = setTimeout(() => {
+      console.error(`Image load timeout: ${imageUrl}`);
+      reject(new Error("Image load timed out after 10 seconds"));
+    }, 10000);
+
+    // First try loading without crossOrigin
     const img = new Image();
-    img.crossOrigin = "anonymous"; // Important for working with canvas
 
     img.onload = () => {
+      clearTimeout(timeoutId);
       console.log(`Image loaded successfully: ${imageUrl}`);
       resolve(img);
     };
@@ -234,17 +241,41 @@ export const downloadImage = async (
     img.onerror = (e) => {
       console.error(`Error loading image from: ${imageUrl}`, e);
 
-      // If this is a placeholder URL, we can still try to use it
-      if (imageUrl.includes("placehold.co")) {
-        console.log("Retrying placeholder image without crossOrigin");
-        const fallbackImg = new Image();
-        fallbackImg.onload = () => resolve(fallbackImg);
-        fallbackImg.onerror = (err) =>
-          reject(`Failed to load even placeholder image: ${err}`);
-        fallbackImg.src = imageUrl;
-      } else {
-        reject(`Failed to load image: ${e}`);
-      }
+      // Try with crossOrigin as a fallback
+      console.log("Retrying with crossOrigin=anonymous");
+      const fallbackImg = new Image();
+      fallbackImg.crossOrigin = "anonymous";
+
+      fallbackImg.onload = () => {
+        clearTimeout(timeoutId);
+        console.log(`Image loaded successfully with crossOrigin: ${imageUrl}`);
+        resolve(fallbackImg);
+      };
+
+      fallbackImg.onerror = (err) => {
+        // If this is a placeholder URL, we can still try without any options
+        if (imageUrl.includes("placehold.co")) {
+          console.log("Retrying placeholder image with third attempt");
+          const lastAttemptImg = new Image();
+
+          lastAttemptImg.onload = () => {
+            clearTimeout(timeoutId);
+            resolve(lastAttemptImg);
+          };
+
+          lastAttemptImg.onerror = () => {
+            clearTimeout(timeoutId);
+            reject(new Error(`Failed to load image after multiple attempts`));
+          };
+
+          lastAttemptImg.src = imageUrl;
+        } else {
+          clearTimeout(timeoutId);
+          reject(new Error(`Failed to load image: ${err}`));
+        }
+      };
+
+      fallbackImg.src = imageUrl;
     };
 
     // Set source after setting event handlers

@@ -4,8 +4,19 @@ import dynamic from "next/dynamic";
 
 // Dynamically import fabric to avoid SSR issues
 const loadFabric = async () => {
-  const fabricModule = await import("fabric");
-  return fabricModule.default;
+  try {
+    console.log("Attempting to load fabric.js module");
+    const fabricModule = await import("fabric");
+    console.log("Fabric module imported successfully");
+    return fabricModule.default;
+  } catch (error) {
+    console.error("Error importing fabric.js module:", error);
+    throw new Error(
+      `Failed to load fabric.js: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`
+    );
+  }
 };
 
 interface TextEditorProps {
@@ -90,27 +101,54 @@ const TextEditor: React.FC<TextEditorProps> = ({
 
   // Load fabric.js
   useEffect(() => {
+    let isMounted = true;
+
     const loadFabricLibrary = async () => {
       try {
+        console.log("Loading fabric.js library");
         const fabricInstance = await loadFabric();
-        setFabric(fabricInstance);
+        if (isMounted) {
+          console.log("Fabric.js loaded successfully");
+          setFabric(fabricInstance);
+        }
       } catch (err) {
         console.error("Failed to load fabric.js:", err);
-        setError("Failed to load the editor. Please try again.");
-        setLoading(false);
+        if (isMounted) {
+          setError("Failed to load the editor. Please try again.");
+          setLoading(false);
+        }
       }
     };
 
     loadFabricLibrary();
-  }, []);
-  // Initialize canvas with fabric.js when it's loaded
+
+    // Cleanup function
+    return () => {
+      isMounted = false;
+    };
+  }, []); // Initialize canvas with fabric.js when it's loaded
   useEffect(() => {
     if (!fabric || !canvasRef.current) return;
+
+    let loadingTimeout: NodeJS.Timeout | null = null;
+    let isMounted = true;
 
     const setupCanvas = async () => {
       try {
         setLoading(true);
         setError(null);
+
+        // Set a timeout to update the UI if loading takes too long
+        loadingTimeout = setTimeout(() => {
+          console.log(
+            "Loading is taking longer than expected, showing extended loading message"
+          );
+          if (isMounted) {
+            setError(
+              "Loading is taking longer than expected, but we're still trying. Please wait..."
+            );
+          }
+        }, 5000);
 
         console.log(`Setting up canvas for image: ${selectedImage.fullUrl}`);
 
@@ -119,6 +157,11 @@ const TextEditor: React.FC<TextEditorProps> = ({
           backgroundColor: "#f0f0f0",
           preserveObjectStacking: true,
         });
+
+        if (!isMounted) {
+          fabricCanvas.dispose();
+          return;
+        }
 
         fabricCanvasRef.current = fabricCanvas;
 
@@ -140,6 +183,11 @@ const TextEditor: React.FC<TextEditorProps> = ({
           } else {
             throw imgError; // Re throw if even the placeholder fails
           }
+        }
+
+        if (!isMounted) {
+          fabricCanvas.dispose();
+          return;
         }
 
         // Create fabric image and add to canvas
@@ -190,15 +238,22 @@ const TextEditor: React.FC<TextEditorProps> = ({
 
         // Render
         fabricCanvas.renderAll();
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error setting up canvas:", error);
-        setError(
-          `Failed to setup the editor: ${
-            error instanceof Error ? error.message : "Unknown error"
-          }. Please try another image.`
-        );
+        if (isMounted) {
+          setError(
+            `Failed to setup the editor: ${
+              error instanceof Error ? error.message : "Unknown error"
+            }. Please try another image.`
+          );
+        }
       } finally {
-        setLoading(false);
+        if (loadingTimeout) {
+          clearTimeout(loadingTimeout);
+        }
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
@@ -206,8 +261,13 @@ const TextEditor: React.FC<TextEditorProps> = ({
 
     // Clean up on unmount
     return () => {
+      isMounted = false;
+      if (loadingTimeout) {
+        clearTimeout(loadingTimeout);
+      }
       if (fabricCanvasRef.current) {
         fabricCanvasRef.current.dispose();
+        fabricCanvasRef.current = null;
       }
     };
   }, [
@@ -272,30 +332,71 @@ const TextEditor: React.FC<TextEditorProps> = ({
     setTextShadow(enabled);
     updateTextProperties("shadow", enabled);
   };
-
   const handleSave = () => {
-    if (!fabricCanvasRef.current) return;
+    if (!fabricCanvasRef.current) {
+      setError("Editor not ready. Please try again.");
+      return;
+    }
 
     try {
+      // Set a maximum dimensions for the saved image to avoid memory issues
+      const MAX_DIMENSION = 2048;
+      const canvas = fabricCanvasRef.current.getElement();
+      const width = Math.min(canvas.width, MAX_DIMENSION);
+      const height = Math.min(canvas.height, MAX_DIMENSION);
+      const scaleFactor = Math.min(
+        1,
+        MAX_DIMENSION / Math.max(canvas.width, canvas.height)
+      );
+
+      console.log(
+        `Saving canvas with dimensions: ${width}x${height}, scale factor: ${scaleFactor}`
+      );
+
       const dataUrl = fabricCanvasRef.current.toDataURL({
         format: "jpeg",
-        quality: 0.8,
+        quality: 0.85,
+        width: width * scaleFactor,
+        height: height * scaleFactor,
       });
 
       onSave(dataUrl);
     } catch (err) {
       console.error("Error saving image:", err);
-      setError("Failed to save the image. Please try again.");
+      setError(
+        `Failed to save the image: ${
+          err instanceof Error ? err.message : "Unknown error"
+        }. Please try again.`
+      );
     }
   };
 
   const handleDownload = () => {
-    if (!fabricCanvasRef.current) return;
+    if (!fabricCanvasRef.current) {
+      setError("Editor not ready. Please try again.");
+      return;
+    }
 
     try {
+      // Set a maximum dimensions for the downloaded image to avoid memory issues
+      const MAX_DIMENSION = 2048;
+      const canvas = fabricCanvasRef.current.getElement();
+      const width = Math.min(canvas.width, MAX_DIMENSION);
+      const height = Math.min(canvas.height, MAX_DIMENSION);
+      const scaleFactor = Math.min(
+        1,
+        MAX_DIMENSION / Math.max(canvas.width, canvas.height)
+      );
+
+      console.log(
+        `Downloading canvas with dimensions: ${width}x${height}, scale factor: ${scaleFactor}`
+      );
+
       const dataUrl = fabricCanvasRef.current.toDataURL({
         format: "jpeg",
-        quality: 0.8,
+        quality: 0.85,
+        width: width * scaleFactor,
+        height: height * scaleFactor,
       });
 
       const link = document.createElement("a");
@@ -306,24 +407,39 @@ const TextEditor: React.FC<TextEditorProps> = ({
       document.body.removeChild(link);
     } catch (err) {
       console.error("Error downloading image:", err);
-      setError("Failed to download the image. Please try again.");
+      setError(
+        `Failed to download the image: ${
+          err instanceof Error ? err.message : "Unknown error"
+        }. Please try again.`
+      );
     }
   };
   if (error) {
     return (
       <div className="w-full text-center py-8">
-        <div className="bg-red-50 dark:bg-red-900/30 p-4 rounded-lg mb-4">
-          <p className="text-red-600 dark:text-red-400">{error}</p>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
-            This might be due to CORS restrictions or network issues. Try
-            another image or refresh the page.
-          </p>
+        <div className="bg-red-50 dark:bg-red-900/30 p-6 rounded-lg mb-6">
+          <h3 className="text-lg font-semibold text-red-700 dark:text-red-400 mb-2">
+            Image Editor Issue
+          </h3>
+          <p className="text-red-600 dark:text-red-400 mb-4">{error}</p>
+          <div className="text-sm text-gray-600 dark:text-gray-400 mt-2 space-y-2">
+            <p>This might be due to one of the following reasons:</p>
+            <ul className="list-disc pl-5 space-y-1">
+              <li>CORS restrictions preventing image loading</li>
+              <li>Network connectivity issues</li>
+              <li>The image format may not be supported</li>
+              <li>Browser memory limitations for large images</li>
+            </ul>
+            <p className="mt-3 font-medium">
+              Please try selecting a different image or refreshing the page.
+            </p>
+          </div>
         </div>
         <button
           onClick={onBack}
-          className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+          className="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
         >
-          Go Back
+          Go Back and Try Again
         </button>
       </div>
     );
@@ -336,14 +452,26 @@ const TextEditor: React.FC<TextEditorProps> = ({
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 mb-4">
             {" "}
             {loading ? (
-              <div className="flex flex-col justify-center items-center h-64 space-y-3">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
-                <span className="text-gray-600 dark:text-gray-300">
-                  Loading editor...
+              <div className="flex flex-col justify-center items-center h-80 space-y-4 p-6">
+                <div className="animate-spin rounded-full h-12 w-12 border-4 border-indigo-200 border-t-indigo-600"></div>
+                <span className="text-gray-600 dark:text-gray-300 font-medium">
+                  Loading image editor...
                 </span>
-                <span className="text-xs text-gray-500 dark:text-gray-400">
-                  This may take a moment to load the image
-                </span>
+                <div className="text-sm text-gray-500 dark:text-gray-400 text-center max-w-sm">
+                  <p>
+                    This may take a few moments depending on image size and
+                    network speed.
+                  </p>
+                  <p className="mt-2">
+                    If loading takes too long, try clicking "Back" and selecting
+                    a different image.
+                  </p>
+                </div>
+                {error && (
+                  <div className="mt-2 p-3 bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 text-sm rounded-lg max-w-sm text-center">
+                    {error}
+                  </div>
+                )}
               </div>
             ) : (
               <div className="flex justify-center">
