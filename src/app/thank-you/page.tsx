@@ -188,6 +188,7 @@ function ThankYouContent() {
         manualProcessAttempted: true,
         manualProcessResult: response.data,
       }));
+
       if (response.data.success) {
         setProcessingStatus("Credits added successfully!");
 
@@ -200,9 +201,10 @@ function ThankYouContent() {
           setFinalCredits(updatedUser.credits);
         }
 
-        // Mark this purchase as processed in this session to prevent duplicate processing
-        const sessionKey = `processed_${sessionId}_${packageId}`;
-        sessionStorage.setItem(sessionKey, "true");
+        // Mark this purchase as processed in this session using just the sessionId
+        // Store a timestamp to know when it was processed
+        const sessionKey = `processed_${sessionId}`;
+        sessionStorage.setItem(sessionKey, Date.now().toString());
 
         // Mark for home page refresh
         localStorage.setItem("credits_need_refresh", "true");
@@ -235,6 +237,7 @@ function ThankYouContent() {
     setIsLoading,
     setProcessingStatus,
   ]);
+
   useEffect(() => {
     // If there's no session ID, redirect to homepage
     if (!sessionId) {
@@ -242,36 +245,55 @@ function ThankYouContent() {
       return;
     }
 
-    // Create a flag to track if this component has already started processing the purchase
-    const purchaseKey = `${sessionId}_${packageId}`;
+    // Create a unique key for this specific purchase that includes the timestamp
+    // This ensures we can differentiate between multiple purchases of the same package
+    const purchaseKey = `${sessionId}`;
     const processingKey = `processing_${purchaseKey}`;
-    const alreadyProcessingInThisSession =
-      sessionStorage.getItem(processingKey);
 
-    // Check if this purchase has already been processed during this session
-    const sessionKey = `processed_${purchaseKey}`;
+    // Check if this exact purchase is already being processed in another component instance
+    const processingData = sessionStorage.getItem(processingKey);
+    const alreadyProcessingInThisSession = processingData
+      ? Date.now() - parseInt(processingData) < 30000
+      : false; // Only consider it processing if less than 30 seconds
+
+    // For processed purchases, we still want to allow the same package to be purchased multiple times
+    // So we check if this specific sessionId has been processed, not the package type
+    const sessionKey = `processed_${sessionId}`;
     const alreadyProcessed = sessionStorage.getItem(sessionKey);
 
     if (alreadyProcessed) {
-      console.log(
-        "Purchase already processed in this session, skipping processing"
-      );
-      setIsLoading(false);
+      console.log(`Purchase with session ID ${sessionId} already processed`);
 
-      // Even if already processed, still mark for refresh on home page
-      localStorage.setItem("credits_need_refresh", "true");
-      return;
+      // Check if this is a new purchase with the same package by comparing timestamps
+      const processedTime = parseInt(alreadyProcessed);
+      const currentTime = Date.now();
+      const timeSinceProcessed = currentTime - processedTime;
+
+      // If it's been less than 5 seconds since this exact session was processed,
+      // likely it's a page refresh/reload, so we skip processing
+      if (timeSinceProcessed < 5000) {
+        console.log("Recent duplicate detection - likely a page refresh");
+        setIsLoading(false);
+        localStorage.setItem("credits_need_refresh", "true");
+        return;
+      } else {
+        // It's been a while, so this could be a new purchase of the same package type
+        console.log(
+          "Same package purchased again after previous purchase completed"
+        );
+        // Continue with processing
+      }
     }
 
     if (alreadyProcessingInThisSession) {
       console.log(
-        "Already processing this purchase in this browser session, preventing duplicate"
+        "This purchase is already being processed in another tab/window"
       );
       setIsLoading(false);
       return;
     }
 
-    // Mark that we're starting to process this purchase
+    // Mark that we're starting to process this purchase with the current timestamp
     sessionStorage.setItem(processingKey, Date.now().toString());
 
     // First verify authentication status
@@ -337,7 +359,9 @@ function ThankYouContent() {
           setIsLoading(false);
         }
       }
-    }; // Process credits after authentication is confirmed
+    };
+
+    // Process credits after authentication is confirmed
     const processCredits = async () => {
       try {
         // Get fresh user data
@@ -407,9 +431,9 @@ function ThankYouContent() {
             const updatedUser = await getCurrentUser();
             setFinalCredits(updatedUser?.credits || 0);
 
-            // Mark this purchase as processed in this session to prevent duplicate processing
-            const sessionKey = `processed_${sessionId}_${packageId}`;
-            sessionStorage.setItem(sessionKey, "true");
+            // Mark this purchase as processed in this session using just the sessionId
+            const sessionKey = `processed_${sessionId}`;
+            sessionStorage.setItem(sessionKey, Date.now().toString());
 
             // Mark for home page refresh
             localStorage.setItem("credits_need_refresh", "true");
@@ -430,15 +454,16 @@ function ThankYouContent() {
         });
         setIsLoading(false);
       }
-    }; // Start the authentication check
+    };
+
+    // Start the authentication check
     checkAuth();
 
     // Cleanup function to remove processing flags on unmount
     return () => {
       // If the component unmounts without completing, remove the processing flag
-      // but keep the processed flag if it was set
-      if (!sessionStorage.getItem(`processed_${sessionId}_${packageId}`)) {
-        sessionStorage.removeItem(`processing_${sessionId}_${packageId}`);
+      if (!sessionStorage.getItem(`processed_${sessionId}`)) {
+        sessionStorage.removeItem(`processing_${sessionId}`);
       }
     };
 
@@ -527,6 +552,13 @@ function ThankYouContent() {
         await refreshUserCredits();
         const updatedUser = await getCurrentUser();
         setFinalCredits(updatedUser?.credits || 0);
+
+        // Mark this purchase as processed with the current timestamp
+        const sessionKey = `processed_${sessionId}`;
+        sessionStorage.setItem(sessionKey, Date.now().toString());
+
+        // Update credits_need_refresh flag for other components
+        localStorage.setItem("credits_need_refresh", "true");
       } else {
         throw new Error(response.data.error || "Unknown error");
       }

@@ -196,9 +196,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const updateCurrentUser = (user: UserData) => {
     setCurrentUser(user);
   };
-
   const refreshUserCredits = async () => {
     if (!currentUser) return;
+
+    console.log("Refreshing user credits for:", currentUser.id);
 
     // For guest users, just get the current state from localStorage
     if (currentUser.isGuest) {
@@ -206,13 +207,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       if (updatedGuestUser) {
         setCurrentUser(updatedGuestUser);
       }
+      console.log("Guest user credits refreshed");
       return;
     }
 
+    // Add credit refresh throttling to prevent excessive refreshes
+    const lastCreditRefreshTime = parseInt(
+      localStorage.getItem("last_credit_refresh") || "0"
+    );
+    const currentTime = Date.now();
+
+    // If we refreshed credits in the last 2 seconds, skip to avoid multiple refreshes
+    if (currentTime - lastCreditRefreshTime < 2000) {
+      console.log("Credit refresh throttled - recent refresh detected");
+      return;
+    }
+
+    // Mark this refresh attempt
+    localStorage.setItem("last_credit_refresh", currentTime.toString());
+
     // For regular users, get from Appwrite
     try {
+      console.log("Getting fresh user data from Appwrite...");
       const user = await getUserById(currentUser.id);
+
       if (user) {
+        console.log("User credits refreshed. New balance:", user.credits);
         setCurrentUser(user);
       }
     } catch (error) {

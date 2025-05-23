@@ -103,21 +103,37 @@ export const addCredits = async (
     throw new Error("Guest user not found");
   }
 
-  // Normal Appwrite user
+  // Normal Appwrite user - use a transaction-like approach
   try {
+    console.log(`Adding ${credits} credits to user ${userId}`);
+
+    // First get current state
     const user = await databases.getDocument(
       DATABASE_ID,
       USERS_COLLECTION_ID,
       userId
     );
 
-    const newCreditBalance = user.credits + credits;
+    const currentCredits = user.credits || 0;
+    console.log(`Current credits: ${currentCredits}`);
 
-    await databases.updateDocument(DATABASE_ID, USERS_COLLECTION_ID, userId, {
-      credits: newCreditBalance,
-    });
+    const newCreditBalance = currentCredits + credits;
+    console.log(`New credit balance will be: ${newCreditBalance}`);
 
-    return newCreditBalance;
+    // Update the document
+    const updatedUser = await databases.updateDocument(
+      DATABASE_ID,
+      USERS_COLLECTION_ID,
+      userId,
+      {
+        credits: newCreditBalance,
+      }
+    );
+
+    console.log(
+      `Credits updated successfully. New balance: ${updatedUser.credits}`
+    );
+    return updatedUser.credits;
   } catch (error) {
     console.error("Error adding credits:", error);
     throw error;
