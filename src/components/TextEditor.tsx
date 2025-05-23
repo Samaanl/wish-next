@@ -103,7 +103,6 @@ const TextEditor: React.FC<TextEditorProps> = ({
 
     loadFabricLibrary();
   }, []);
-
   // Initialize canvas with fabric.js when it's loaded
   useEffect(() => {
     if (!fabric || !canvasRef.current) return;
@@ -111,6 +110,9 @@ const TextEditor: React.FC<TextEditorProps> = ({
     const setupCanvas = async () => {
       try {
         setLoading(true);
+        setError(null);
+
+        console.log(`Setting up canvas for image: ${selectedImage.fullUrl}`);
 
         // Initialize canvas
         const fabricCanvas = new fabric.Canvas(canvasRef.current, {
@@ -121,7 +123,24 @@ const TextEditor: React.FC<TextEditorProps> = ({
         fabricCanvasRef.current = fabricCanvas;
 
         // Load image
-        const img = await downloadImage(selectedImage.fullUrl);
+        console.log(`Attempting to download image: ${selectedImage.fullUrl}`);
+        let img;
+        try {
+          img = await downloadImage(selectedImage.fullUrl);
+          console.log("Image downloaded successfully");
+        } catch (imgError) {
+          console.error("Error downloading image:", imgError);
+
+          // Try fallback to placeholder if real image fails
+          if (!selectedImage.fullUrl.includes("placehold.co")) {
+            console.log("Attempting to use placeholder image instead");
+            const placeholderSize = 600;
+            const placeholderUrl = `https://placehold.co/${placeholderSize}x${placeholderSize}?text=${selectedImage.occasion}`;
+            img = await downloadImage(placeholderUrl);
+          } else {
+            throw imgError; // Re-throw if even the placeholder fails
+          }
+        }
 
         // Create fabric image and add to canvas
         const fabricImage = new fabric.Image(img, {
@@ -173,7 +192,11 @@ const TextEditor: React.FC<TextEditorProps> = ({
         fabricCanvas.renderAll();
       } catch (error) {
         console.error("Error setting up canvas:", error);
-        setError("Failed to setup the editor. Please try again.");
+        setError(
+          `Failed to setup the editor: ${
+            error instanceof Error ? error.message : "Unknown error"
+          }. Please try another image.`
+        );
       } finally {
         setLoading(false);
       }
@@ -190,6 +213,7 @@ const TextEditor: React.FC<TextEditorProps> = ({
   }, [
     fabric,
     selectedImage.fullUrl,
+    selectedImage.occasion,
     wish,
     fontSize,
     fontFamily,
@@ -285,12 +309,15 @@ const TextEditor: React.FC<TextEditorProps> = ({
       setError("Failed to download the image. Please try again.");
     }
   };
-
   if (error) {
     return (
       <div className="w-full text-center py-8">
         <div className="bg-red-50 dark:bg-red-900/30 p-4 rounded-lg mb-4">
           <p className="text-red-600 dark:text-red-400">{error}</p>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+            This might be due to CORS restrictions or network issues. Try
+            another image or refresh the page.
+          </p>
         </div>
         <button
           onClick={onBack}
@@ -307,11 +334,15 @@ const TextEditor: React.FC<TextEditorProps> = ({
       <div className="flex flex-col lg:flex-row gap-6">
         <div className="lg:w-3/4">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 mb-4">
+            {" "}
             {loading ? (
-              <div className="flex justify-center items-center h-64">
+              <div className="flex flex-col justify-center items-center h-64 space-y-3">
                 <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
-                <span className="ml-3 text-gray-600 dark:text-gray-300">
+                <span className="text-gray-600 dark:text-gray-300">
                   Loading editor...
+                </span>
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  This may take a moment to load the image
                 </span>
               </div>
             ) : (

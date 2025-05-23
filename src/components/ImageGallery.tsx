@@ -33,18 +33,23 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({
         // The listImagesByOccasion function now handles all errors internally
         // and will always return either real images or dummy images
         const occasionImages = await listImagesByOccasion(occasion.id);
-        
+
         // Check if we got dummy images
-        if (occasionImages.length > 0 && occasionImages[0].previewUrl.includes('placehold.co')) {
+        if (
+          occasionImages.length > 0 &&
+          occasionImages[0].previewUrl.includes("placehold.co")
+        ) {
           setUseDummyImages(true);
-          setError("Using placeholder images - Appwrite storage images couldn't be loaded.");
+          setError(
+            "Using placeholder images - Appwrite storage images couldn't be loaded."
+          );
         }
-        
+
         setImages(occasionImages);
       } catch (err) {
         console.error("Fatal error in image fetching:", err);
         setError("Failed to load images. Using placeholder images instead.");
-        
+
         // As a last resort, show dummy images
         if (images.length === 0) {
           const dummyImages = getDummyImagesForOccasion(occasion.id);

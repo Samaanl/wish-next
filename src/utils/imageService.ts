@@ -121,24 +121,26 @@ export const listImagesByOccasion = async (
     console.log(
       `Fetching images for occasion ${occasionId} from storage ID: ${STORAGE_ID}`
     );
-    
+
     try {
       // More robust approach: fetch all files without complex queries
       console.log(`Fetching all files from bucket ${STORAGE_ID}`);
-      
+
       // Use a simple limit query to avoid potential pagination issues
       const allFiles = await storage.listFiles(STORAGE_ID, [
         // No complex queries that might cause errors
       ]);
-      
+
       console.log(`Found ${allFiles.files.length} total files in bucket`);
-      
+
       // Filter files that match our occasion on the client side
-      const matchingFiles = allFiles.files.filter(file => 
+      const matchingFiles = allFiles.files.filter((file) =>
         file.name.toLowerCase().includes(occasionId.toLowerCase())
       );
-      
-      console.log(`Found ${matchingFiles.length} files matching occasion: ${occasionId}`);
+
+      console.log(
+        `Found ${matchingFiles.length} files matching occasion: ${occasionId}`
+      );
 
       if (matchingFiles.length === 0) {
         console.warn(
@@ -218,11 +220,34 @@ export const getImageById = async (
 export const downloadImage = async (
   imageUrl: string
 ): Promise<HTMLImageElement> => {
+  console.log(`Attempting to download image from: ${imageUrl}`);
+
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.crossOrigin = "anonymous"; // Important for working with canvas
-    img.onload = () => resolve(img);
-    img.onerror = reject;
+
+    img.onload = () => {
+      console.log(`Image loaded successfully: ${imageUrl}`);
+      resolve(img);
+    };
+
+    img.onerror = (e) => {
+      console.error(`Error loading image from: ${imageUrl}`, e);
+
+      // If this is a placeholder URL, we can still try to use it
+      if (imageUrl.includes("placehold.co")) {
+        console.log("Retrying placeholder image without crossOrigin");
+        const fallbackImg = new Image();
+        fallbackImg.onload = () => resolve(fallbackImg);
+        fallbackImg.onerror = (err) =>
+          reject(`Failed to load even placeholder image: ${err}`);
+        fallbackImg.src = imageUrl;
+      } else {
+        reject(`Failed to load image: ${e}`);
+      }
+    };
+
+    // Set source after setting event handlers
     img.src = imageUrl;
   });
 };
