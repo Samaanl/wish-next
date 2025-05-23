@@ -290,7 +290,7 @@ export const uploadWishImage = async (
     const timestamp = Date.now();
     const filename = `${occasionId}_${userId}_${timestamp}.jpg`;
 
-    // Create file from Blob
+    // Create file from Blo
     const file = new File([blob], filename, { type: "image/jpeg" });
 
     // Upload file to Appwrite storage this is a
