@@ -1,3 +1,4 @@
+// filepath: c:\Users\samaa\Desktop\wish maker\next-wish\src\components\TextEditor.tsx
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { OccasionImage, downloadImage } from "@/utils/imageService";
 import dynamic from "next/dynamic";
@@ -68,8 +69,6 @@ const TextEditor: React.FC<TextEditorProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [fontFamily, setFontFamily] = useState("Arial");
   const [fabric, setFabric] = useState<any>(null);
-  const [canvasReady, setCanvasReady] = useState(false);
-  const [setupAttempts, setSetupAttempts] = useState(0);
 
   const colorOptions = [
     "#ffffff", // White
@@ -192,6 +191,7 @@ const TextEditor: React.FC<TextEditorProps> = ({
       }
       return;
     }
+
     if (loading) {
       console.log(
         "[CanvasSetupEffect] Fabric & image ready. Main 'loading' is true. Setting to false to render canvas element."
@@ -199,6 +199,7 @@ const TextEditor: React.FC<TextEditorProps> = ({
       setLoading(false);
       return;
     }
+
     if (!canvasRef.current) {
       console.error(
         "[CanvasSetupEffect] CRITICAL: Fabric, image selected, loading=false, BUT canvasRef.current is NULL."
@@ -210,8 +211,7 @@ const TextEditor: React.FC<TextEditorProps> = ({
     }
 
     console.log(
-      "[CanvasSetupEffect] All prerequisites met. Proceeding to _setupFabricCanvas. Attempt:",
-      setupAttempts + 1
+      "[CanvasSetupEffect] All prerequisites met. Proceeding to _setupFabricCanvas."
     );
 
     const _setupFabricCanvas = async () => {
@@ -299,37 +299,11 @@ const TextEditor: React.FC<TextEditorProps> = ({
         newCanvas.add(text);
         newCanvas.setActiveObject(text);
         newCanvas.renderAll();
-        setCanvasReady(true);
-        setSetupAttempts(0); // Reset attempts on success
-        console.log(
-          "[_setupFabricCanvas] Canvas setup complete. Active object:",
-          newCanvas.getActiveObject()
-        );
+        console.log("[_setupFabricCanvas] Canvas setup complete.");
       } catch (err: any) {
         if (isCanvasSetupMounted) {
           console.error("[_setupFabricCanvas] Error during canvas setup:", err);
-          const newAttempts = setupAttempts + 1;
-          setSetupAttempts(newAttempts);
-
-          if (newAttempts < 3) {
-            console.log(
-              `[_setupFabricCanvas] Retrying setup attempt ${newAttempts + 1}/3`
-            );
-            // Retry after a short delay
-            setTimeout(() => {
-              if (isCanvasSetupMounted) {
-                _setupFabricCanvas();
-              }
-            }, 1000);
-          } else {
-            console.error(
-              "[_setupFabricCanvas] Max setup attempts reached. Enabling controls anyway."
-            );
-            setError(
-              `Failed to load image into editor: ${err.message}. Controls are enabled for manual retry.`
-            );
-            setCanvasReady(true); // Enable controls even if setup failed
-          }
+          setError(`Failed to load image into editor: ${err.message}.`);
         }
       } finally {
         if (isCanvasSetupMounted) {
@@ -342,6 +316,7 @@ const TextEditor: React.FC<TextEditorProps> = ({
     };
 
     _setupFabricCanvas();
+
     return () => {
       isCanvasSetupMounted = false;
       if (imageLoadingTimeout) clearTimeout(imageLoadingTimeout);
@@ -352,7 +327,6 @@ const TextEditor: React.FC<TextEditorProps> = ({
         fabricCanvasRef.current.dispose();
         fabricCanvasRef.current = null;
       }
-      setCanvasReady(false);
     };
   }, [
     fabric,
@@ -363,45 +337,13 @@ const TextEditor: React.FC<TextEditorProps> = ({
     fontFamily,
     textColor,
     textShadow,
-    setupAttempts,
-  ]); // Fallback to enable controls if canvas setup is taking too long
-  useEffect(() => {
-    const fallbackTimeout = setTimeout(() => {
-      if (!canvasReady && !loading && !error) {
-        console.warn(
-          "[TextEditor] Canvas setup taking too long. Enabling controls as fallback."
-        );
-        setCanvasReady(true);
-        setError(
-          "Canvas setup had issues, but controls are enabled. You may need to refresh if text editing doesn't work properly."
-        );
-      }
-    }, 10000); // 10 second fallback
-
-    return () => clearTimeout(fallbackTimeout);
-  }, [canvasReady, loading, error]);
+  ]);
 
   // Apply changes when text properties change
   const updateTextProperties = (property: string, value: any) => {
-    if (!fabricCanvasRef.current) {
-      console.log("Fabric canvas not ready, skipping text property update");
+    if (!fabricCanvasRef.current || !fabricCanvasRef.current.getActiveObject())
       return;
-    }
-
-    let activeObject = fabricCanvasRef.current.getActiveObject();
-    if (!activeObject || activeObject.type !== "textbox") {
-      // If no active object, try to find the text object
-      const objects = fabricCanvasRef.current.getObjects();
-      const textObject = objects.find((obj: any) => obj.type === "textbox");
-      if (textObject) {
-        fabricCanvasRef.current.setActiveObject(textObject);
-        activeObject = textObject;
-      } else {
-        console.log("No text object found to update");
-        return;
-      }
-    }
-
+    const activeObject = fabricCanvasRef.current.getActiveObject();
     if (activeObject && activeObject.type === "textbox") {
       if (property === "shadow") {
         if (value) {
@@ -511,8 +453,8 @@ const TextEditor: React.FC<TextEditorProps> = ({
 
   return (
     <div className="w-full">
-      <div className="flex flex-col lg:flex-row gap-6">
-        <div className="lg:w-3/4">
+      <div className="flex flex-col md:flex-row gap-6">
+        <div className="w-full md:w-3/4 order-2 md:order-1">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 mb-4 min-h-[400px]">
             {loading ? (
               <div
@@ -557,65 +499,46 @@ const TextEditor: React.FC<TextEditorProps> = ({
                 <canvas ref={canvasRef} />
               </div>
             )}
-          </div>{" "}
-          {/* Fixed position bottom bar for mobile */}
-          <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 shadow-lg p-4 flex justify-center space-x-2 lg:hidden z-50">
+          </div>
+
+          <div className="flex flex-wrap gap-2 justify-center mt-4 mb-8">
             <button
               onClick={onBack}
               className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
             >
               Back
             </button>
-            {!loading && !error && canvasReady && (
-              <>
-                <button
-                  onClick={handleSave}
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-                >
-                  Save
-                </button>
-                <button
-                  onClick={handleDownload}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                >
-                  Download
-                </button>
-              </>
-            )}
-          </div>
-          {/* Desktop buttons */}
-          <div className="hidden lg:flex space-x-2 justify-center mt-4 mb-8">
+            {/* Always show buttons but disable when not ready */}
             <button
-              onClick={onBack}
-              className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+              onClick={handleSave}
+              disabled={Boolean(loading || error || !fabricCanvasRef.current)}
+              className={`px-4 py-2 text-white rounded-lg transition-colors ${
+                loading || error || !fabricCanvasRef.current
+                  ? "bg-indigo-400 cursor-not-allowed"
+                  : "bg-indigo-600 hover:bg-indigo-700"
+              }`}
             >
-              Back
+              Save
             </button>
-            {!loading && !error && (
-              <>
-                <button
-                  onClick={handleSave}
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-                >
-                  Save
-                </button>
-                <button
-                  onClick={handleDownload}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                >
-                  Download
-                </button>
-              </>
-            )}
+            <button
+              onClick={handleDownload}
+              disabled={Boolean(loading || error || !fabricCanvasRef.current)}
+              className={`px-4 py-2 text-white rounded-lg transition-colors ${
+                loading || error || !fabricCanvasRef.current
+                  ? "bg-green-400 cursor-not-allowed"
+                  : "bg-green-600 hover:bg-green-700"
+              }`}
+            >
+              Download
+            </button>
           </div>
-        </div>{" "}
-        <div className="lg:w-1/4 mb-20 lg:mb-0">
-          {" "}
-          {/* Added bottom margin for mobile to account for fixed button bar */}{" "}
+        </div>
+
+        <div className="w-full md:w-1/4 order-1 md:order-2 mb-6 md:mb-0">
           <div
             className={`bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 ${
-              loading || error || !canvasReady
-                ? "opacity-50 pointer-events-none"
+              loading || error || !fabricCanvasRef.current
+                ? "opacity-70 pointer-events-none"
                 : ""
             }`}
           >
@@ -623,101 +546,48 @@ const TextEditor: React.FC<TextEditorProps> = ({
               Text Settings
             </h3>
 
-            {/* Debug info when controls are disabled */}
-            {(loading || error || !canvasReady) && (
-              <div className="mb-4 p-2 bg-yellow-100 dark:bg-yellow-900 rounded text-sm">
-                <p className="text-yellow-800 dark:text-yellow-200">
-                  Controls disabled: Loading: {loading ? "Yes" : "No"}, Canvas
-                  Ready: {canvasReady ? "Yes" : "No"}, Error:{" "}
-                  {error ? "Yes" : "No"}
-                  {setupAttempts > 0 && ` (Attempt: ${setupAttempts}/3)`}
-                </p>{" "}
-                {error && (
-                  <p className="text-red-600 dark:text-red-400 mt-1 text-xs">
-                    {error}
-                  </p>
-                )}
-                {!canvasReady && !loading && (
-                  <button
-                    onClick={() => {
-                      setSetupAttempts(0);
-                      setError(null);
-                      setLoading(true);
-                    }}
-                    className="mt-2 px-3 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600"
-                  >
-                    Retry Setup
-                  </button>
-                )}
-              </div>
-            )}
-
-            {/* Color picker with better mobile touch targets */}
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Text Color
               </label>
-              <div className="grid grid-cols-6 sm:grid-cols-8 gap-2">
+              <div className="grid grid-cols-8 gap-1">
                 {colorOptions.map((color) => (
-                  <button
+                  <div
                     key={color}
-                    className={`w-8 h-8 rounded-full cursor-pointer hover:scale-110 transition-transform ${
+                    className={`w-6 h-6 rounded-full cursor-pointer hover:scale-110 transition-transform ${
                       textColor === color
                         ? "ring-2 ring-offset-2 ring-indigo-500"
                         : ""
                     }`}
                     style={{ backgroundColor: color }}
                     onClick={() => handleColorChange(color)}
-                    aria-label={`Select color ${color}`}
                   />
                 ))}
               </div>
             </div>
 
-            {/* Improved mobile font size slider */}
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Font Size: {fontSize}px
               </label>
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={() =>
-                    handleFontSizeChange(Math.max(12, fontSize - 2))
-                  }
-                  className="w-8 h-8 flex items-center justify-center bg-gray-200 dark:bg-gray-700 rounded-lg"
-                >
-                  -
-                </button>
-                <input
-                  type="range"
-                  min="12"
-                  max="72"
-                  value={fontSize}
-                  onChange={(e) =>
-                    handleFontSizeChange(parseInt(e.target.value))
-                  }
-                  className="flex-1"
-                />
-                <button
-                  onClick={() =>
-                    handleFontSizeChange(Math.min(72, fontSize + 2))
-                  }
-                  className="w-8 h-8 flex items-center justify-center bg-gray-200 dark:bg-gray-700 rounded-lg"
-                >
-                  +
-                </button>
-              </div>
+              <input
+                type="range"
+                min="12"
+                max="72"
+                value={fontSize}
+                onChange={(e) => handleFontSizeChange(parseInt(e.target.value))}
+                className="w-full"
+              />
             </div>
 
-            {/* Mobile-friendly font selector */}
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Font Family
               </label>
               <select
                 value={fontFamily}
                 onChange={(e) => handleFontFamilyChange(e.target.value)}
-                className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-base"
+                className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
               >
                 {fontOptions.map((font) => (
                   <option key={font} value={font} style={{ fontFamily: font }}>
@@ -727,25 +597,24 @@ const TextEditor: React.FC<TextEditorProps> = ({
               </select>
             </div>
 
-            {/* Larger touch target for shadow toggle */}
-            <div className="mb-6">
+            <div className="mb-4">
               <label className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300">
                 <input
                   type="checkbox"
                   checked={textShadow}
                   onChange={(e) => handleShadowToggle(e.target.checked)}
-                  className="w-5 h-5 mr-3 rounded border-gray-300 dark:border-gray-600"
+                  className="mr-2"
                 />
                 Text Shadow
               </label>
             </div>
 
             <div className="mt-6 text-xs text-gray-500 dark:text-gray-400">
-              <p className="font-medium mb-2">Tips:</p>
-              <ul className="list-disc pl-4 space-y-2">
-                <li>Tap and drag the text to position it</li>
-                <li>Tap the text to edit the content</li>
-                <li>Use corner handles to resize text</li>
+              <p>Tips:</p>
+              <ul className="list-disc pl-4 mt-1 space-y-1">
+                <li>Click and drag the text to position it</li>
+                <li>Click the text to edit the content directly</li>
+                <li>Use the corner handles to resize text</li>
                 <li>Use rotation handle to rotate text</li>
               </ul>
             </div>
