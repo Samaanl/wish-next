@@ -489,10 +489,18 @@ const TextEditor: React.FC<TextEditorProps> = ({
       // Draw background at full resolution
       exportCtx.drawImage(originalImg, 0, 0);
 
-      // Get fabric canvas dimensions for scaling calculations
+      // Get fabric canvas dimensions for scaling calculations safely
       const fabricCanvas = fabricCanvasRef.current;
+      if (!fabricCanvas || typeof fabricCanvas.getWidth !== "function") {
+        throw new Error("Fabric canvas is not properly initialized");
+      }
+
       const canvasWidth = fabricCanvas.getWidth();
       const canvasHeight = fabricCanvas.getHeight();
+
+      if (!canvasWidth || !canvasHeight) {
+        throw new Error("Canvas dimensions are invalid");
+      }
 
       // Calculate scaling factors for text elements
       const scaleX = originalImg.width / canvasWidth;
@@ -524,17 +532,34 @@ const TextEditor: React.FC<TextEditorProps> = ({
         }
       });
 
-      // Export as high-quality PNG and download
+      // Export as high-quality PNG and download with safer DOM manipulation
       const dataUrl = exportCanvas.toDataURL("image/png", 1.0);
-      const link = document.createElement("a");
-      link.download = `wish-maker-${selectedImage?.occasion || "image"}.png`;
-      link.href = dataUrl;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+
+      // Use a safer download method
+      const downloadLink = document.createElement("a");
+      downloadLink.download = `wish-maker-${
+        selectedImage?.occasion || "image"
+      }-${Date.now()}.png`;
+      downloadLink.href = dataUrl;
+      downloadLink.style.display = "none";
+
+      // Add to body, click, and remove safely
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+
+      // Use setTimeout to ensure the click event is processed before removal
+      setTimeout(() => {
+        if (downloadLink.parentNode) {
+          document.body.removeChild(downloadLink);
+        }
+      }, 100);
     } catch (err) {
       console.error("Error downloading image:", err);
-      setError("Failed to download image.");
+      setError(
+        `Failed to download image: ${
+          err instanceof Error ? err.message : "Unknown error"
+        }`
+      );
     } finally {
       setLoading(false);
     }
