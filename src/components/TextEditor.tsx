@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { OccasionImage, downloadImage } from "@/utils/imageService";
 import dynamic from "next/dynamic";
 
@@ -129,216 +129,185 @@ const TextEditor: React.FC<TextEditorProps> = ({
   // Load fabric.js
   useEffect(() => {
     let isMounted = true;
-
-    const loadFabricLibrary = async () => {
-      try {
-        console.log("Loading fabric.js library");
-        const fabricInstance = await loadFabric();
+    console.log("[FabricLoaderEffect] Initializing fabric load.");
+    loadFabric()
+      .then((fabricInstance) => {
         if (isMounted) {
-          console.log("Fabric.js loaded successfully, setting fabric state.");
+          console.log(
+            "[FabricLoaderEffect] Fabric.js loaded successfully, setting fabric state."
+          );
           setFabric(fabricInstance);
         }
-      } catch (err) {
-        console.error("Failed to load fabric.js:", err);
+      })
+      .catch((err) => {
         if (isMounted) {
+          console.error("[FabricLoaderEffect] Failed to load fabric.js:", err);
           setError("Failed to load the editor library. Please try again.");
           setLoading(false);
         }
-      }
-    };
-
-    loadFabricLibrary();
-
-    // Cleanup function
+      });
     return () => {
       isMounted = false;
     };
-  }, []); // Empty dependency array, runs once on mount
+  }, []);
+
+  // Diagnostic layout effect for canvasRef
+  useLayoutEffect(() => {
+    console.log(
+      `[TextEditor LayoutEffect] After DOM mutation - loading: ${loading}, canvasRef.current populated: ${!!canvasRef.current}`
+    );
+  }, [loading]);
 
   // Initialize canvas with fabric.js when it's loaded AND selectedImage changes
   useEffect(() => {
+    let isCanvasSetupMounted = true;
+    let imageLoadingTimeout: NodeJS.Timeout | null = null;
+
     console.log(
-      "[TextEditor DEBUG] Canvas useEffect triggered. Fabric object:",
-      fabric,
-      "Is fabric ready (has .Canvas)?",
-      !!(fabric && fabric.Canvas && typeof fabric.Canvas === "function"),
-      "canvasRef.current available?",
-      !!canvasRef.current,
-      "SelectedImage fullUrl:",
-      selectedImage?.fullUrl
+      `[CanvasSetupEffect] Triggered. Fabric ready: ${!!(
+        fabric && fabric.Canvas
+      )}, Image selected: ${!!selectedImage?.fullUrl}, Current loading state: ${loading}, Canvas ref available: ${!!canvasRef.current}`
     );
 
-    if (
-      !(fabric && fabric.Canvas && typeof fabric.Canvas === "function") ||
-      !selectedImage?.fullUrl
-    ) {
+    if (!fabric || !selectedImage?.fullUrl) {
       console.log(
-        "[TextEditor DEBUG] Canvas useEffect: fabric, selectedImage.fullUrl, or canvasRef not ready yet. Returning."
+        "[CanvasSetupEffect] Pre-requisites not met (no fabric or no selected image). Returning."
       );
-      if (fabric && !selectedImage?.fullUrl && !loading) {
-        // setError("Please select an image to start editing."); // Optional: guide user
-      }
+      return;
+    }
+
+    if (loading) {
+      console.log(
+        "[CanvasSetupEffect] Fabric & image ready. Main 'loading' is true. Setting to false to allow canvas DOM render."
+      );
+      setLoading(false);
       return;
     }
 
     if (!canvasRef.current) {
-      console.log(
-        "[TextEditor DEBUG] Canvas useEffect: canvasRef.current is still not available. This is unexpected if fabric is loaded. Deferring setupCanvas."
+      console.error(
+        "[CanvasSetupEffect] CRITICAL: Fabric loaded, image selected, main 'loading' is false, BUT canvasRef.current is STILL NULL. This implies canvas element didn't render or ref didn't attach."
       );
-      if (loading) setLoading(false);
+      setError(
+        "Editor canvas could not be initialized. Please check console and try refreshing."
+      );
       return;
     }
 
     console.log(
-      "[TextEditor DEBUG] Canvas useEffect: All conditions met. Proceeding to setupCanvas."
+      "[CanvasSetupEffect] All prerequisites met. Proceeding to _setupFabricCanvas."
     );
 
-    const setupCanvas = async () => {
+    const _setupFabricCanvas = async () => {
       console.log(
-        `[TextEditor DEBUG] setupCanvas: Starting. Image URL: ${selectedImage.fullUrl}`
+        `[_setupFabricCanvas] Starting for image: ${selectedImage.fullUrl}`
       );
-      setLoading(true);
       setError(null);
-      let loadingTimeout: NodeJS.Timeout | null = null;
-      let isMountedInSetup = true;
 
-      loadingTimeout = setTimeout(() => {
-        console.log(
-          "[TextEditor DEBUG] setupCanvas: UI Loading timeout (5s) fired."
-        );
-        if (isMountedInSetup && loading && !error) {
-          setError(
-            "Loading is taking longer than expected, but we're still trying. Please wait..."
+      const editorContentLoadingElement = document.getElementById(
+        "editor-content-loading"
+      );
+      if (editorContentLoadingElement)
+        editorContentLoadingElement.style.display = "flex";
+
+      imageLoadingTimeout = setTimeout(() => {
+        if (isCanvasSetupMounted) {
+          console.warn(
+            "[_setupFabricCanvas] Image loading seems to be taking a while..."
           );
         }
-      }, 5000);
+      }, 7000);
 
-      console.log(
-        `[TextEditor DEBUG] setupCanvas: Initializing fabric.Canvas for image: ${selectedImage.fullUrl}`
-      );
-      if (fabricCanvasRef.current) {
-        fabricCanvasRef.current.dispose();
-      }
-      const fabricCanvas = new fabric.Canvas(canvasRef.current, {
-        backgroundColor: "#f0f0f0",
-        preserveObjectStacking: true,
-      });
-
-      if (!isMountedInSetup) {
-        console.log(
-          "[TextEditor DEBUG] setupCanvas: Component unmounted during fabric.Canvas init. Disposing."
-        );
-        fabricCanvas.dispose();
-        return;
-      }
-      fabricCanvasRef.current = fabricCanvas;
-
-      console.log(
-        `[TextEditor DEBUG] setupCanvas: Attempting to download primary image: ${selectedImage.fullUrl}`
-      );
-      let img: HTMLImageElement;
       try {
-        img = await downloadImage(selectedImage.fullUrl);
-        console.log(
-          "[TextEditor DEBUG] setupCanvas: Primary image downloaded successfully."
-        );
-      } catch (imgError) {
-        console.error(
-          "[TextEditor DEBUG] setupCanvas: Error downloading primary image:",
-          imgError
-        );
-        if (selectedImage.fullUrl.includes("placehold.co")) {
-          console.error(
-            "[TextEditor DEBUG] setupCanvas: Primary image (which was a placeholder) failed. Re-throwing error."
-          );
-          throw imgError;
+        if (fabricCanvasRef.current) {
+          fabricCanvasRef.current.dispose();
+          fabricCanvasRef.current = null;
         }
 
-        console.log(
-          "[TextEditor DEBUG] setupCanvas: Attempting to download placeholder image due to primary image failure."
-        );
-        const placeholderSize = 600;
-        const placeholderUrl = `https://placehold.co/${placeholderSize}x${placeholderSize}?text=${selectedImage.occasion}_fallback`;
-        try {
-          img = await downloadImage(placeholderUrl);
-          console.log(
-            "[TextEditor DEBUG] setupCanvas: Placeholder image downloaded successfully."
-          );
-        } catch (placeholderError) {
-          console.error(
-            "[TextEditor DEBUG] setupCanvas: Error downloading placeholder image:",
-            placeholderError
-          );
-          throw placeholderError;
-        }
-      }
-
-      if (!isMountedInSetup) {
-        console.log(
-          "[TextEditor DEBUG] setupCanvas: Component unmounted after image download. Disposing canvas."
-        );
-        fabricCanvas.dispose();
-        return;
-      }
-      console.log(
-        "[TextEditor DEBUG] setupCanvas: Image obtained. Proceeding to add to canvas."
-      );
-
-      const fabricImage = new fabric.Image(img, {
-        selectable: false,
-        evented: false,
-      });
-
-      const canvasWidth = Math.min(window.innerWidth - 40, 600);
-      const scaleFactor = canvasWidth / img.width;
-      const canvasHeight = img.height * scaleFactor;
-
-      fabricCanvas.setWidth(canvasWidth);
-      fabricCanvas.setHeight(canvasHeight);
-      fabricImage.scaleToWidth(canvasWidth);
-      fabricCanvas.add(fabricImage);
-
-      const textOptions: any = {
-        left: canvasWidth / 2,
-        top: canvasHeight / 2,
-        originX: "center",
-        originY: "center",
-        fontSize,
-        fontFamily,
-        fill: textColor,
-        textAlign: "center",
-        width: canvasWidth * 0.8,
-        editable: true,
-      };
-
-      if (textShadow) {
-        textOptions.shadow = new fabric.Shadow({
-          color: "rgba(0,0,0,0.6)",
-          blur: 5,
-          offsetX: 2,
-          offsetY: 2,
+        const newCanvas = new fabric.Canvas(canvasRef.current, {
+          backgroundColor: "#f0f0f0",
+          preserveObjectStacking: true,
         });
-      }
+        if (!isCanvasSetupMounted) {
+          newCanvas.dispose();
+          return;
+        }
+        fabricCanvasRef.current = newCanvas;
 
-      const text = new fabric.Textbox(wish, textOptions);
-      fabricCanvas.add(text);
-      fabricCanvas.setActiveObject(text);
-      fabricCanvas.renderAll();
-      console.log(
-        "[TextEditor DEBUG] setupCanvas: Canvas setup complete, image and text added."
-      );
+        console.log(
+          `[_setupFabricCanvas] Downloading image via imageService: ${selectedImage.fullUrl}`
+        );
+        const imgHtmlElement = await downloadImage(selectedImage.fullUrl);
+        if (!isCanvasSetupMounted) {
+          newCanvas.dispose();
+          return;
+        }
+        console.log("[_setupFabricCanvas] Image downloaded successfully.");
+
+        const fabricImage = new fabric.Image(imgHtmlElement, {
+          selectable: false,
+          evented: false,
+        });
+
+        const MAX_CANVAS_WIDTH = 600;
+        const canvasWidth = Math.min(window.innerWidth - 40, MAX_CANVAS_WIDTH);
+        const scaleFactor = canvasWidth / imgHtmlElement.width;
+        const canvasHeight = imgHtmlElement.height * scaleFactor;
+
+        newCanvas.setWidth(canvasWidth);
+        newCanvas.setHeight(canvasHeight);
+        fabricImage.scaleToWidth(canvasWidth);
+        newCanvas.add(fabricImage);
+
+        const textOptions: any = {
+          left: canvasWidth / 2,
+          top: canvasHeight / 2,
+          originX: "center",
+          originY: "center",
+          fontSize,
+          fontFamily,
+          fill: textColor,
+          textAlign: "center",
+          width: canvasWidth * 0.8,
+          editable: true,
+        };
+        if (textShadow) {
+          textOptions.shadow = new fabric.Shadow({
+            color: "rgba(0,0,0,0.6)",
+            blur: 5,
+            offsetX: 2,
+            offsetY: 2,
+          });
+        }
+        const text = new fabric.Textbox(wish, textOptions);
+        newCanvas.add(text);
+        newCanvas.setActiveObject(text);
+        newCanvas.renderAll();
+        console.log("[_setupFabricCanvas] Canvas setup complete.");
+      } catch (err: any) {
+        if (isCanvasSetupMounted) {
+          console.error("[_setupFabricCanvas] Error during canvas setup:", err);
+          setError(`Failed to load image into editor: ${err.message}.`);
+        }
+      } finally {
+        if (isCanvasSetupMounted) {
+          console.log("[_setupFabricCanvas] Reached finally block.");
+          if (imageLoadingTimeout) clearTimeout(imageLoadingTimeout);
+          if (editorContentLoadingElement)
+            editorContentLoadingElement.style.display = "none";
+        }
+      }
     };
 
-    setupCanvas();
+    _setupFabricCanvas();
 
     return () => {
+      isCanvasSetupMounted = false;
+      if (imageLoadingTimeout) clearTimeout(imageLoadingTimeout);
       console.log(
-        "[TextEditor DEBUG] Canvas useEffect cleanup. Tearing down. Aborting any ongoing setupCanvas indirectly."
+        "[CanvasSetupEffect] Cleanup. Disposing fabric canvas if it exists."
       );
       if (fabricCanvasRef.current) {
-        console.log(
-          "[TextEditor DEBUG] Disposing fabric canvas from Canvas useEffect cleanup."
-        );
         fabricCanvasRef.current.dispose();
         fabricCanvasRef.current = null;
       }
@@ -346,6 +315,7 @@ const TextEditor: React.FC<TextEditorProps> = ({
   }, [
     fabric,
     selectedImage,
+    loading,
     wish,
     fontSize,
     fontFamily,
@@ -355,8 +325,8 @@ const TextEditor: React.FC<TextEditorProps> = ({
 
   // Apply changes when text properties change
   const updateTextProperties = (property: string, value: any) => {
-    if (!fabricCanvasRef.current) return;
-
+    if (!fabricCanvasRef.current || !fabricCanvasRef.current.getActiveObject())
+      return;
     const activeObject = fabricCanvasRef.current.getActiveObject();
     if (activeObject && activeObject.type === "textbox") {
       if (property === "shadow") {
@@ -404,6 +374,7 @@ const TextEditor: React.FC<TextEditorProps> = ({
     setTextShadow(enabled);
     updateTextProperties("shadow", enabled);
   };
+
   const handleSave = () => {
     if (!fabricCanvasRef.current) {
       setError("Editor not ready. Please try again.");
@@ -486,33 +457,22 @@ const TextEditor: React.FC<TextEditorProps> = ({
       );
     }
   };
-  if (error) {
+
+  if (error && !fabric) {
     return (
       <div className="w-full text-center py-8">
-        <div className="bg-red-50 dark:bg-red-900/30 p-6 rounded-lg mb-6">
+        <div className="bg-red-50 dark:bg-red-900/30 p-6 rounded-lg">
           <h3 className="text-lg font-semibold text-red-700 dark:text-red-400 mb-2">
-            Image Editor Issue
+            Editor Initialization Failed
           </h3>
-          <p className="text-red-600 dark:text-red-400 mb-4">{error}</p>
-          <div className="text-sm text-gray-600 dark:text-gray-400 mt-2 space-y-2">
-            <p>This might be due to one of the following reasons:</p>
-            <ul className="list-disc pl-5 space-y-1">
-              <li>CORS restrictions preventing image loading</li>
-              <li>Network connectivity issues</li>
-              <li>The image format may not be supported</li>
-              <li>Browser memory limitations for large images</li>
-            </ul>
-            <p className="mt-3 font-medium">
-              Please try selecting a different image or refreshing the page.
-            </p>
-          </div>
+          <p className="text-red-600 dark:text-red-400">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
+          >
+            Reload Page
+          </button>
         </div>
-        <button
-          onClick={onBack}
-          className="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-        >
-          Go Back and Try Again
-        </button>
       </div>
     );
   }
@@ -521,8 +481,8 @@ const TextEditor: React.FC<TextEditorProps> = ({
     <div className="w-full">
       <div className="flex flex-col lg:flex-row gap-6">
         <div className="lg:w-3/4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 mb-4">
-            {loading && !error ? (
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 mb-4 min-h-[400px]">
+            {loading ? (
               <div
                 id="editor-initial-loading"
                 className="flex flex-col justify-center items-center h-80 space-y-4 p-6"
@@ -554,7 +514,7 @@ const TextEditor: React.FC<TextEditorProps> = ({
               <div className="flex justify-center items-center relative min-h-[300px]">
                 <div
                   id="editor-content-loading"
-                  className="absolute inset-0 flex-col justify-center items-center h-full w-full bg-white/80 dark:bg-gray-800/80 z-10"
+                  className="absolute inset-0 flex flex-col justify-center items-center h-full w-full bg-white/80 dark:bg-gray-800/80 z-10"
                   style={{ display: "none" }}
                 >
                   <div className="animate-spin rounded-full h-10 w-10 border-4 border-indigo-200 border-t-indigo-600"></div>
@@ -568,49 +528,35 @@ const TextEditor: React.FC<TextEditorProps> = ({
           </div>
 
           <div className="flex space-x-2 justify-center mt-4 mb-8">
-            {!loading && !error && (
+            <button
+              onClick={onBack}
+              className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+            >
+              Back
+            </button>
+            {!loading && !error && fabricCanvasRef.current && (
               <>
-                <button
-                  onClick={onBack}
-                  className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
-                >
-                  Back
-                </button>
                 <button
                   onClick={handleSave}
                   className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-                  disabled={loading}
                 >
                   Save
                 </button>
                 <button
                   onClick={handleDownload}
                   className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                  disabled={loading}
                 >
                   Download
                 </button>
               </>
             )}
-            {(loading || error) && (
-              <div className="flex space-x-2 justify-center mt-4 mb-8">
-                <button
-                  onClick={onBack}
-                  className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
-                >
-                  Back
-                </button>
-              </div>
-            )}
           </div>
         </div>
-
         <div className="lg:w-1/4">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4">
             <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">
               Text Settings
             </h3>
-
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Text Color
@@ -630,7 +576,6 @@ const TextEditor: React.FC<TextEditorProps> = ({
                 ))}
               </div>
             </div>
-
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Font Size: {fontSize}px
@@ -645,7 +590,6 @@ const TextEditor: React.FC<TextEditorProps> = ({
                 disabled={!fabricCanvasRef.current || !!error}
               />
             </div>
-
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Font Family
@@ -663,7 +607,6 @@ const TextEditor: React.FC<TextEditorProps> = ({
                 ))}
               </select>
             </div>
-
             <div className="mb-4">
               <label className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300">
                 <input
@@ -676,7 +619,6 @@ const TextEditor: React.FC<TextEditorProps> = ({
                 Text Shadow
               </label>
             </div>
-
             <div className="mt-6 text-xs text-gray-500 dark:text-gray-400">
               <p>Tips:</p>
               <ul className="list-disc pl-4 mt-1 space-y-1">
