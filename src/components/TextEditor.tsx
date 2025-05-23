@@ -259,23 +259,22 @@ const TextEditor: React.FC<TextEditorProps> = ({
           return;
         }
         console.log("[_setupFabricCanvas] Image downloaded successfully.");
+
         const fabricImage = new fabric.Image(imgHtmlElement, {
           selectable: false,
           evented: false,
-        }); // Use larger canvas size for better quality output, optimized for 2048x2048 source images
-        const MAX_CANVAS_WIDTH = 1024; // Increased to handle 2048x2048 source images better
-        const canvasWidth = Math.min(window.innerWidth - 40, MAX_CANVAS_WIDTH);
+        }); // Responsive canvas sizing for better UI/UX
+        const isMobile = window.innerWidth < 768;
+        const MAX_CANVAS_WIDTH = isMobile ? window.innerWidth - 32 : 500; // Smaller on mobile
+        const canvasWidth = Math.min(
+          window.innerWidth - (isMobile ? 32 : 80),
+          MAX_CANVAS_WIDTH
+        );
         const scaleFactor = canvasWidth / imgHtmlElement.width;
         const canvasHeight = imgHtmlElement.height * scaleFactor;
 
         newCanvas.setWidth(canvasWidth);
         newCanvas.setHeight(canvasHeight);
-
-        // Store original dimensions for high-quality export (2048x2048 at 96 DPI)
-        newCanvas.originalWidth = 2048; // Known source resolution
-        newCanvas.originalHeight = 2048;
-        newCanvas.originalDPI = 96;
-
         fabricImage.scaleToWidth(canvasWidth);
         newCanvas.add(fabricImage);
 
@@ -452,118 +451,151 @@ const TextEditor: React.FC<TextEditorProps> = ({
     setTextShadow(enabled);
     updateTextProperties("shadow", enabled);
   };
-  const handleSave = () => {
-    if (!fabricCanvasRef.current) {
+  const handleSave = async () => {
+    if (!fabricCanvasRef.current || !canvasRef.current) {
       setError("Canvas not ready for saving.");
       return;
     }
 
     try {
-      // For 2048x2048 source images, calculate proper multiplier
-      const originalWidth = fabricCanvasRef.current.originalWidth || 2048;
-      const currentWidth = fabricCanvasRef.current.width;
-      const multiplier = originalWidth / currentWidth;
+      setLoading(true);
 
-      console.log(
-        `[handleSave] Saving with ${multiplier}x multiplier for 2048x2048 source`
-      );
+      // Create high-resolution canvas for export (2048x2048 original quality)
+      const originalImg = new Image();
+      originalImg.crossOrigin = "anonymous";
 
-      const dataUrl = fabricCanvasRef.current.toDataURL({
-        format: "png",
-        quality: 1.0,
-        multiplier: Math.min(multiplier, 3), // Cap at 3x to prevent memory issues
+      await new Promise((resolve, reject) => {
+        originalImg.onload = resolve;
+        originalImg.onerror = reject;
+        originalImg.src = selectedImage.fullUrl;
       });
+
+      // Use original high resolution for export (2048x2048)
+      const exportCanvas = document.createElement("canvas");
+      const exportCtx = exportCanvas.getContext("2d");
+      exportCanvas.width = originalImg.width; // Full 2048px
+      exportCanvas.height = originalImg.height; // Full 2048px
+
+      if (!exportCtx) throw new Error("Could not create export context");
+
+      // Draw background at full resolution
+      exportCtx.drawImage(originalImg, 0, 0);
+
+      // Calculate scaling factors for text elements
+      const displayCanvas = canvasRef.current;
+      const scaleX = originalImg.width / displayCanvas.width;
+      const scaleY = originalImg.height / displayCanvas.height;
+
+      // Get all fabric objects and draw text at high resolution
+      const objects = fabricCanvasRef.current.getObjects();
+      objects.forEach((obj: any) => {
+        if (obj.type === "textbox" || obj.type === "text") {
+          exportCtx.font = `${obj.fontSize * scaleX}px ${obj.fontFamily}`;
+          exportCtx.fillStyle = obj.fill;
+          exportCtx.textAlign = obj.textAlign || "center";
+
+          // Handle text shadow if present
+          if (obj.shadow) {
+            exportCtx.shadowColor = obj.shadow.color;
+            exportCtx.shadowBlur = obj.shadow.blur * scaleX;
+            exportCtx.shadowOffsetX = obj.shadow.offsetX * scaleX;
+            exportCtx.shadowOffsetY = obj.shadow.offsetY * scaleY;
+          }
+
+          exportCtx.fillText(obj.text, obj.left * scaleX, obj.top * scaleY);
+
+          // Reset shadow
+          exportCtx.shadowColor = "transparent";
+          exportCtx.shadowBlur = 0;
+          exportCtx.shadowOffsetX = 0;
+          exportCtx.shadowOffsetY = 0;
+        }
+      });
+
+      // Export as high-quality PNG (lossless)
+      const dataUrl = exportCanvas.toDataURL("image/png", 1.0);
       onSave(dataUrl);
     } catch (err) {
       console.error("Error saving image:", err);
       setError("Failed to save image.");
+    } finally {
+      setLoading(false);
     }
   };
-  const handleDownload = () => {
-    if (!fabricCanvasRef.current) {
+  const handleDownload = async () => {
+    if (!fabricCanvasRef.current || !canvasRef.current) {
       setError("Canvas not ready for download.");
       return;
     }
 
     try {
-      // For 2048x2048 source images at 96 DPI, calculate optimal multiplier
-      const originalWidth = fabricCanvasRef.current.originalWidth || 2048;
-      const currentWidth = fabricCanvasRef.current.width;
-      const multiplier = originalWidth / currentWidth;
+      setLoading(true);
 
-      console.log(
-        `[handleDownload] 2048x2048 source -> Current: ${currentWidth}px, Multiplier: ${multiplier.toFixed(
-          2
-        )}x`
-      );
+      // Create high-resolution canvas for export (2048x2048 original quality)
+      const originalImg = new Image();
+      originalImg.crossOrigin = "anonymous";
 
-      const dataUrl = fabricCanvasRef.current.toDataURL({
-        format: "png",
-        quality: 1.0,
-        multiplier: Math.min(multiplier, 2.5), // Conservative multiplier for reliability
+      await new Promise((resolve, reject) => {
+        originalImg.onload = resolve;
+        originalImg.onerror = reject;
+        originalImg.src = selectedImage.fullUrl;
       });
 
+      // Use original high resolution for export (2048x2048)
+      const exportCanvas = document.createElement("canvas");
+      const exportCtx = exportCanvas.getContext("2d");
+      exportCanvas.width = originalImg.width; // Full 2048px
+      exportCanvas.height = originalImg.height; // Full 2048px
+
+      if (!exportCtx) throw new Error("Could not create export context");
+
+      // Draw background at full resolution
+      exportCtx.drawImage(originalImg, 0, 0);
+
+      // Calculate scaling factors for text elements
+      const displayCanvas = canvasRef.current;
+      const scaleX = originalImg.width / displayCanvas.width;
+      const scaleY = originalImg.height / displayCanvas.height;
+
+      // Get all fabric objects and draw text at high resolution
+      const objects = fabricCanvasRef.current.getObjects();
+      objects.forEach((obj: any) => {
+        if (obj.type === "textbox" || obj.type === "text") {
+          exportCtx.font = `${obj.fontSize * scaleX}px ${obj.fontFamily}`;
+          exportCtx.fillStyle = obj.fill;
+          exportCtx.textAlign = obj.textAlign || "center";
+
+          // Handle text shadow if present
+          if (obj.shadow) {
+            exportCtx.shadowColor = obj.shadow.color;
+            exportCtx.shadowBlur = obj.shadow.blur * scaleX;
+            exportCtx.shadowOffsetX = obj.shadow.offsetX * scaleX;
+            exportCtx.shadowOffsetY = obj.shadow.offsetY * scaleY;
+          }
+
+          exportCtx.fillText(obj.text, obj.left * scaleX, obj.top * scaleY);
+
+          // Reset shadow
+          exportCtx.shadowColor = "transparent";
+          exportCtx.shadowBlur = 0;
+          exportCtx.shadowOffsetX = 0;
+          exportCtx.shadowOffsetY = 0;
+        }
+      });
+
+      // Export as high-quality PNG and download
+      const dataUrl = exportCanvas.toDataURL("image/png", 1.0);
       const link = document.createElement("a");
-      link.download = `wish-maker-${
-        selectedImage?.occasion || "image"
-      }-2048px.png`;
+      link.download = `wish-maker-${selectedImage?.occasion || "image"}.png`;
       link.href = dataUrl;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-
-      console.log(
-        `[handleDownload] High quality image downloaded at ${Math.min(
-          multiplier,
-          2.5
-        ).toFixed(2)}x resolution`
-      );
     } catch (err) {
       console.error("Error downloading image:", err);
-      setError("Failed to download image. Try refreshing and trying again.");
-    }
-  };
-
-  const handleDownloadHighQuality = () => {
-    if (!fabricCanvasRef.current) {
-      setError("Canvas not ready for download.");
-      return;
-    }
-
-    try {
-      // Use original image dimensions for maximum quality
-      const originalWidth =
-        fabricCanvasRef.current.originalWidth || fabricCanvasRef.current.width;
-      const currentWidth = fabricCanvasRef.current.width;
-      const multiplier = Math.max(2, originalWidth / currentWidth); // Minimum 2x
-
-      console.log(
-        `[handleDownloadHighQuality] Generating ultra-high quality image with ${multiplier}x resolution`
-      );
-
-      const dataUrl = fabricCanvasRef.current.toDataURL({
-        format: "png",
-        quality: 1.0,
-        multiplier: Math.min(multiplier, 6), // Allow up to 6x for ultra-high quality
-      });
-
-      const link = document.createElement("a");
-      link.download = `wish-maker-${
-        selectedImage?.occasion || "image"
-      }-ultra-hq.png`;
-      link.href = dataUrl;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-
-      console.log(
-        `[handleDownloadHighQuality] Ultra high quality image downloaded`
-      );
-    } catch (err) {
-      console.error("Error downloading ultra-high quality image:", err);
-      setError(
-        "Failed to download ultra-high quality image. This may happen with very large images. Try the regular download instead."
-      );
+      setError("Failed to download image.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -585,254 +617,297 @@ const TextEditor: React.FC<TextEditorProps> = ({
       </div>
     );
   }
-
   return (
-    <div className="w-full">
-      <div className="flex flex-col lg:flex-row gap-6">
-        <div className="lg:w-3/4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 mb-4 min-h-[400px]">
-            {loading ? (
-              <div
-                id="editor-initial-loading"
-                className="flex flex-col justify-center items-center h-80 space-y-4 p-6"
+    <div className="w-full min-h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="container mx-auto px-4 py-6">
+        <div className="flex flex-col xl:flex-row gap-6 max-w-7xl mx-auto">
+          {/* Canvas Section */}
+          <div className="xl:w-2/3 flex flex-col">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 flex-1">
+              <div className="flex justify-center items-center">
+                {loading ? (
+                  <div
+                    id="editor-initial-loading"
+                    className="flex flex-col justify-center items-center min-h-[300px] space-y-4 p-6"
+                  >
+                    <div className="animate-spin rounded-full h-12 w-12 border-4 border-indigo-200 border-t-indigo-600"></div>
+                    <span className="text-gray-600 dark:text-gray-300 font-medium">
+                      Loading editor components...
+                    </span>
+                    <div className="text-sm text-gray-500 dark:text-gray-400 text-center max-w-sm">
+                      <p>Initializing Fabric.js and preparing canvas.</p>
+                    </div>
+                  </div>
+                ) : error ? (
+                  <div className="flex flex-col justify-center items-center min-h-[300px] space-y-4 p-6 bg-red-50 dark:bg-red-900/10 rounded-md">
+                    <h3 className="text-lg font-semibold text-red-700 dark:text-red-400">
+                      Image Editor Message
+                    </h3>
+                    <p className="text-red-600 dark:text-red-400 text-center">
+                      {error}
+                    </p>
+                    <button
+                      onClick={onBack}
+                      className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
+                    >
+                      Go Back
+                    </button>
+                  </div>
+                ) : (
+                  <div className="relative w-full flex justify-center">
+                    <div
+                      id="editor-content-loading"
+                      className="absolute inset-0 flex flex-col justify-center items-center bg-white/80 dark:bg-gray-800/80 z-10"
+                      style={{ display: "none" }}
+                    >
+                      <div className="animate-spin rounded-full h-10 w-10 border-4 border-indigo-200 border-t-indigo-600"></div>
+                      <span className="text-gray-600 dark:text-gray-300 font-medium mt-3">
+                        Loading image...
+                      </span>
+                    </div>
+                    <canvas
+                      ref={canvasRef}
+                      className="max-w-full h-auto rounded-lg shadow-sm border border-gray-200 dark:border-gray-600"
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Action Buttons - Desktop/Tablet */}
+            <div className="hidden md:flex gap-3 justify-center mt-6">
+              <button
+                onClick={onBack}
+                className="px-6 py-3 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors font-medium"
               >
-                <div className="animate-spin rounded-full h-12 w-12 border-4 border-indigo-200 border-t-indigo-600"></div>
-                <span className="text-gray-600 dark:text-gray-300 font-medium">
-                  Loading editor components...
-                </span>
-                <div className="text-sm text-gray-500 dark:text-gray-400 text-center max-w-sm">
-                  <p>Initializing Fabric.js and preparing canvas.</p>
-                </div>
-              </div>
-            ) : error ? (
-              <div className="flex flex-col justify-center items-center h-80 space-y-4 p-6 bg-red-50 dark:bg-red-900/10 rounded-md">
-                <h3 className="text-lg font-semibold text-red-700 dark:text-red-400">
-                  Image Editor Message
-                </h3>
-                <p className="text-red-600 dark:text-red-400 text-center">
-                  {error}
-                </p>
-                <button
-                  onClick={onBack}
-                  className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
-                >
-                  Go Back
-                </button>
-              </div>
-            ) : (
-              <div className="flex justify-center items-center relative min-h-[300px]">
-                <div
-                  id="editor-content-loading"
-                  className="absolute inset-0 flex flex-col justify-center items-center h-full w-full bg-white/80 dark:bg-gray-800/80 z-10"
-                  style={{ display: "none" }}
-                >
-                  <div className="animate-spin rounded-full h-10 w-10 border-4 border-indigo-200 border-t-indigo-600"></div>
-                  <span className="text-gray-600 dark:text-gray-300 font-medium mt-3">
-                    Loading image...
-                  </span>
-                </div>
-                <canvas ref={canvasRef} />
-              </div>
-            )}
-          </div>{" "}
-          {/* Fixed position bottom bar for mobile */}
-          <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 shadow-lg p-4 flex justify-center space-x-2 lg:hidden z-50">
-            <button
-              onClick={onBack}
-              className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
-            >
-              Back
-            </button>{" "}
-            {!loading && !error && canvasReady && (
-              <>
-                <button
-                  onClick={handleSave}
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-                >
-                  Save
-                </button>
-                <div className="relative">
+                ← Back
+              </button>
+              {!loading && !error && canvasReady && (
+                <>
                   <button
-                    onClick={handleDownload}
-                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                  >
-                    Download HQ
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-          {/* Desktop buttons */}
-          <div className="hidden lg:flex space-x-2 justify-center mt-4 mb-8">
-            <button
-              onClick={onBack}
-              className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
-            >
-              Back
-            </button>{" "}
-            {!loading && !error && (
-              <>
-                <button
-                  onClick={handleSave}
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-                >
-                  Save
-                </button>
-                <div className="relative">
-                  <button
-                    onClick={handleDownload}
-                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                  >
-                    Download HQ
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        </div>{" "}
-        <div className="lg:w-1/4 mb-20 lg:mb-0">
-          {" "}
-          {/* Added bottom margin for mobile to account for fixed button bar */}{" "}
-          <div
-            className={`bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 ${
-              loading || error || !canvasReady
-                ? "opacity-50 pointer-events-none"
-                : ""
-            }`}
-          >
-            <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">
-              Text Settings
-            </h3>
-
-            {/* Debug info when controls are disabled */}
-            {(loading || error || !canvasReady) && (
-              <div className="mb-4 p-2 bg-yellow-100 dark:bg-yellow-900 rounded text-sm">
-                <p className="text-yellow-800 dark:text-yellow-200">
-                  Controls disabled: Loading: {loading ? "Yes" : "No"}, Canvas
-                  Ready: {canvasReady ? "Yes" : "No"}, Error:{" "}
-                  {error ? "Yes" : "No"}
-                  {setupAttempts > 0 && ` (Attempt: ${setupAttempts}/3)`}
-                </p>{" "}
-                {error && (
-                  <p className="text-red-600 dark:text-red-400 mt-1 text-xs">
-                    {error}
-                  </p>
-                )}
-                {!canvasReady && !loading && (
-                  <button
-                    onClick={() => {
-                      setSetupAttempts(0);
-                      setError(null);
-                      setLoading(true);
-                    }}
-                    className="mt-2 px-3 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600"
-                  >
-                    Retry Setup
-                  </button>
-                )}
-              </div>
-            )}
-
-            {/* Color picker with better mobile touch targets */}
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Text Color
-              </label>
-              <div className="grid grid-cols-6 sm:grid-cols-8 gap-2">
-                {colorOptions.map((color) => (
-                  <button
-                    key={color}
-                    className={`w-8 h-8 rounded-full cursor-pointer hover:scale-110 transition-transform ${
-                      textColor === color
-                        ? "ring-2 ring-offset-2 ring-indigo-500"
-                        : ""
+                    onClick={handleSave}
+                    disabled={loading}
+                    className={`px-6 py-3 rounded-lg font-medium transition-colors ${
+                      loading
+                        ? "bg-indigo-400 cursor-not-allowed text-white"
+                        : "bg-indigo-600 hover:bg-indigo-700 text-white"
                     }`}
-                    style={{ backgroundColor: color }}
-                    onClick={() => handleColorChange(color)}
-                    aria-label={`Select color ${color}`}
+                  >
+                    {loading ? "Saving..." : "💾 Save"}
+                  </button>
+                  <button
+                    onClick={handleDownload}
+                    disabled={loading}
+                    className={`px-6 py-3 rounded-lg font-medium transition-colors ${
+                      loading
+                        ? "bg-green-400 cursor-not-allowed text-white"
+                        : "bg-green-600 hover:bg-green-700 text-white"
+                    }`}
+                  >
+                    {loading ? "Processing..." : "⬇️ Download"}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Controls Section */}
+          <div className="xl:w-1/3">
+            <div
+              className={`bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 ${
+                loading || error || !canvasReady
+                  ? "opacity-50 pointer-events-none"
+                  : ""
+              }`}
+            >
+              <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-6 flex items-center">
+                <span className="mr-2">🎨</span>
+                Text Settings
+              </h3>
+
+              {/* Debug info when controls are disabled */}
+              {(loading || error || !canvasReady) && (
+                <div className="mb-6 p-3 bg-yellow-100 dark:bg-yellow-900 rounded-lg text-sm">
+                  <p className="text-yellow-800 dark:text-yellow-200 font-medium">
+                    Controls disabled: Loading: {loading ? "Yes" : "No"}, Canvas
+                    Ready: {canvasReady ? "Yes" : "No"}, Error:{" "}
+                    {error ? "Yes" : "No"}
+                    {setupAttempts > 0 && ` (Attempt: ${setupAttempts}/3)`}
+                  </p>
+                  {error && (
+                    <p className="text-red-600 dark:text-red-400 mt-2 text-xs">
+                      {error}
+                    </p>
+                  )}
+                  {!canvasReady && !loading && (
+                    <button
+                      onClick={() => {
+                        setSetupAttempts(0);
+                        setError(null);
+                        setLoading(true);
+                      }}
+                      className="mt-3 px-4 py-2 bg-blue-500 text-white text-sm rounded-lg hover:bg-blue-600 font-medium"
+                    >
+                      🔄 Retry Setup
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* Color picker with improved mobile experience */}
+              <div className="mb-8">
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+                  🎨 Text Color
+                </label>
+                <div className="grid grid-cols-8 sm:grid-cols-10 gap-2">
+                  {colorOptions.map((color) => (
+                    <button
+                      key={color}
+                      className={`w-8 h-8 rounded-full cursor-pointer hover:scale-110 transition-all duration-200 ${
+                        textColor === color
+                          ? "ring-3 ring-offset-2 ring-indigo-500 shadow-lg"
+                          : "hover:shadow-md"
+                      }`}
+                      style={{ backgroundColor: color }}
+                      onClick={() => handleColorChange(color)}
+                      aria-label={`Select color ${color}`}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              {/* Enhanced font size control */}
+              <div className="mb-8">
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+                  📏 Font Size: {fontSize}px
+                </label>
+                <div className="flex items-center space-x-3">
+                  <button
+                    onClick={() =>
+                      handleFontSizeChange(Math.max(12, fontSize - 2))
+                    }
+                    className="w-10 h-10 flex items-center justify-center bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-lg font-bold text-lg transition-colors"
+                  >
+                    −
+                  </button>
+                  <input
+                    type="range"
+                    min="12"
+                    max="72"
+                    value={fontSize}
+                    onChange={(e) =>
+                      handleFontSizeChange(parseInt(e.target.value))
+                    }
+                    className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
                   />
-                ))}
+                  <button
+                    onClick={() =>
+                      handleFontSizeChange(Math.min(72, fontSize + 2))
+                    }
+                    className="w-10 h-10 flex items-center justify-center bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-lg font-bold text-lg transition-colors"
+                  >
+                    +
+                  </button>
+                </div>
               </div>
-            </div>
 
-            {/* Improved mobile font size slider */}
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Font Size: {fontSize}px
-              </label>
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={() =>
-                    handleFontSizeChange(Math.max(12, fontSize - 2))
-                  }
-                  className="w-8 h-8 flex items-center justify-center bg-gray-200 dark:bg-gray-700 rounded-lg"
+              {/* Enhanced font family selector */}
+              <div className="mb-8">
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+                  🔤 Font Family
+                </label>
+                <select
+                  value={fontFamily}
+                  onChange={(e) => handleFontFamilyChange(e.target.value)}
+                  className="w-full p-4 border-2 border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white text-base focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all"
                 >
-                  -
-                </button>
-                <input
-                  type="range"
-                  min="12"
-                  max="72"
-                  value={fontSize}
-                  onChange={(e) =>
-                    handleFontSizeChange(parseInt(e.target.value))
-                  }
-                  className="flex-1"
-                />
-                <button
-                  onClick={() =>
-                    handleFontSizeChange(Math.min(72, fontSize + 2))
-                  }
-                  className="w-8 h-8 flex items-center justify-center bg-gray-200 dark:bg-gray-700 rounded-lg"
-                >
-                  +
-                </button>
+                  {fontOptions.map((font) => (
+                    <option
+                      key={font}
+                      value={font}
+                      style={{ fontFamily: font }}
+                    >
+                      {font}
+                    </option>
+                  ))}
+                </select>
               </div>
-            </div>
 
-            {/* Mobile-friendly font selector */}
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Font Family
-              </label>
-              <select
-                value={fontFamily}
-                onChange={(e) => handleFontFamilyChange(e.target.value)}
-                className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-base"
-              >
-                {fontOptions.map((font) => (
-                  <option key={font} value={font} style={{ fontFamily: font }}>
-                    {font}
-                  </option>
-                ))}
-              </select>
-            </div>
+              {/* Enhanced shadow toggle */}
+              <div className="mb-8">
+                <label className="flex items-center text-sm font-semibold text-gray-700 dark:text-gray-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={textShadow}
+                    onChange={(e) => handleShadowToggle(e.target.checked)}
+                    className="w-5 h-5 mr-3 rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <span className="mr-2">✨</span>
+                  Text Shadow
+                </label>
+              </div>
 
-            {/* Larger touch target for shadow toggle */}
-            <div className="mb-6">
-              <label className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300">
-                <input
-                  type="checkbox"
-                  checked={textShadow}
-                  onChange={(e) => handleShadowToggle(e.target.checked)}
-                  className="w-5 h-5 mr-3 rounded border-gray-300 dark:border-gray-600"
-                />
-                Text Shadow
-              </label>
-            </div>
-
-            <div className="mt-6 text-xs text-gray-500 dark:text-gray-400">
-              <p className="font-medium mb-2">Tips:</p>
-              <ul className="list-disc pl-4 space-y-2">
-                <li>Tap and drag the text to position it</li>
-                <li>Tap the text to edit the content</li>
-                <li>Use corner handles to resize text</li>
-                <li>Use rotation handle to rotate text</li>
-              </ul>
+              {/* Enhanced tips section */}
+              <div className="mt-8 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <p className="font-semibold mb-3 text-gray-700 dark:text-gray-300 flex items-center">
+                  <span className="mr-2">💡</span>
+                  Tips:
+                </p>
+                <ul className="list-disc pl-6 space-y-2 text-sm text-gray-600 dark:text-gray-400">
+                  <li>Tap and drag text to reposition it on the image</li>
+                  <li>Double-tap text to edit the content directly</li>
+                  <li>Use corner handles to resize text</li>
+                  <li>Use rotation handle to rotate text</li>
+                  <li>Images are exported in full 2048x2048 quality</li>
+                </ul>
+              </div>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Mobile Action Bar - Fixed at bottom */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-4 z-50">
+        <div className="flex justify-center gap-3 max-w-sm mx-auto">
+          <button
+            onClick={onBack}
+            className="flex-1 px-4 py-3 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors font-medium"
+          >
+            ← Back
+          </button>
+          {!loading && !error && canvasReady && (
+            <>
+              <button
+                onClick={handleSave}
+                disabled={loading}
+                className={`flex-1 px-4 py-3 rounded-lg font-medium transition-colors ${
+                  loading
+                    ? "bg-indigo-400 cursor-not-allowed text-white"
+                    : "bg-indigo-600 hover:bg-indigo-700 text-white"
+                }`}
+              >
+                {loading ? "💾..." : "💾 Save"}
+              </button>
+              <button
+                onClick={handleDownload}
+                disabled={loading}
+                className={`flex-1 px-4 py-3 rounded-lg font-medium transition-colors ${
+                  loading
+                    ? "bg-green-400 cursor-not-allowed text-white"
+                    : "bg-green-600 hover:bg-green-700 text-white"
+                }`}
+              >
+                {loading ? "⬇️..." : "⬇️ Download"}
+              </button>
+            </>
+          )}
+        </div>
+        {/* Safe area for mobile devices */}
+        <div className="h-4"></div>
+      </div>
+
+      {/* Spacer for mobile to prevent content being hidden behind fixed bar */}
+      <div className="md:hidden h-24"></div>
     </div>
   );
 };
