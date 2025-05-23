@@ -500,7 +500,34 @@ const TextEditor: React.FC<TextEditorProps> = ({
             )}
           </div>
 
-          <div className="flex space-x-2 justify-center mt-4 mb-8">
+          {/* Fixed position bottom bar for mobile */}
+          <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 shadow-lg p-4 flex justify-center space-x-2 lg:hidden z-50">
+            <button
+              onClick={onBack}
+              className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+            >
+              Back
+            </button>
+            {!loading && !error && fabricCanvasRef.current && (
+              <>
+                <button
+                  onClick={handleSave}
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                >
+                  Save
+                </button>
+                <button
+                  onClick={handleDownload}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                >
+                  Download
+                </button>
+              </>
+            )}
+          </div>
+
+          {/* Desktop buttons */}
+          <div className="hidden lg:flex space-x-2 justify-center mt-4 mb-8">
             <button
               onClick={onBack}
               className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
@@ -525,7 +552,9 @@ const TextEditor: React.FC<TextEditorProps> = ({
             )}
           </div>
         </div>
-        <div className="lg:w-1/4">
+        <div className="lg:w-1/4 mb-20 lg:mb-0">
+          {" "}
+          {/* Added bottom margin for mobile to account for fixed button bar */}
           <div
             className={`bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 ${
               loading || error || !fabricCanvasRef.current
@@ -536,46 +565,73 @@ const TextEditor: React.FC<TextEditorProps> = ({
             <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">
               Text Settings
             </h3>
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+
+            {/* Color picker with better mobile touch targets */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Text Color
               </label>
-              <div className="grid grid-cols-8 gap-1">
+              <div className="grid grid-cols-6 sm:grid-cols-8 gap-2">
                 {colorOptions.map((color) => (
-                  <div
+                  <button
                     key={color}
-                    className={`w-6 h-6 rounded-full cursor-pointer hover:scale-110 transition-transform ${
+                    className={`w-8 h-8 rounded-full cursor-pointer hover:scale-110 transition-transform ${
                       textColor === color
                         ? "ring-2 ring-offset-2 ring-indigo-500"
                         : ""
                     }`}
                     style={{ backgroundColor: color }}
                     onClick={() => handleColorChange(color)}
+                    aria-label={`Select color ${color}`}
                   />
                 ))}
               </div>
             </div>
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+
+            {/* Improved mobile font size slider */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Font Size: {fontSize}px
               </label>
-              <input
-                type="range"
-                min="12"
-                max="72"
-                value={fontSize}
-                onChange={(e) => handleFontSizeChange(parseInt(e.target.value))}
-                className="w-full"
-              />
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() =>
+                    handleFontSizeChange(Math.max(12, fontSize - 2))
+                  }
+                  className="w-8 h-8 flex items-center justify-center bg-gray-200 dark:bg-gray-700 rounded-lg"
+                >
+                  -
+                </button>
+                <input
+                  type="range"
+                  min="12"
+                  max="72"
+                  value={fontSize}
+                  onChange={(e) =>
+                    handleFontSizeChange(parseInt(e.target.value))
+                  }
+                  className="flex-1"
+                />
+                <button
+                  onClick={() =>
+                    handleFontSizeChange(Math.min(72, fontSize + 2))
+                  }
+                  className="w-8 h-8 flex items-center justify-center bg-gray-200 dark:bg-gray-700 rounded-lg"
+                >
+                  +
+                </button>
+              </div>
             </div>
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+
+            {/* Mobile-friendly font selector */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Font Family
               </label>
               <select
                 value={fontFamily}
                 onChange={(e) => handleFontFamilyChange(e.target.value)}
-                className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
+                className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-base"
               >
                 {fontOptions.map((font) => (
                   <option key={font} value={font} style={{ fontFamily: font }}>
@@ -584,23 +640,26 @@ const TextEditor: React.FC<TextEditorProps> = ({
                 ))}
               </select>
             </div>
-            <div className="mb-4">
+
+            {/* Larger touch target for shadow toggle */}
+            <div className="mb-6">
               <label className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300">
                 <input
                   type="checkbox"
                   checked={textShadow}
                   onChange={(e) => handleShadowToggle(e.target.checked)}
-                  className="mr-2"
+                  className="w-5 h-5 mr-3 rounded border-gray-300 dark:border-gray-600"
                 />
                 Text Shadow
               </label>
             </div>
+
             <div className="mt-6 text-xs text-gray-500 dark:text-gray-400">
-              <p>Tips:</p>
-              <ul className="list-disc pl-4 mt-1 space-y-1">
-                <li>Click and drag the text to position it</li>
-                <li>Click the text to edit the content directly</li>
-                <li>Use the corner handles to resize text</li>
+              <p className="font-medium mb-2">Tips:</p>
+              <ul className="list-disc pl-4 space-y-2">
+                <li>Tap and drag the text to position it</li>
+                <li>Tap the text to edit the content</li>
+                <li>Use corner handles to resize text</li>
                 <li>Use rotation handle to rotate text</li>
               </ul>
             </div>
