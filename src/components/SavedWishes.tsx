@@ -29,7 +29,7 @@ const SavedWishes: React.FC<SavedWishesProps> = ({ userId, onSelect }) => {
         setLoading(true);
         setError(null);
 
-        // Query files that contain the user ID in their name
+        //Queres files that contain the user ID in their name
         const response = await storage.listFiles(STORAGE_ID, [
           Query.search("name", userId),
           Query.limit(50),
