@@ -33,8 +33,7 @@ export const DATABASE_ID =
 export const USERS_COLLECTION_ID = "682b227f003d0c77525f";
 export const WISHES_COLLECTION_ID = "682b24150002a58ee120";
 export const PURCHASES_COLLECTION_ID = "682b237300157933c8e8"; // Add your actual collection ID here
-export const STORAGE_ID =
-  process.env.NEXT_PUBLIC_APPWRITE_STORAGE_ID || "wish-images"; // Default bucket ID for development
+export const STORAGE_ID = "6830089400289a5f7cdd"; // Direct hardcoded value from .env.local
 
 console.log("Appwrite Configuration:", {
   STORAGE_ID,

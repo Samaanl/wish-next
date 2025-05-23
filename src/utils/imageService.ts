@@ -121,13 +121,25 @@ export const listImagesByOccasion = async (
     console.log(
       `Fetching images for occasion ${occasionId} from storage ID: ${STORAGE_ID}`
     );
-
     try {
       // List files that have the occasion in their name
+      console.log(
+        `Searching for files with name containing '${occasionId}_' in bucket ${STORAGE_ID}`
+      );
+
+      // First try to list all files to see what's in the bucket
+      const allFiles = await storage.listFiles(STORAGE_ID, [Query.limit(50)]);
+
+      console.log(`Found ${allFiles.files.length} total files in bucket:`);
+      allFiles.files.forEach((file, index) => {
+        console.log(`  ${index + 1}. ${file.name} (ID: ${file.$id})`);
+      });
+
+      // Now search specifically for this occasion
       const response = await storage.listFiles(STORAGE_ID, [
         // Pattern matching for files with the occasion name prefix
         // e.g., "birthday_1", "birthday_2", etc.
-        Query.search("name", occasionId),
+        Query.search("name", `${occasionId}_`),
         Query.limit(20),
       ]);
 
