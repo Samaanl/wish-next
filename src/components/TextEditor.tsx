@@ -138,7 +138,7 @@ const TextEditor: React.FC<TextEditorProps> = ({
             const placeholderUrl = `https://placehold.co/${placeholderSize}x${placeholderSize}?text=${selectedImage.occasion}`;
             img = await downloadImage(placeholderUrl);
           } else {
-            throw imgError; // Re-throw if even the placeholder fails
+            throw imgError; // Re throw if even the placeholder fails
           }
         }
 
