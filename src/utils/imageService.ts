@@ -293,7 +293,7 @@ export const uploadWishImage = async (
     // Create file from Blob
     const file = new File([blob], filename, { type: "image/jpeg" });
 
-    // Upload file to Appwrite storage
+    // Upload file to Appwrite storage this is a
     const response = await storage.createFile(STORAGE_ID, ID.unique(), file);
 
     return {
