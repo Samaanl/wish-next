@@ -142,7 +142,9 @@ const TextEditor: React.FC<TextEditorProps> = ({
       .catch((err) => {
         if (isMounted) {
           console.error("[FabricLoaderEffect] Failed to load fabric.js:", err);
-          setError("Failed to load the editor library. Please try again.");
+          setError(
+            "CRITICAL: Editor libraries failed to load. Please refresh."
+          );
           setLoading(false);
         }
       });
@@ -169,16 +171,29 @@ const TextEditor: React.FC<TextEditorProps> = ({
       )}, Image selected: ${!!selectedImage?.fullUrl}, Current loading state: ${loading}, Canvas ref available: ${!!canvasRef.current}`
     );
 
-    if (!fabric || !selectedImage?.fullUrl) {
+    if (!fabric) {
+      console.log("[CanvasSetupEffect] Fabric not loaded yet. Returning.");
+      return;
+    }
+
+    if (!selectedImage?.fullUrl) {
       console.log(
-        "[CanvasSetupEffect] Pre-requisites not met (no fabric or no selected image). Returning."
+        "[CanvasSetupEffect] Fabric loaded, but no image selected (e.g., on refresh or direct nav). Hiding main loader, showing prompt."
       );
+      setLoading(false);
+      setError(
+        "No image selected for editing. Please go back and choose an image."
+      );
+      if (fabricCanvasRef.current) {
+        fabricCanvasRef.current.dispose();
+        fabricCanvasRef.current = null;
+      }
       return;
     }
 
     if (loading) {
       console.log(
-        "[CanvasSetupEffect] Fabric & image ready. Main 'loading' is true. Setting to false to allow canvas DOM render."
+        "[CanvasSetupEffect] Fabric & image ready. Main 'loading' is true. Setting to false to render canvas element."
       );
       setLoading(false);
       return;
@@ -186,10 +201,10 @@ const TextEditor: React.FC<TextEditorProps> = ({
 
     if (!canvasRef.current) {
       console.error(
-        "[CanvasSetupEffect] CRITICAL: Fabric loaded, image selected, main 'loading' is false, BUT canvasRef.current is STILL NULL. This implies canvas element didn't render or ref didn't attach."
+        "[CanvasSetupEffect] CRITICAL: Fabric, image selected, loading=false, BUT canvasRef.current is NULL."
       );
       setError(
-        "Editor canvas could not be initialized. Please check console and try refreshing."
+        "Editor canvas could not be initialized. Please try refreshing."
       );
       return;
     }
@@ -377,88 +392,46 @@ const TextEditor: React.FC<TextEditorProps> = ({
 
   const handleSave = () => {
     if (!fabricCanvasRef.current) {
-      setError("Editor not ready. Please try again.");
+      setError("Canvas not ready for saving.");
       return;
     }
 
     try {
-      // Set a maximum dimensions for the saved image to avoid memory issues
-      const MAX_DIMENSION = 2048;
-      const canvas = fabricCanvasRef.current.getElement();
-      const width = Math.min(canvas.width, MAX_DIMENSION);
-      const height = Math.min(canvas.height, MAX_DIMENSION);
-      const scaleFactor = Math.min(
-        1,
-        MAX_DIMENSION / Math.max(canvas.width, canvas.height)
-      );
-
-      console.log(
-        `Saving canvas with dimensions: ${width}x${height}, scale factor: ${scaleFactor}`
-      );
-
       const dataUrl = fabricCanvasRef.current.toDataURL({
         format: "jpeg",
         quality: 0.85,
-        width: width * scaleFactor,
-        height: height * scaleFactor,
       });
-
       onSave(dataUrl);
     } catch (err) {
       console.error("Error saving image:", err);
-      setError(
-        `Failed to save the image: ${
-          err instanceof Error ? err.message : "Unknown error"
-        }. Please try again.`
-      );
+      setError("Failed to save image.");
     }
   };
 
   const handleDownload = () => {
     if (!fabricCanvasRef.current) {
-      setError("Editor not ready. Please try again.");
+      setError("Canvas not ready for download.");
       return;
     }
 
     try {
-      // Set a maximum dimensions for the downloaded image to avoid memory issues
-      const MAX_DIMENSION = 2048;
-      const canvas = fabricCanvasRef.current.getElement();
-      const width = Math.min(canvas.width, MAX_DIMENSION);
-      const height = Math.min(canvas.height, MAX_DIMENSION);
-      const scaleFactor = Math.min(
-        1,
-        MAX_DIMENSION / Math.max(canvas.width, canvas.height)
-      );
-
-      console.log(
-        `Downloading canvas with dimensions: ${width}x${height}, scale factor: ${scaleFactor}`
-      );
-
       const dataUrl = fabricCanvasRef.current.toDataURL({
         format: "jpeg",
         quality: 0.85,
-        width: width * scaleFactor,
-        height: height * scaleFactor,
       });
-
       const link = document.createElement("a");
-      link.download = `wish-maker-${selectedImage.occasion}.jpg`;
+      link.download = `wish-maker-${selectedImage?.occasion || "image"}.jpg`;
       link.href = dataUrl;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
     } catch (err) {
       console.error("Error downloading image:", err);
-      setError(
-        `Failed to download the image: ${
-          err instanceof Error ? err.message : "Unknown error"
-        }. Please try again.`
-      );
+      setError("Failed to download image.");
     }
   };
 
-  if (error && !fabric) {
+  if (error && !fabric && !fabricCanvasRef.current) {
     return (
       <div className="w-full text-center py-8">
         <div className="bg-red-50 dark:bg-red-900/30 p-6 rounded-lg">
@@ -498,7 +471,7 @@ const TextEditor: React.FC<TextEditorProps> = ({
             ) : error ? (
               <div className="flex flex-col justify-center items-center h-80 space-y-4 p-6 bg-red-50 dark:bg-red-900/10 rounded-md">
                 <h3 className="text-lg font-semibold text-red-700 dark:text-red-400">
-                  Image Editor Error
+                  Image Editor Message
                 </h3>
                 <p className="text-red-600 dark:text-red-400 text-center">
                   {error}
@@ -553,7 +526,13 @@ const TextEditor: React.FC<TextEditorProps> = ({
           </div>
         </div>
         <div className="lg:w-1/4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4">
+          <div
+            className={`bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 ${
+              loading || error || !fabricCanvasRef.current
+                ? "opacity-50 pointer-events-none"
+                : ""
+            }`}
+          >
             <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">
               Text Settings
             </h3>
@@ -587,7 +566,6 @@ const TextEditor: React.FC<TextEditorProps> = ({
                 value={fontSize}
                 onChange={(e) => handleFontSizeChange(parseInt(e.target.value))}
                 className="w-full"
-                disabled={!fabricCanvasRef.current || !!error}
               />
             </div>
             <div className="mb-4">
@@ -598,7 +576,6 @@ const TextEditor: React.FC<TextEditorProps> = ({
                 value={fontFamily}
                 onChange={(e) => handleFontFamilyChange(e.target.value)}
                 className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
-                disabled={!fabricCanvasRef.current || !!error}
               >
                 {fontOptions.map((font) => (
                   <option key={font} value={font} style={{ fontFamily: font }}>
@@ -614,7 +591,6 @@ const TextEditor: React.FC<TextEditorProps> = ({
                   checked={textShadow}
                   onChange={(e) => handleShadowToggle(e.target.checked)}
                   className="mr-2"
-                  disabled={!fabricCanvasRef.current || !!error}
                 />
                 Text Shadow
               </label>
