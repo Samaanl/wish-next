@@ -530,61 +530,54 @@ const TextEditor: React.FC<TextEditorProps> = ({
           exportCtx.shadowOffsetX = 0;
           exportCtx.shadowOffsetY = 0;
         }
-      });
-
-      // Convert canvas to blob and download using modern approach (NO DOM MANIPULATION)
-      const blob = await new Promise<Blob>((resolve) => {
-        exportCanvas.toBlob(
-          (blob) => {
-            resolve(blob!);
-          },
-          "image/png",
-          1.0
-        );
-      });
-
-      // Use modern File System Access API or fallback
+      }); // Export using data URL approach - completely avoid DOM manipulation
+      const dataUrl = exportCanvas.toDataURL("image/png", 1.0);
       const filename = `wish-maker-${
         selectedImage?.occasion || "image"
       }-${Date.now()}.png`;
 
-      // Try modern approach first
-      if ("showSaveFilePicker" in window) {
+      // Use the safest download method - create invisible link via useRef to avoid React conflicts
+      const downloadData = {
+        url: dataUrl,
+        filename: filename,
+      };
+
+      // Trigger download using a safe method that doesn't interfere with React
+      triggerSafeDownload(downloadData);
+
+      function triggerSafeDownload(data: { url: string; filename: string }) {
+        // Method 1: Try using the browser's built-in download capability
         try {
-          const fileHandle = await (window as any).showSaveFilePicker({
-            suggestedName: filename,
-            types: [
-              {
-                description: "PNG images",
-                accept: { "image/png": [".png"] },
-              },
-            ],
+          // Create a temporary link element that we never add to DOM
+          const link = document.createElement("a");
+          link.href = data.url;
+          link.download = data.filename;
+
+          // Trigger download using a mouse event instead of DOM manipulation
+          const clickEvent = new MouseEvent("click", {
+            view: window,
+            bubbles: true,
+            cancelable: false,
           });
-          const writable = await fileHandle.createWritable();
-          await writable.write(blob);
-          await writable.close();
-        } catch (err: any) {
-          if (err.name !== "AbortError") {
-            // Fall back to URL.createObjectURL method if modern API fails
-            fallbackDownload();
+
+          link.dispatchEvent(clickEvent);
+
+          // No DOM manipulation - let the browser handle the download
+          console.log("Download triggered successfully");
+        } catch (downloadError) {
+          console.error("Primary download method failed:", downloadError);
+
+          // Fallback: Use window.open as last resort
+          try {
+            const newWindow = window.open(data.url, "_blank");
+            if (newWindow) {
+              newWindow.document.title = data.filename;
+            }
+          } catch (fallbackError) {
+            console.error("Fallback download method failed:", fallbackError);
+            throw new Error("All download methods failed");
           }
         }
-      } else {
-        // Fallback for browsers that don't support File System Access API
-        fallbackDownload();
-      }
-
-      function fallbackDownload() {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = filename;
-        a.style.display = "none";
-        document.body.appendChild(a);
-        a.click();
-        // Clean up immediately without setTimeout to avoid React issues
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
       }
     } catch (err) {
       console.error("Error downloading image:", err);
