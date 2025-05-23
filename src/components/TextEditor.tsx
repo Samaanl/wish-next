@@ -259,19 +259,23 @@ const TextEditor: React.FC<TextEditorProps> = ({
           return;
         }
         console.log("[_setupFabricCanvas] Image downloaded successfully.");
-
         const fabricImage = new fabric.Image(imgHtmlElement, {
           selectable: false,
           evented: false,
-        });
-
-        const MAX_CANVAS_WIDTH = 600;
+        }); // Use larger canvas size for better quality output, optimized for 2048x2048 source images
+        const MAX_CANVAS_WIDTH = 1024; // Increased to handle 2048x2048 source images better
         const canvasWidth = Math.min(window.innerWidth - 40, MAX_CANVAS_WIDTH);
         const scaleFactor = canvasWidth / imgHtmlElement.width;
         const canvasHeight = imgHtmlElement.height * scaleFactor;
 
         newCanvas.setWidth(canvasWidth);
         newCanvas.setHeight(canvasHeight);
+
+        // Store original dimensions for high-quality export (2048x2048 at 96 DPI)
+        newCanvas.originalWidth = 2048; // Known source resolution
+        newCanvas.originalHeight = 2048;
+        newCanvas.originalDPI = 96;
+
         fabricImage.scaleToWidth(canvasWidth);
         newCanvas.add(fabricImage);
 
@@ -448,7 +452,6 @@ const TextEditor: React.FC<TextEditorProps> = ({
     setTextShadow(enabled);
     updateTextProperties("shadow", enabled);
   };
-
   const handleSave = () => {
     if (!fabricCanvasRef.current) {
       setError("Canvas not ready for saving.");
@@ -456,9 +459,19 @@ const TextEditor: React.FC<TextEditorProps> = ({
     }
 
     try {
+      // For 2048x2048 source images, calculate proper multiplier
+      const originalWidth = fabricCanvasRef.current.originalWidth || 2048;
+      const currentWidth = fabricCanvasRef.current.width;
+      const multiplier = originalWidth / currentWidth;
+
+      console.log(
+        `[handleSave] Saving with ${multiplier}x multiplier for 2048x2048 source`
+      );
+
       const dataUrl = fabricCanvasRef.current.toDataURL({
-        format: "jpeg",
-        quality: 0.85,
+        format: "png",
+        quality: 1.0,
+        multiplier: Math.min(multiplier, 3), // Cap at 3x to prevent memory issues
       });
       onSave(dataUrl);
     } catch (err) {
@@ -466,7 +479,6 @@ const TextEditor: React.FC<TextEditorProps> = ({
       setError("Failed to save image.");
     }
   };
-
   const handleDownload = () => {
     if (!fabricCanvasRef.current) {
       setError("Canvas not ready for download.");
@@ -474,19 +486,84 @@ const TextEditor: React.FC<TextEditorProps> = ({
     }
 
     try {
+      // For 2048x2048 source images at 96 DPI, calculate optimal multiplier
+      const originalWidth = fabricCanvasRef.current.originalWidth || 2048;
+      const currentWidth = fabricCanvasRef.current.width;
+      const multiplier = originalWidth / currentWidth;
+
+      console.log(
+        `[handleDownload] 2048x2048 source -> Current: ${currentWidth}px, Multiplier: ${multiplier.toFixed(
+          2
+        )}x`
+      );
+
       const dataUrl = fabricCanvasRef.current.toDataURL({
-        format: "jpeg",
-        quality: 0.85,
+        format: "png",
+        quality: 1.0,
+        multiplier: Math.min(multiplier, 2.5), // Conservative multiplier for reliability
       });
+
       const link = document.createElement("a");
-      link.download = `wish-maker-${selectedImage?.occasion || "image"}.jpg`;
+      link.download = `wish-maker-${
+        selectedImage?.occasion || "image"
+      }-2048px.png`;
       link.href = dataUrl;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+
+      console.log(
+        `[handleDownload] High quality image downloaded at ${Math.min(
+          multiplier,
+          2.5
+        ).toFixed(2)}x resolution`
+      );
     } catch (err) {
       console.error("Error downloading image:", err);
-      setError("Failed to download image.");
+      setError("Failed to download image. Try refreshing and trying again.");
+    }
+  };
+
+  const handleDownloadHighQuality = () => {
+    if (!fabricCanvasRef.current) {
+      setError("Canvas not ready for download.");
+      return;
+    }
+
+    try {
+      // Use original image dimensions for maximum quality
+      const originalWidth =
+        fabricCanvasRef.current.originalWidth || fabricCanvasRef.current.width;
+      const currentWidth = fabricCanvasRef.current.width;
+      const multiplier = Math.max(2, originalWidth / currentWidth); // Minimum 2x
+
+      console.log(
+        `[handleDownloadHighQuality] Generating ultra-high quality image with ${multiplier}x resolution`
+      );
+
+      const dataUrl = fabricCanvasRef.current.toDataURL({
+        format: "png",
+        quality: 1.0,
+        multiplier: Math.min(multiplier, 6), // Allow up to 6x for ultra-high quality
+      });
+
+      const link = document.createElement("a");
+      link.download = `wish-maker-${
+        selectedImage?.occasion || "image"
+      }-ultra-hq.png`;
+      link.href = dataUrl;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      console.log(
+        `[handleDownloadHighQuality] Ultra high quality image downloaded`
+      );
+    } catch (err) {
+      console.error("Error downloading ultra-high quality image:", err);
+      setError(
+        "Failed to download ultra-high quality image. This may happen with very large images. Try the regular download instead."
+      );
     }
   };
 
@@ -565,7 +642,7 @@ const TextEditor: React.FC<TextEditorProps> = ({
               className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
             >
               Back
-            </button>
+            </button>{" "}
             {!loading && !error && canvasReady && (
               <>
                 <button
@@ -574,12 +651,14 @@ const TextEditor: React.FC<TextEditorProps> = ({
                 >
                   Save
                 </button>
-                <button
-                  onClick={handleDownload}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                >
-                  Download
-                </button>
+                <div className="relative">
+                  <button
+                    onClick={handleDownload}
+                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                  >
+                    Download HQ
+                  </button>
+                </div>
               </>
             )}
           </div>
@@ -590,7 +669,7 @@ const TextEditor: React.FC<TextEditorProps> = ({
               className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
             >
               Back
-            </button>
+            </button>{" "}
             {!loading && !error && (
               <>
                 <button
@@ -599,12 +678,14 @@ const TextEditor: React.FC<TextEditorProps> = ({
                 >
                   Save
                 </button>
-                <button
-                  onClick={handleDownload}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                >
-                  Download
-                </button>
+                <div className="relative">
+                  <button
+                    onClick={handleDownload}
+                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                  >
+                    Download HQ
+                  </button>
+                </div>
               </>
             )}
           </div>
