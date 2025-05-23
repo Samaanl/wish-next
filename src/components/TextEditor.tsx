@@ -530,55 +530,65 @@ const TextEditor: React.FC<TextEditorProps> = ({
           exportCtx.shadowOffsetX = 0;
           exportCtx.shadowOffsetY = 0;
         }
-      }); // Export using data URL approach - completely avoid DOM manipulation
-      const dataUrl = exportCanvas.toDataURL("image/png", 1.0);
-      const filename = `wish-maker-${
-        selectedImage?.occasion || "image"
-      }-${Date.now()}.png`;
+      });
 
-      // Use the safest download method - create invisible link via useRef to avoid React conflicts
-      const downloadData = {
-        url: dataUrl,
-        filename: filename,
-      };
-
-      // Trigger download using a safe method that doesn't interfere with React
-      triggerSafeDownload(downloadData);
-
-      function triggerSafeDownload(data: { url: string; filename: string }) {
-        // Method 1: Try using the browser's built-in download capability
-        try {
-          // Create a temporary link element that we never add to DOM
-          const link = document.createElement("a");
-          link.href = data.url;
-          link.download = data.filename;
-
-          // Trigger download using a mouse event instead of DOM manipulation
-          const clickEvent = new MouseEvent("click", {
-            view: window,
-            bubbles: true,
-            cancelable: false,
-          });
-
-          link.dispatchEvent(clickEvent);
-
-          // No DOM manipulation - let the browser handle the download
-          console.log("Download triggered successfully");
-        } catch (downloadError) {
-          console.error("Primary download method failed:", downloadError);
-
-          // Fallback: Use window.open as last resort
-          try {
-            const newWindow = window.open(data.url, "_blank");
-            if (newWindow) {
-              newWindow.document.title = data.filename;
-            }
-          } catch (fallbackError) {
-            console.error("Fallback download method failed:", fallbackError);
-            throw new Error("All download methods failed");
+      // Convert canvas to blob with React-safe download - NO DOM MANIPULATION
+      exportCanvas.toBlob(
+        (blob) => {
+          if (!blob) {
+            throw new Error("Failed to create image blob");
           }
-        }
-      }
+
+          const filename = `wish-maker-${
+            selectedImage?.occasion || "image"
+          }-${Date.now()}.png`;
+
+          // React-safe download using only modern APIs
+          try {
+            // Check if File System Access API is available (most secure method)
+            if ("showSaveFilePicker" in window) {
+              // Modern browsers with File System Access API
+              (window as any)
+                .showSaveFilePicker({
+                  suggestedName: filename,
+                  types: [
+                    {
+                      description: "PNG Images",
+                      accept: { "image/png": [".png"] },
+                    },
+                  ],
+                })
+                .then((fileHandle: any) => {
+                  return fileHandle.createWritable();
+                })
+                .then((writable: any) => {
+                  writable.write(blob);
+                  return writable.close();
+                })
+                .catch((e: Error) => {
+                  // User cancelled or error occurred, fallback to blob URL
+                  if (e.name !== "AbortError") {
+                    console.log(
+                      "File System API failed, using fallback:",
+                      e.message
+                    );
+                    triggerBlobDownload(blob, filename);
+                  }
+                });
+            } else {
+              // Fallback for browsers without File System Access API
+              triggerBlobDownload(blob, filename);
+            }
+          } catch (e) {
+            console.error("Download failed:", e);
+            triggerBlobDownload(blob, filename);
+          }
+
+          console.log("High-quality PNG download initiated");
+        },
+        "image/png",
+        1.0
+      );
     } catch (err) {
       console.error("Error downloading image:", err);
       setError(
@@ -589,6 +599,32 @@ const TextEditor: React.FC<TextEditorProps> = ({
     } finally {
       setLoading(false);
     }
+  };
+
+  // Utility function for blob downloads without DOM conflicts
+  const triggerBlobDownload = (blob: Blob, filename: string) => {
+    const url = URL.createObjectURL(blob);
+
+    // Check for legacy IE/Edge support
+    if ((navigator as any).msSaveBlob) {
+      (navigator as any).msSaveBlob(blob, filename);
+      URL.revokeObjectURL(url);
+      return;
+    }
+
+    // Modern approach: Use programmatic click without DOM insertion
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+
+    // Trigger download without adding to DOM (React-safe)
+    link.style.display = "none";
+    link.click();
+
+    // Clean up immediately
+    setTimeout(() => {
+      URL.revokeObjectURL(url);
+    }, 100);
   };
 
   if (error && !fabric && !fabricCanvasRef.current) {
