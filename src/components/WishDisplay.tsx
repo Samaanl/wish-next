@@ -3,18 +3,41 @@ import {
   ClipboardDocumentIcon,
   PencilIcon,
   HeartIcon,
+  PhotoIcon,
+  CloudArrowUpIcon,
 } from "@heroicons/react/24/outline";
+import OccasionSelector from "./OccasionSelector";
+import ImageGallery from "./ImageGallery";
+import TextEditor from "./TextEditor";
+import { Occasion, OccasionImage, uploadWishImage } from "@/utils/imageService";
 
 interface WishDisplayProps {
   wish: string;
   onEdit: () => void;
+  userId?: string; // Optional userId for authenticated users
 }
 
-export default function WishDisplay({ wish, onEdit }: WishDisplayProps) {
+export default function WishDisplay({
+  wish,
+  onEdit,
+  userId,
+}: WishDisplayProps) {
   const wishRef = useRef<HTMLDivElement>(null);
   const [wishText, setWishText] = useState(wish);
   const [copied, setCopied] = useState(false);
   const [isAnimated, setIsAnimated] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  // New state for image flow
+  const [isImageMode, setIsImageMode] = useState(false);
+  const [selectedOccasion, setSelectedOccasion] = useState<Occasion | null>(
+    null
+  );
+  const [selectedImage, setSelectedImage] = useState<OccasionImage | null>(
+    null
+  );
+  const [finalImage, setFinalImage] = useState<string | null>(null);
 
   useEffect(() => {
     // Start animation when component mounts
@@ -43,6 +66,205 @@ export default function WishDisplay({ wish, onEdit }: WishDisplayProps) {
     e.target.style.height = "auto";
     e.target.style.height = `${e.target.scrollHeight}px`;
   };
+
+  const handleSelectOccasion = (occasion: Occasion) => {
+    setSelectedOccasion(occasion);
+    setSelectedImage(null);
+  };
+
+  const handleSelectImage = (image: OccasionImage) => {
+    setSelectedImage(image);
+  };
+
+  const handleSaveImage = (dataUrl: string) => {
+    setFinalImage(dataUrl);
+    setSelectedImage(null);
+    setSelectedOccasion(null);
+  };
+
+  const handleBackToOccasion = () => {
+    setSelectedImage(null);
+  };
+
+  const handleBackToWish = () => {
+    setIsImageMode(false);
+    setSelectedOccasion(null);
+    setSelectedImage(null);
+  };
+
+  // Handle saving the image to Appwrite storage
+  const handleSaveToStorage = async () => {
+    if (!finalImage || !selectedOccasion || !userId) {
+      // If no userId, the save button shouldn't be visible anyway
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      setSaveError(null);
+
+      const savedImage = await uploadWishImage(
+        finalImage,
+        selectedOccasion.id,
+        userId
+      );
+
+      if (!savedImage) {
+        throw new Error("Failed to save image to storage");
+      }
+
+      // Show success message or update UI as needed
+      setTimeout(() => {
+        setIsSaving(false);
+        // Maybe navigate to a gallery or show a success message
+      }, 1500);
+    } catch (error) {
+      console.error("Error saving image:", error);
+      setSaveError("Failed to save your image. Please try again.");
+      setIsSaving(false);
+    }
+  };
+
+  if (finalImage) {
+    return (
+      <div
+        className={`w-full max-w-2xl mx-auto transform transition-all duration-700 ${
+          isAnimated ? "translate-y-0 opacity-100" : "translate-y-10 opacity-0"
+        }`}
+      >
+        <div className="relative bg-white dark:bg-gray-800 rounded-xl shadow-xl overflow-hidden">
+          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500"></div>
+
+          <div className="p-8">
+            <div className="mb-6 flex justify-between items-center">
+              <div className="flex items-center">
+                <HeartIcon className="h-6 w-6 text-pink-500 mr-2" />
+                <h3 className="text-xl font-bold bg-gradient-to-r from-indigo-600 to-pink-500 bg-clip-text text-transparent">
+                  Your Wish Image
+                </h3>
+              </div>
+            </div>
+
+            <div className="flex justify-center mb-6">
+              <img
+                src={finalImage}
+                alt="Personalized wish"
+                className="max-w-full rounded-lg shadow-lg"
+              />
+            </div>
+            <div className="flex flex-wrap justify-center gap-3 mt-6">
+              <button
+                onClick={() => setFinalImage(null)}
+                className="px-4 py-2 bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-300 font-medium rounded-lg hover:bg-indigo-200 dark:hover:bg-indigo-800 transition-colors"
+              >
+                Create Another Image
+              </button>
+
+              <button
+                onClick={() => {
+                  const link = document.createElement("a");
+                  link.download = "my-wish.jpg";
+                  link.href = finalImage;
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                }}
+                className="px-4 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors"
+              >
+                Download Image
+              </button>
+
+              {userId && (
+                <button
+                  onClick={handleSaveToStorage}
+                  disabled={isSaving}
+                  className={`px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors flex items-center ${
+                    isSaving ? "opacity-70 cursor-not-allowed" : ""
+                  }`}
+                >
+                  {isSaving ? (
+                    <>
+                      <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2"></div>
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <CloudArrowUpIcon className="h-5 w-5 mr-2" />
+                      Save to My Collection
+                    </>
+                  )}
+                </button>
+              )}
+
+              <button
+                onClick={onEdit}
+                className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white font-medium rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+              >
+                Start Over
+              </button>
+            </div>
+
+            {saveError && (
+              <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-sm rounded-lg">
+                {saveError}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (isImageMode) {
+    if (selectedImage && selectedOccasion) {
+      return (
+        <div className="w-full max-w-4xl mx-auto">
+          <TextEditor
+            wish={wishText}
+            selectedImage={selectedImage}
+            onBack={handleBackToOccasion}
+            onSave={handleSaveImage}
+          />
+        </div>
+      );
+    }
+
+    if (selectedOccasion) {
+      return (
+        <div className="w-full max-w-4xl mx-auto">
+          <ImageGallery
+            occasion={selectedOccasion}
+            onSelectImage={handleSelectImage}
+          />
+          <div className="flex justify-center mt-6">
+            <button
+              onClick={() => setSelectedOccasion(null)}
+              className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+            >
+              Back to Occasions
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="w-full max-w-4xl mx-auto">
+        <OccasionSelector
+          onSelectOccasion={handleSelectOccasion}
+          selectedOccasion={selectedOccasion}
+        />
+        <div className="flex justify-center mt-6">
+          <button
+            onClick={handleBackToWish}
+            className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+          >
+            Back to Wish
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -160,10 +382,18 @@ export default function WishDisplay({ wish, onEdit }: WishDisplayProps) {
             />
           </div>
 
-          <div className="flex justify-center mt-6">
+          <div className="flex flex-wrap justify-center gap-3 mt-6">
+            <button
+              onClick={() => setIsImageMode(true)}
+              className="px-4 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors flex items-center"
+            >
+              <PhotoIcon className="h-5 w-5 mr-2" />
+              Create Image with this Wish
+            </button>
+
             <button
               onClick={onEdit}
-              className="px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-medium rounded-lg shadow-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition duration-150 ease-in-out"
+              className="px-4 py-2.5 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white font-medium rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
             >
               Create Another Wish
             </button>

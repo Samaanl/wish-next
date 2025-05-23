@@ -170,7 +170,6 @@ export default function Home() {
             <Sparkle top="50%" left="-5%" size={12} delay={0.7} />
             <Sparkle bottom="30%" right="-3%" size={8} delay={2} />
           </div>
-
           {/* Credit display for logged in users */}
           {currentUser && (
             <motion.div
@@ -182,7 +181,6 @@ export default function Home() {
               <CreditDisplay onBuyCredits={handleBuyCredits} />
             </motion.div>
           )}
-
           {error && (
             <motion.div
               initial={{ opacity: 0 }}
@@ -191,12 +189,15 @@ export default function Home() {
             >
               <p>{error}</p>
             </motion.div>
-          )}
-
+          )}{" "}
           {insufficientCredits ? (
             <NotEnoughCredits onBuyCredits={handleBuyCredits} />
           ) : generatedWish ? (
-            <WishDisplay wish={generatedWish} onEdit={handleStartOver} />
+            <WishDisplay
+              wish={generatedWish}
+              onEdit={handleStartOver}
+              userId={currentUser?.id}
+            />
           ) : (
             <motion.div
               initial={{ opacity: 0, y: 20 }}

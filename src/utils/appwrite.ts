@@ -1,4 +1,12 @@
-import { Client, Functions, Account, Databases, ID, Query } from "appwrite";
+import {
+  Client,
+  Functions,
+  Account,
+  Databases,
+  Storage,
+  ID,
+  Query,
+} from "appwrite";
 
 // Initialize the Appwrite client
 const client = new Client();
@@ -17,6 +25,7 @@ client
 const functions = new Functions(client);
 const account = new Account(client);
 const databases = new Databases(client);
+const storage = new Storage(client);
 
 // Appwrite Database constants
 export const DATABASE_ID =
@@ -24,6 +33,15 @@ export const DATABASE_ID =
 export const USERS_COLLECTION_ID = "682b227f003d0c77525f";
 export const WISHES_COLLECTION_ID = "682b24150002a58ee120";
 export const PURCHASES_COLLECTION_ID = "682b237300157933c8e8"; // Add your actual collection ID here
+export const STORAGE_ID =
+  process.env.NEXT_PUBLIC_APPWRITE_STORAGE_ID || "wish-images"; // Default bucket ID for development
+
+console.log("Appwrite Configuration:", {
+  STORAGE_ID,
+  databaseId: DATABASE_ID,
+  endpoint: process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT,
+  projectId: process.env.NEXT_PUBLIC_APPWRITE_PROJECT,
+});
 
 // Helper to check if we should try to use Appwrite authentication
 export const shouldUseAppwrite = () => {
@@ -48,4 +66,4 @@ export const shouldUseAppwrite = () => {
   }
 };
 
-export { client, functions, account, databases, ID, Query };
+export { client, functions, account, databases, storage, ID, Query };
