@@ -532,27 +532,60 @@ const TextEditor: React.FC<TextEditorProps> = ({
         }
       });
 
-      // Export as high-quality PNG and download with safer DOM manipulation
-      const dataUrl = exportCanvas.toDataURL("image/png", 1.0);
+      // Convert canvas to blob and download using modern approach (NO DOM MANIPULATION)
+      const blob = await new Promise<Blob>((resolve) => {
+        exportCanvas.toBlob(
+          (blob) => {
+            resolve(blob!);
+          },
+          "image/png",
+          1.0
+        );
+      });
 
-      // Use a safer download method
-      const downloadLink = document.createElement("a");
-      downloadLink.download = `wish-maker-${
+      // Use modern File System Access API or fallback
+      const filename = `wish-maker-${
         selectedImage?.occasion || "image"
       }-${Date.now()}.png`;
-      downloadLink.href = dataUrl;
-      downloadLink.style.display = "none";
 
-      // Add to body, click, and remove safely
-      document.body.appendChild(downloadLink);
-      downloadLink.click();
-
-      // Use setTimeout to ensure the click event is processed before removal
-      setTimeout(() => {
-        if (downloadLink.parentNode) {
-          document.body.removeChild(downloadLink);
+      // Try modern approach first
+      if ("showSaveFilePicker" in window) {
+        try {
+          const fileHandle = await (window as any).showSaveFilePicker({
+            suggestedName: filename,
+            types: [
+              {
+                description: "PNG images",
+                accept: { "image/png": [".png"] },
+              },
+            ],
+          });
+          const writable = await fileHandle.createWritable();
+          await writable.write(blob);
+          await writable.close();
+        } catch (err: any) {
+          if (err.name !== "AbortError") {
+            // Fall back to URL.createObjectURL method if modern API fails
+            fallbackDownload();
+          }
         }
-      }, 100);
+      } else {
+        // Fallback for browsers that don't support File System Access API
+        fallbackDownload();
+      }
+
+      function fallbackDownload() {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        a.style.display = "none";
+        document.body.appendChild(a);
+        a.click();
+        // Clean up immediately without setTimeout to avoid React issues
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
     } catch (err) {
       console.error("Error downloading image:", err);
       setError(
