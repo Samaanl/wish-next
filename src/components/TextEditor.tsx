@@ -521,34 +521,35 @@ const TextEditor: React.FC<TextEditorProps> = ({
     } finally {
       setLoading(false);
     }
-  };
-  // Utility function for blob downloads without DOM conflicts
+  }; // Utility function for blob downloads without DOM conflicts
   const triggerBlobDownload = (blob: Blob, filename: string) => {
     try {
-      const url = URL.createObjectURL(blob);
-
-      // Check for legacy IE/Edge support
+      // Check for legacy IE/Edge support first
       if ((navigator as any).msSaveBlob) {
         (navigator as any).msSaveBlob(blob, filename);
-        URL.revokeObjectURL(url);
         return;
       }
 
-      // Modern approach - Use programmatic click without DOM insertion
+      // Modern browsers - Use URL.createObjectURL with link click
+      const url = URL.createObjectURL(blob);
+
+      // Create link element without adding to DOM
       const link = document.createElement("a");
       link.href = url;
       link.download = filename;
-      link.style.display = "none";
 
-      // Add to document temporarily, click, then remove immediately
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      // Use a more reliable click method that doesn't require DOM insertion
+      // This approach is React-safe and avoids DOM manipulation conflicts
+      const clickEvent = new MouseEvent("click", {
+        view: window,
+        bubbles: true,
+        cancelable: true,
+      });
 
-      // Clean up URL
-      setTimeout(() => {
-        URL.revokeObjectURL(url);
-      }, 100);
+      link.dispatchEvent(clickEvent);
+
+      // Clean up URL immediately
+      URL.revokeObjectURL(url);
     } catch (error) {
       console.error("Download failed:", error);
       setError("Download failed. Please try again.");
