@@ -67,7 +67,6 @@ const TextEditor: React.FC<TextEditorProps> = ({
   const [fontFamily, setFontFamily] = useState("Arial");
   const [fabric, setFabric] = useState<any>(null);
   const [canvasReady, setCanvasReady] = useState(false);
-  const [setupAttempts, setSetupAttempts] = useState(0);
 
   const colorOptions = [
     "#ffffff", // White
@@ -206,10 +205,8 @@ const TextEditor: React.FC<TextEditorProps> = ({
       );
       return;
     }
-
     console.log(
-      "[CanvasSetupEffect] All prerequisites met. Proceeding to _setupFabricCanvas. Attempt:",
-      setupAttempts + 1
+      "[CanvasSetupEffect] All prerequisites met. Proceeding to _setupFabricCanvas."
     );
 
     const _setupFabricCanvas = async () => {
@@ -311,13 +308,11 @@ const TextEditor: React.FC<TextEditorProps> = ({
         const text = new fabric.Textbox(wish, textOptions);
         newCanvas.add(text);
         newCanvas.setActiveObject(text);
-        newCanvas.renderAll();
-
-        // Wait a moment to ensure everything is rendered before marking as ready
+        newCanvas.renderAll(); // Wait a moment to ensure everything is rendered before marking as ready
         setTimeout(() => {
           if (isCanvasSetupMounted) {
             setCanvasReady(true);
-            setSetupAttempts(0); // Reset attempts on success
+            // Don't reset setupAttempts here to avoid infinite loops
             console.log(
               "[_setupFabricCanvas] Canvas setup complete. Canvas ready for download."
             );
@@ -326,14 +321,17 @@ const TextEditor: React.FC<TextEditorProps> = ({
       } catch (err: any) {
         if (isCanvasSetupMounted) {
           console.error("[_setupFabricCanvas] Error during canvas setup:", err);
-          const newAttempts = setupAttempts + 1;
-          setSetupAttempts(newAttempts);
+          // Track attempts locally within this execution to avoid state loops
+          let currentAttempts = 0; // Start fresh for each setup attempt
 
-          if (newAttempts < 3) {
+          if (currentAttempts < 2) {
+            currentAttempts++;
             console.log(
-              `[_setupFabricCanvas] Retrying setup attempt ${newAttempts + 1}/3`
+              `[_setupFabricCanvas] Retrying setup attempt ${
+                currentAttempts + 1
+              }/3`
             );
-            // Retry after a short delay
+            // Retry after a short delay without updating state
             setTimeout(() => {
               if (isCanvasSetupMounted) {
                 _setupFabricCanvas();
@@ -381,7 +379,7 @@ const TextEditor: React.FC<TextEditorProps> = ({
     fontFamily,
     textColor,
     textShadow,
-    setupAttempts,
+    // Remove setupAttempts from dependencies to prevent infinite loops
   ]); // Fallback to enable controls if canvas setup is taking too long
   useEffect(() => {
     const fallbackTimeout = setTimeout(() => {
@@ -672,23 +670,25 @@ const TextEditor: React.FC<TextEditorProps> = ({
               {/* Debug info when controls are disabled */}
               {(loading || error || !canvasReady) && (
                 <div className="mb-6 p-3 bg-yellow-100 dark:bg-yellow-900 rounded-lg text-sm">
+                  {" "}
                   <p className="text-yellow-800 dark:text-yellow-200 font-medium">
                     Controls disabled: Loading: {loading ? "Yes" : "No"}, Canvas
                     Ready: {canvasReady ? "Yes" : "No"}, Error:{" "}
                     {error ? "Yes" : "No"}
-                    {setupAttempts > 0 && ` (Attempt: ${setupAttempts}/3)`}
                   </p>
                   {error && (
                     <p className="text-red-600 dark:text-red-400 mt-2 text-xs">
                       {error}
                     </p>
-                  )}
+                  )}{" "}
                   {!canvasReady && !loading && (
                     <button
                       onClick={() => {
-                        setSetupAttempts(0);
+                        // Reset states without triggering infinite loops
                         setError(null);
+                        setCanvasReady(false);
                         setLoading(true);
+                        // Don't update setupAttempts here
                       }}
                       className="mt-3 px-4 py-2 bg-blue-500 text-white text-sm rounded-lg hover:bg-blue-600 font-medium"
                     >
