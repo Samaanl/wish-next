@@ -123,7 +123,90 @@ const TextEditor: React.FC<TextEditorProps> = ({
     "Lucida Sans",
     "Tahoma",
     "Verdana",
-  ];
+  ]; // Improved sync canvas object properties with UI controls
+  const syncCanvasStateToUI = () => {
+    if (!fabricCanvasRef.current) return;
+
+    const activeObject = fabricCanvasRef.current.getActiveObject();
+    if (activeObject && activeObject.type === "textbox") {
+      // Get current values from canvas object
+      const currentFontSize = Math.round(activeObject.fontSize || 24);
+      const currentFontFamily = activeObject.fontFamily || "Arial";
+      const currentFill = activeObject.fill || "#ffffff";
+      const currentShadow = !!activeObject.shadow;
+
+      // Only update state if values have actually changed to avoid unnecessary re-renders
+      if (fontSize !== currentFontSize) {
+        console.log(
+          `[StateSync] Updating fontSize: ${fontSize} -> ${currentFontSize}`
+        );
+        setFontSize(currentFontSize);
+      }
+      if (fontFamily !== currentFontFamily) {
+        console.log(
+          `[StateSync] Updating fontFamily: ${fontFamily} -> ${currentFontFamily}`
+        );
+        setFontFamily(currentFontFamily);
+      }
+      if (textColor !== currentFill) {
+        console.log(
+          `[StateSync] Updating textColor: ${textColor} -> ${currentFill}`
+        );
+        setTextColor(currentFill);
+      }
+      if (textShadow !== currentShadow) {
+        console.log(
+          `[StateSync] Updating textShadow: ${textShadow} -> ${currentShadow}`
+        );
+        setTextShadow(currentShadow);
+      }
+    }
+  };
+
+  // Debounced sync to avoid too many state updates during interactions
+  const debouncedSyncRef = useRef<NodeJS.Timeout | null>(null);
+  const syncCanvasStateToUIDebounced = () => {
+    if (debouncedSyncRef.current) clearTimeout(debouncedSyncRef.current);
+    debouncedSyncRef.current = setTimeout(syncCanvasStateToUI, 150);
+  };
+  // Enhanced center text function with better positioning
+  const centerText = () => {
+    if (!fabricCanvasRef.current) {
+      console.log("[CenterText] Canvas not ready");
+      return;
+    }
+
+    const canvas = fabricCanvasRef.current;
+    const activeObject = canvas.getActiveObject();
+
+    if (activeObject && activeObject.type === "textbox") {
+      activeObject.set({
+        left: canvas.width / 2,
+        top: canvas.height / 2,
+        originX: "center",
+        originY: "center",
+      });
+      canvas.renderAll();
+      console.log("[CenterText] Text centered successfully");
+    } else {
+      // If no active object, try to find and center the text object
+      const objects = canvas.getObjects();
+      const textObject = objects.find((obj: any) => obj.type === "textbox");
+      if (textObject) {
+        canvas.setActiveObject(textObject);
+        textObject.set({
+          left: canvas.width / 2,
+          top: canvas.height / 2,
+          originX: "center",
+          originY: "center",
+        });
+        canvas.renderAll();
+        console.log("[CenterText] Found and centered text object");
+      } else {
+        console.log("[CenterText] No text object found to center");
+      }
+    }
+  };
 
   // Load fabric.js
   useEffect(() => {
@@ -308,6 +391,48 @@ const TextEditor: React.FC<TextEditorProps> = ({
         const text = new fabric.Textbox(wish, textOptions);
         newCanvas.add(text);
         newCanvas.setActiveObject(text);
+
+        // Add comprehensive event listeners to sync canvas changes with UI controls
+        newCanvas.on("object:modified", (_e: any) => {
+          console.log("[CanvasEvent] object:modified triggered");
+          syncCanvasStateToUIDebounced();
+        });
+
+        newCanvas.on("object:scaling", (_e: any) => {
+          console.log("[CanvasEvent] object:scaling triggered");
+          syncCanvasStateToUIDebounced();
+        });
+
+        newCanvas.on("object:rotating", (_e: any) => {
+          console.log("[CanvasEvent] object:rotating triggered");
+          syncCanvasStateToUIDebounced();
+        });
+
+        newCanvas.on("selection:created", (_e: any) => {
+          console.log("[CanvasEvent] selection:created triggered");
+          syncCanvasStateToUIDebounced();
+        });
+
+        newCanvas.on("selection:updated", (_e: any) => {
+          console.log("[CanvasEvent] selection:updated triggered");
+          syncCanvasStateToUIDebounced();
+        });
+
+        newCanvas.on("text:changed", (_e: any) => {
+          console.log("[CanvasEvent] text:changed triggered");
+          syncCanvasStateToUIDebounced();
+        });
+
+        // Additional events for better state sync
+        newCanvas.on("object:moving", (_e: any) => {
+          // Don't sync during moving to avoid performance issues
+          // The final position will be synced on object:modified
+        });
+
+        newCanvas.on("path:created", (_e: any) => {
+          syncCanvasStateToUIDebounced();
+        });
+
         newCanvas.renderAll(); // Wait a moment to ensure everything is rendered before marking as ready
         setTimeout(() => {
           if (isCanvasSetupMounted) {
@@ -369,6 +494,11 @@ const TextEditor: React.FC<TextEditorProps> = ({
         fabricCanvasRef.current = null;
       }
       setCanvasReady(false);
+      // Clean up debounced sync timeout
+      if (debouncedSyncRef.current) {
+        clearTimeout(debouncedSyncRef.current);
+        debouncedSyncRef.current = null;
+      }
     };
   }, [
     fabric,
@@ -380,7 +510,24 @@ const TextEditor: React.FC<TextEditorProps> = ({
     textColor,
     textShadow,
     // Remove setupAttempts from dependencies to prevent infinite loops
-  ]); // Fallback to enable controls if canvas setup is taking too long
+  ]); // Cleanup effect for component unmounting
+  useEffect(() => {
+    return () => {
+      console.log("[TextEditor] Component unmounting - cleaning up");
+      // Clean up debounced sync timeout
+      if (debouncedSyncRef.current) {
+        clearTimeout(debouncedSyncRef.current);
+        debouncedSyncRef.current = null;
+      }
+      // Dispose fabric canvas
+      if (fabricCanvasRef.current) {
+        fabricCanvasRef.current.dispose();
+        fabricCanvasRef.current = null;
+      }
+    };
+  }, []);
+
+  // Fallback to enable controls if canvas setup is taking too long
   useEffect(() => {
     const fallbackTimeout = setTimeout(() => {
       if (!canvasReady && !loading && !error) {
@@ -463,7 +610,7 @@ const TextEditor: React.FC<TextEditorProps> = ({
   const handleShadowToggle = (enabled: boolean) => {
     setTextShadow(enabled);
     updateTextProperties("shadow", enabled);
-  };
+  }; // Enhanced download function with better error handling and quality
   const handleDownload = async () => {
     // Check if canvas and fabric are ready
     if (!fabricCanvasRef.current || !canvasReady || !fabric) {
@@ -484,42 +631,62 @@ const TextEditor: React.FC<TextEditorProps> = ({
     }
 
     try {
-      console.log("Starting download process...");
+      console.log("Starting enhanced download process...");
+      setError(null); // Clear any previous errors
 
-      // Use fabric's built-in export functionality
       const fabricCanvas = fabricCanvasRef.current;
 
-      // Export using fabric's toDataURL which handles scaling better
+      // Ensure canvas is properly rendered before export
+      fabricCanvas.renderAll();
+
+      // Wait a moment to ensure rendering is complete
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Export with high quality settings
       const dataURL = fabricCanvas.toDataURL({
         format: "png",
         quality: 1.0,
-        multiplier: 2, // Double resolution for better quality
+        multiplier: 3, // Triple resolution for high quality
+        enableRetinaScaling: true,
       });
 
-      // Create filename
+      // Validate the generated data URL
+      if (!dataURL || !dataURL.startsWith("data:image/")) {
+        throw new Error("Failed to generate image data");
+      }
+
+      // Create descriptive filename with timestamp
+      const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
       const filename = `wish-maker-${
-        selectedImage?.occasion || "image"
-      }-${Date.now()}.png`;
+        selectedImage?.occasion || "custom"
+      }-${timestamp}.png`;
 
-      // Use the simplest possible download method to avoid React conflicts
-      // Create a temporary anchor element and trigger download
-      const tempLink = document.createElement("a");
-      tempLink.href = dataURL;
-      tempLink.download = filename;
+      console.log(`Downloading as: ${filename}`);
 
-      // Add to document briefly, click, then remove immediately
-      document.body.appendChild(tempLink);
-      tempLink.click();
-      document.body.removeChild(tempLink);
+      // Use the most reliable download method
+      const downloadLink = document.createElement("a");
+      downloadLink.href = dataURL;
+      downloadLink.download = filename;
+      downloadLink.style.display = "none";
+
+      // Add to DOM, trigger download, then remove
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+
+      // Clean up immediately
+      setTimeout(() => {
+        document.body.removeChild(downloadLink);
+      }, 100);
 
       console.log("Download completed successfully");
+
+      // Optional: Show success feedback
+      // You could add a toast notification here
     } catch (err) {
       console.error("Error downloading image:", err);
-      setError(
-        `Failed to download image: ${
-          err instanceof Error ? err.message : "Unknown error"
-        }`
-      );
+      const errorMessage =
+        err instanceof Error ? err.message : "Unknown error occurred";
+      setError(`Failed to download image: ${errorMessage}. Please try again.`);
     }
   };
   if (error && !fabric && !fabricCanvasRef.current) {
@@ -595,45 +762,59 @@ const TextEditor: React.FC<TextEditorProps> = ({
                   </div>
                 )}
               </div>
-            </div>
-
-            {/* Action Buttons - Desktop/Tablet */}
+            </div>{" "}
+            {/* Enhanced Action Buttons - Desktop/Tablet */}
             <div className="hidden md:flex gap-3 justify-center mt-6">
               <button
                 onClick={onBack}
-                className="px-6 py-3 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors font-medium"
+                className="px-6 py-3 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-all duration-200 font-medium shadow-sm active:scale-95 flex items-center"
               >
-                ← Back{" "}
-              </button>{" "}
+                <span className="mr-2">←</span>
+                Back
+              </button>
               {!loading && !error && canvasReady && (
-                <button
-                  onClick={handleDownload}
-                  className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors"
-                >
-                  ⬇️ Download
-                </button>
+                <>
+                  <button
+                    onClick={centerText}
+                    className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-all duration-200 shadow-sm active:scale-95 flex items-center"
+                  >
+                    <span className="mr-2">🎯</span>
+                    Center Text
+                  </button>
+                  <button
+                    onClick={handleDownload}
+                    className="px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-lg font-medium transition-all duration-200 shadow-lg hover:shadow-xl active:scale-95 flex items-center"
+                  >
+                    <span className="mr-2">⬇️</span>
+                    Download
+                  </button>
+                </>
+              )}
+              {(loading || error || !canvasReady) && (
+                <div className="px-6 py-3 bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 rounded-lg font-medium cursor-not-allowed flex items-center">
+                  <span className="mr-2">⌛</span>
+                  {loading ? "Loading..." : "Not Ready"}
+                </div>
               )}
             </div>
-          </div>
-
+          </div>{" "}
           {/* Controls Section */}
           <div className="xl:w-1/3">
             <div
-              className={`bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 ${
+              className={`bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 sm:p-6 transition-all duration-300 ${
                 loading || error || !canvasReady
                   ? "opacity-50 pointer-events-none"
                   : ""
               }`}
             >
-              <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-6 flex items-center">
+              <h3 className="text-lg sm:text-xl font-bold text-gray-800 dark:text-white mb-4 sm:mb-6 flex items-center">
                 <span className="mr-2">🎨</span>
                 Text Settings
               </h3>
 
               {/* Debug info when controls are disabled */}
               {(loading || error || !canvasReady) && (
-                <div className="mb-6 p-3 bg-yellow-100 dark:bg-yellow-900 rounded-lg text-sm">
-                  {" "}
+                <div className="mb-4 sm:mb-6 p-3 bg-yellow-100 dark:bg-yellow-900/20 rounded-lg text-sm border border-yellow-200 dark:border-yellow-800">
                   <p className="text-yellow-800 dark:text-yellow-200 font-medium">
                     Controls disabled: Loading: {loading ? "Yes" : "No"}, Canvas
                     Ready: {canvasReady ? "Yes" : "No"}, Error:{" "}
@@ -643,7 +824,7 @@ const TextEditor: React.FC<TextEditorProps> = ({
                     <p className="text-red-600 dark:text-red-400 mt-2 text-xs">
                       {error}
                     </p>
-                  )}{" "}
+                  )}
                   {!canvasReady && !loading && (
                     <button
                       onClick={() => {
@@ -653,7 +834,7 @@ const TextEditor: React.FC<TextEditorProps> = ({
                         setLoading(true);
                         // Don't update setupAttempts here
                       }}
-                      className="mt-3 px-4 py-2 bg-blue-500 text-white text-sm rounded-lg hover:bg-blue-600 font-medium"
+                      className="mt-3 px-4 py-2 bg-blue-500 text-white text-sm rounded-lg hover:bg-blue-600 font-medium transition-colors"
                     >
                       🔄 Retry Setup
                     </button>
@@ -662,17 +843,17 @@ const TextEditor: React.FC<TextEditorProps> = ({
               )}
 
               {/* Color picker with improved mobile experience */}
-              <div className="mb-8">
+              <div className="mb-6 sm:mb-8">
                 <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
                   🎨 Text Color
                 </label>
-                <div className="grid grid-cols-8 sm:grid-cols-10 gap-2">
+                <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 gap-2">
                   {colorOptions.map((color) => (
                     <button
                       key={color}
-                      className={`w-8 h-8 rounded-full cursor-pointer hover:scale-110 transition-all duration-200 ${
+                      className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full cursor-pointer hover:scale-110 transition-all duration-200 ${
                         textColor === color
-                          ? "ring-3 ring-offset-2 ring-indigo-500 shadow-lg"
+                          ? "ring-2 sm:ring-3 ring-offset-1 sm:ring-offset-2 ring-indigo-500 shadow-lg scale-110"
                           : "hover:shadow-md"
                       }`}
                       style={{ backgroundColor: color }}
@@ -684,16 +865,19 @@ const TextEditor: React.FC<TextEditorProps> = ({
               </div>
 
               {/* Enhanced font size control */}
-              <div className="mb-8">
+              <div className="mb-6 sm:mb-8">
                 <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
-                  📏 Font Size: {fontSize}px
+                  📏 Font Size:{" "}
+                  <span className="text-indigo-600 dark:text-indigo-400 font-bold">
+                    {fontSize}px
+                  </span>
                 </label>
                 <div className="flex items-center space-x-3">
                   <button
                     onClick={() =>
                       handleFontSizeChange(Math.max(12, fontSize - 2))
                     }
-                    className="w-10 h-10 flex items-center justify-center bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-lg font-bold text-lg transition-colors"
+                    className="w-10 h-10 flex items-center justify-center bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-lg font-bold text-lg transition-colors shadow-sm active:scale-95"
                   >
                     −
                   </button>
@@ -705,28 +889,39 @@ const TextEditor: React.FC<TextEditorProps> = ({
                     onChange={(e) =>
                       handleFontSizeChange(parseInt(e.target.value))
                     }
-                    className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
+                    className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700 slider"
+                    style={{
+                      background: `linear-gradient(to right, #4f46e5 0%, #4f46e5 ${
+                        ((fontSize - 12) / (72 - 12)) * 100
+                      }%, #e5e7eb ${
+                        ((fontSize - 12) / (72 - 12)) * 100
+                      }%, #e5e7eb 100%)`,
+                    }}
                   />
                   <button
                     onClick={() =>
                       handleFontSizeChange(Math.min(72, fontSize + 2))
                     }
-                    className="w-10 h-10 flex items-center justify-center bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-lg font-bold text-lg transition-colors"
+                    className="w-10 h-10 flex items-center justify-center bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-lg font-bold text-lg transition-colors shadow-sm active:scale-95"
                   >
                     +
                   </button>
                 </div>
+                <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  <span>Small</span>
+                  <span>Large</span>
+                </div>
               </div>
 
               {/* Enhanced font family selector */}
-              <div className="mb-8">
+              <div className="mb-6 sm:mb-8">
                 <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
                   🔤 Font Family
                 </label>
                 <select
                   value={fontFamily}
                   onChange={(e) => handleFontFamilyChange(e.target.value)}
-                  className="w-full p-4 border-2 border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white text-base focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all"
+                  className="w-full p-3 sm:p-4 border-2 border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white text-base focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all shadow-sm"
                 >
                   {fontOptions.map((font) => (
                     <option
@@ -741,62 +936,116 @@ const TextEditor: React.FC<TextEditorProps> = ({
               </div>
 
               {/* Enhanced shadow toggle */}
-              <div className="mb-8">
-                <label className="flex items-center text-sm font-semibold text-gray-700 dark:text-gray-300 cursor-pointer">
+              <div className="mb-6 sm:mb-8">
+                <label className="flex items-center text-sm font-semibold text-gray-700 dark:text-gray-300 cursor-pointer p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                   <input
                     type="checkbox"
                     checked={textShadow}
                     onChange={(e) => handleShadowToggle(e.target.checked)}
-                    className="w-5 h-5 mr-3 rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-indigo-500"
+                    className="w-5 h-5 mr-3 rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-indigo-500 transition-colors"
                   />
                   <span className="mr-2">✨</span>
                   Text Shadow
+                  <span className="ml-auto text-xs text-gray-500 dark:text-gray-400">
+                    {textShadow ? "On" : "Off"}
+                  </span>
                 </label>
               </div>
 
+              {/* Text positioning controls */}
+              <div className="mb-6 sm:mb-8">
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+                  📍 Text Position
+                </label>
+                <button
+                  onClick={centerText}
+                  className="w-full px-4 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-lg font-medium transition-all duration-200 flex items-center justify-center shadow-lg hover:shadow-xl active:scale-95"
+                >
+                  <span className="mr-2">🎯</span>
+                  Center Text
+                </button>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">
+                  Click to center text or drag text on canvas to reposition
+                </p>
+              </div>
+
               {/* Enhanced tips section */}
-              <div className="mt-8 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+              <div className="mt-6 sm:mt-8 p-4 bg-gradient-to-br from-gray-50 to-blue-50 dark:from-gray-700 dark:to-gray-600 rounded-lg border border-gray-200 dark:border-gray-600">
                 <p className="font-semibold mb-3 text-gray-700 dark:text-gray-300 flex items-center">
                   <span className="mr-2">💡</span>
-                  Tips:
+                  Pro Tips:
                 </p>
-                <ul className="list-disc pl-6 space-y-2 text-sm text-gray-600 dark:text-gray-400">
-                  <li>Tap and drag text to reposition it on the image</li>
-                  <li>Double-tap text to edit the content directly</li>
-                  <li>Use corner handles to resize text</li>
-                  <li>Use rotation handle to rotate text</li>
-                  <li>Download gives you high-quality PNG output</li>
+                <ul className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
+                  <li className="flex items-start">
+                    <span className="mr-2 text-indigo-500">•</span>
+                    <span>Tap and drag text to reposition it on the image</span>
+                  </li>
+                  <li className="flex items-start">
+                    <span className="mr-2 text-indigo-500">•</span>
+                    <span>Double-tap text to edit the content directly</span>
+                  </li>
+                  <li className="flex items-start">
+                    <span className="mr-2 text-indigo-500">•</span>
+                    <span>Use corner handles to resize text</span>
+                  </li>
+                  <li className="flex items-start">
+                    <span className="mr-2 text-indigo-500">•</span>
+                    <span>Use rotation handle to rotate text</span>
+                  </li>
+                  <li className="flex items-start">
+                    <span className="mr-2 text-green-500">•</span>
+                    <span>Download gives you high-quality PNG output</span>
+                  </li>
                 </ul>
               </div>
             </div>
           </div>
         </div>
-      </div>
-
-      {/* Mobile Action Bar - Fixed at bottom */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-4 z-50">
-        <div className="flex justify-center gap-3 max-w-sm mx-auto">
-          <button
-            onClick={onBack}
-            className="flex-1 px-4 py-3 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors font-medium"
-          >
-            ← Back{" "}
-          </button>{" "}
-          {!loading && !error && canvasReady && (
+      </div>{" "}
+      {/* Enhanced Mobile Action Bar - Fixed at bottom */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 shadow-2xl z-50">
+        <div className="px-4 pt-3 pb-2">
+          <div className="flex justify-center gap-3 max-w-sm mx-auto">
             <button
-              onClick={handleDownload}
-              className="flex-1 px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors"
+              onClick={onBack}
+              className="flex-1 px-4 py-3 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors font-medium flex items-center justify-center"
             >
-              ⬇️ Download
+              <span className="mr-2">←</span>
+              Back
             </button>
+            {!loading && !error && canvasReady && (
+              <button
+                onClick={handleDownload}
+                className="flex-1 px-4 py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-lg font-medium transition-all duration-200 flex items-center justify-center shadow-lg active:scale-95"
+              >
+                <span className="mr-2">⬇️</span>
+                Download
+              </button>
+            )}
+            {(loading || error || !canvasReady) && (
+              <div className="flex-1 px-4 py-3 bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 rounded-lg font-medium flex items-center justify-center cursor-not-allowed">
+                <span className="mr-2">⌛</span>
+                {loading ? "Loading..." : "Not Ready"}
+              </div>
+            )}
+          </div>
+          {/* Quick actions for mobile */}
+          {!loading && !error && canvasReady && (
+            <div className="flex justify-center mt-2">
+              <button
+                onClick={centerText}
+                className="px-3 py-1.5 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-md text-sm font-medium hover:bg-indigo-200 dark:hover:bg-indigo-900/50 transition-colors"
+              >
+                🎯 Center Text
+              </button>
+            </div>
           )}
         </div>
-        {/* Safe area for mobile devices */}
-        <div className="h-4"></div>
+        {/* Safe area for mobile devices with home indicator */}
+        <div className="h-safe-bottom h-4 bg-white dark:bg-gray-800"></div>
       </div>
-
       {/* Spacer for mobile to prevent content being hidden behind fixed bar */}
-      <div className="md:hidden h-24"></div>
+      <div className="md:hidden h-32"></div>
     </div>
   );
 };
