@@ -261,7 +261,9 @@ const TextEditor: React.FC<TextEditorProps> = ({
         const fabricImage = new fabric.Image(imgHtmlElement, {
           selectable: false,
           evented: false,
-        }); // Responsive canvas sizing for better mobile UI
+        });
+
+        // Responsive canvas sizing for better mobile UI
         const isMobile = window.innerWidth < 768;
         const isTablet = window.innerWidth >= 768 && window.innerWidth < 1024;
 
@@ -310,12 +312,17 @@ const TextEditor: React.FC<TextEditorProps> = ({
         newCanvas.add(text);
         newCanvas.setActiveObject(text);
         newCanvas.renderAll();
-        setCanvasReady(true);
-        setSetupAttempts(0); // Reset attempts on success
-        console.log(
-          "[_setupFabricCanvas] Canvas setup complete. Active object:",
-          newCanvas.getActiveObject()
-        );
+
+        // Wait a moment to ensure everything is rendered before marking as ready
+        setTimeout(() => {
+          if (isCanvasSetupMounted) {
+            setCanvasReady(true);
+            setSetupAttempts(0); // Reset attempts on success
+            console.log(
+              "[_setupFabricCanvas] Canvas setup complete. Canvas ready for download."
+            );
+          }
+        }, 500);
       } catch (err: any) {
         if (isCanvasSetupMounted) {
           console.error("[_setupFabricCanvas] Error during canvas setup:", err);
@@ -460,135 +467,50 @@ const TextEditor: React.FC<TextEditorProps> = ({
     updateTextProperties("shadow", enabled);
   };
   const handleDownload = async () => {
-    if (!fabricCanvasRef.current) {
-      setError("Canvas not ready for download.");
+    // Check if canvas and fabric are ready
+    if (!fabricCanvasRef.current || !canvasReady || !fabric) {
+      console.error("Canvas not ready for download:", {
+        fabricCanvas: !!fabricCanvasRef.current,
+        canvasReady,
+        fabricLoaded: !!fabric,
+      });
+      setError(
+        "Canvas not ready for download. Please wait for the editor to load completely."
+      );
+      return;
+    }
+
+    if (!selectedImage?.fullUrl) {
+      setError("No image selected for download.");
       return;
     }
 
     try {
       setLoading(true);
+      console.log("Starting download process...");
 
-      // Create high-resolution canvas for export (2048x2048 original quality)
-      const originalImg = new Image();
-      originalImg.crossOrigin = "anonymous";
-
-      await new Promise((resolve, reject) => {
-        originalImg.onload = resolve;
-        originalImg.onerror = reject;
-        originalImg.src = selectedImage.fullUrl;
-      });
-
-      // Use original high resolution for export (2048x2048)
-      const exportCanvas = document.createElement("canvas");
-      const exportCtx = exportCanvas.getContext("2d");
-      exportCanvas.width = originalImg.width; // Full 2048px
-      exportCanvas.height = originalImg.height; // Full 2048px
-
-      if (!exportCtx) throw new Error("Could not create export context");
-
-      // Draw background at full resolution
-      exportCtx.drawImage(originalImg, 0, 0);
-
-      // Get fabric canvas dimensions for scaling calculations safely
+      // Use fabric's built-in export functionality instead of manual canvas creation
       const fabricCanvas = fabricCanvasRef.current;
-      if (!fabricCanvas || typeof fabricCanvas.getWidth !== "function") {
-        throw new Error("Fabric canvas is not properly initialized");
-      }
 
-      const canvasWidth = fabricCanvas.getWidth();
-      const canvasHeight = fabricCanvas.getHeight();
-
-      if (!canvasWidth || !canvasHeight) {
-        throw new Error("Canvas dimensions are invalid");
-      }
-
-      // Calculate scaling factors for text elements
-      const scaleX = originalImg.width / canvasWidth;
-      const scaleY = originalImg.height / canvasHeight;
-
-      // Get all fabric objects and draw text at high resolution
-      const objects = fabricCanvas.getObjects();
-      objects.forEach((obj: any) => {
-        if (obj.type === "textbox" || obj.type === "text") {
-          exportCtx.font = `${obj.fontSize * scaleX}px ${obj.fontFamily}`;
-          exportCtx.fillStyle = obj.fill;
-          exportCtx.textAlign = obj.textAlign || "center";
-
-          // Handle text shadow if present
-          if (obj.shadow) {
-            exportCtx.shadowColor = obj.shadow.color;
-            exportCtx.shadowBlur = obj.shadow.blur * scaleX;
-            exportCtx.shadowOffsetX = obj.shadow.offsetX * scaleX;
-            exportCtx.shadowOffsetY = obj.shadow.offsetY * scaleY;
-          }
-
-          exportCtx.fillText(obj.text, obj.left * scaleX, obj.top * scaleY);
-
-          // Reset shadow
-          exportCtx.shadowColor = "transparent";
-          exportCtx.shadowBlur = 0;
-          exportCtx.shadowOffsetX = 0;
-          exportCtx.shadowOffsetY = 0;
-        }
+      // First, try to export using fabric's toDataURL which handles scaling better
+      const dataURL = fabricCanvas.toDataURL({
+        format: "png",
+        quality: 1.0,
+        multiplier: 2, // Double resolution for better quality
       });
 
-      // Convert canvas to blob with React-safe download - NO DOM MANIPULATION
-      exportCanvas.toBlob(
-        (blob) => {
-          if (!blob) {
-            throw new Error("Failed to create image blob");
-          }
+      // Convert data URL to blob
+      const response = await fetch(dataURL);
+      const blob = await response.blob();
 
-          const filename = `wish-maker-${
-            selectedImage?.occasion || "image"
-          }-${Date.now()}.png`;
+      const filename = `wish-maker-${
+        selectedImage?.occasion || "image"
+      }-${Date.now()}.png`;
 
-          // React-safe download using only modern APIs
-          try {
-            // Check if File System Access API is available (most secure method)
-            if ("showSaveFilePicker" in window) {
-              // Modern browsers with File System Access API
-              (window as any)
-                .showSaveFilePicker({
-                  suggestedName: filename,
-                  types: [
-                    {
-                      description: "PNG Images",
-                      accept: { "image/png": [".png"] },
-                    },
-                  ],
-                })
-                .then((fileHandle: any) => {
-                  return fileHandle.createWritable();
-                })
-                .then((writable: any) => {
-                  writable.write(blob);
-                  return writable.close();
-                })
-                .catch((e: Error) => {
-                  // User cancelled or error occurred, fallback to blob URL
-                  if (e.name !== "AbortError") {
-                    console.log(
-                      "File System API failed, using fallback:",
-                      e.message
-                    );
-                    triggerBlobDownload(blob, filename);
-                  }
-                });
-            } else {
-              // Fallback for browsers without File System Access API
-              triggerBlobDownload(blob, filename);
-            }
-          } catch (e) {
-            console.error("Download failed:", e);
-            triggerBlobDownload(blob, filename);
-          }
+      // Simple, reliable download method
+      triggerBlobDownload(blob, filename);
 
-          console.log("High-quality PNG download initiated");
-        },
-        "image/png",
-        1.0
-      );
+      console.log("Download completed successfully");
     } catch (err) {
       console.error("Error downloading image:", err);
       setError(
@@ -600,31 +522,37 @@ const TextEditor: React.FC<TextEditorProps> = ({
       setLoading(false);
     }
   };
-
   // Utility function for blob downloads without DOM conflicts
   const triggerBlobDownload = (blob: Blob, filename: string) => {
-    const url = URL.createObjectURL(blob);
+    try {
+      const url = URL.createObjectURL(blob);
 
-    // Check for legacy IE/Edge support
-    if ((navigator as any).msSaveBlob) {
-      (navigator as any).msSaveBlob(blob, filename);
-      URL.revokeObjectURL(url);
-      return;
+      // Check for legacy IE/Edge support
+      if ((navigator as any).msSaveBlob) {
+        (navigator as any).msSaveBlob(blob, filename);
+        URL.revokeObjectURL(url);
+        return;
+      }
+
+      // Modern approach - Use programmatic click without DOM insertion
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      link.style.display = "none";
+
+      // Add to document temporarily, click, then remove immediately
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      // Clean up URL
+      setTimeout(() => {
+        URL.revokeObjectURL(url);
+      }, 100);
+    } catch (error) {
+      console.error("Download failed:", error);
+      setError("Download failed. Please try again.");
     }
-
-    // Modern approach Use programmatic click without DOM insertion
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = filename;
-
-    // Trigger download without adding to DOM (React-safe)
-    link.style.display = "none";
-    link.click();
-
-    // Clean up immediately
-    setTimeout(() => {
-      URL.revokeObjectURL(url);
-    }, 100);
   };
 
   if (error && !fabric && !fabricCanvasRef.current) {
@@ -873,7 +801,7 @@ const TextEditor: React.FC<TextEditorProps> = ({
                   <li>Double-tap text to edit the content directly</li>
                   <li>Use corner handles to resize text</li>
                   <li>Use rotation handle to rotate text</li>
-                  <li>Images are exported in full 2048x2048 quality</li>
+                  <li>Download gives you high-quality PNG output</li>
                 </ul>
               </div>
             </div>
