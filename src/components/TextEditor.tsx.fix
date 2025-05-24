@@ -21,7 +21,7 @@ const loadFabric = async () => {
       console.log(
         "fabricModule.default didn't have .Canvas, trying fabricModule itself."
       );
-      fabricInstance = fabricModule as any; // Use the module itself
+      fabricInstance = fabricModule as any; // Use the module directly
     }
 
     if (!(fabricInstance && typeof fabricInstance.Canvas === "function")) {
@@ -459,172 +459,116 @@ const TextEditor: React.FC<TextEditorProps> = ({
     setTextShadow(enabled);
     updateTextProperties("shadow", enabled);
   };
+
+  // Simple download function that avoids DOM manipulation errors completely
   const handleDownload = async () => {
     if (!fabricCanvasRef.current) {
-      setError("Canvas not ready for download.");
+      setError("Canvas not ready for download. Please try refreshing.");
       return;
     }
 
     try {
       setLoading(true);
+      console.log("Starting simplified download process");
 
-      // Create high-resolution canvas for export (2048x2048 original quality)
-      const originalImg = new Image();
-      originalImg.crossOrigin = "anonymous";
-
-      await new Promise((resolve, reject) => {
-        originalImg.onload = resolve;
-        originalImg.onerror = reject;
-        originalImg.src = selectedImage.fullUrl;
+      // Load original high-res image
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error("Failed to load original image for export"));
+        img.src = selectedImage.fullUrl;
+        
+        // Backup timeout
+        setTimeout(() => {
+          if (!img.complete) reject(new Error("Image load timed out"));
+        }, 8000);
       });
-
-      // Use original high resolution for export (2048x2048)
+      
+      // Create export canvas at original high resolution
       const exportCanvas = document.createElement("canvas");
-      const exportCtx = exportCanvas.getContext("2d");
-      exportCanvas.width = originalImg.width; // Full 2048px
-      exportCanvas.height = originalImg.height; // Full 2048px
-
-      if (!exportCtx) throw new Error("Could not create export context");
-
-      // Draw background at full resolution
-      exportCtx.drawImage(originalImg, 0, 0);
-
-      // Get fabric canvas dimensions for scaling calculations safely
+      exportCanvas.width = img.naturalWidth;
+      exportCanvas.height = img.naturalHeight;
+      
+      const ctx = exportCanvas.getContext("2d");
+      if (!ctx) {
+        throw new Error("Failed to get export canvas context");
+      }
+      
+      // Draw the background image
+      ctx.drawImage(img, 0, 0);
+      
+      // Get text from fabric canvas
       const fabricCanvas = fabricCanvasRef.current;
-      if (!fabricCanvas || typeof fabricCanvas.getWidth !== "function") {
-        throw new Error("Fabric canvas is not properly initialized");
-      }
-
-      const canvasWidth = fabricCanvas.getWidth();
-      const canvasHeight = fabricCanvas.getHeight();
-
-      if (!canvasWidth || !canvasHeight) {
-        throw new Error("Canvas dimensions are invalid");
-      }
-
-      // Calculate scaling factors for text elements
-      const scaleX = originalImg.width / canvasWidth;
-      const scaleY = originalImg.height / canvasHeight;
-
-      // Get all fabric objects and draw text at high resolution
-      const objects = fabricCanvas.getObjects();
-      objects.forEach((obj: any) => {
-        if (obj.type === "textbox" || obj.type === "text") {
-          exportCtx.font = `${obj.fontSize * scaleX}px ${obj.fontFamily}`;
-          exportCtx.fillStyle = obj.fill;
-          exportCtx.textAlign = obj.textAlign || "center";
-
-          // Handle text shadow if present
-          if (obj.shadow) {
-            exportCtx.shadowColor = obj.shadow.color;
-            exportCtx.shadowBlur = obj.shadow.blur * scaleX;
-            exportCtx.shadowOffsetX = obj.shadow.offsetX * scaleX;
-            exportCtx.shadowOffsetY = obj.shadow.offsetY * scaleY;
-          }
-
-          exportCtx.fillText(obj.text, obj.left * scaleX, obj.top * scaleY);
-
-          // Reset shadow
-          exportCtx.shadowColor = "transparent";
-          exportCtx.shadowBlur = 0;
-          exportCtx.shadowOffsetX = 0;
-          exportCtx.shadowOffsetY = 0;
+      const textObjects = fabricCanvas.getObjects().filter((obj: any) => 
+        obj.type === "textbox" || obj.type === "text"
+      );
+      
+      // Calculate scaling between display canvas and export canvas
+      const scaleFactorX = img.naturalWidth / fabricCanvas.getWidth();
+      const scaleFactorY = img.naturalHeight / fabricCanvas.getHeight();
+      
+      // Draw each text object
+      textObjects.forEach((obj: any) => {
+        // Scale position and size
+        const fontSize = obj.fontSize * scaleFactorY;
+        const fontFamily = obj.fontFamily || "Arial";
+        const fill = obj.fill || "#ffffff";
+        
+        // Set up text rendering
+        ctx.font = `${fontSize}px ${fontFamily}`;
+        ctx.fillStyle = fill;
+        ctx.textAlign = obj.textAlign || "center";
+        
+        // Handle shadow
+        if (obj.shadow) {
+          ctx.shadowColor = obj.shadow.color || "rgba(0,0,0,0.6)";
+          ctx.shadowBlur = (obj.shadow.blur || 5) * scaleFactorX;
+          ctx.shadowOffsetX = (obj.shadow.offsetX || 2) * scaleFactorX;
+          ctx.shadowOffsetY = (obj.shadow.offsetY || 2) * scaleFactorY;
         }
+        
+        // Position text - adjust for textbox center point
+        const x = obj.left * scaleFactorX;
+        const y = obj.top * scaleFactorY;
+        
+        // Draw text
+        ctx.fillText(obj.text || wish, x, y);
+        
+        // Reset shadow
+        ctx.shadowColor = "transparent";
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
       });
-
-      // Convert canvas to blob with React-safe download - NO DOM MANIPULATION
-      exportCanvas.toBlob(
-        (blob) => {
-          if (!blob) {
-            throw new Error("Failed to create image blob");
-          }
-
-          const filename = `wish-maker-${
-            selectedImage?.occasion || "image"
-          }-${Date.now()}.png`;
-
-          // React-safe download using only modern APIs
-          try {
-            // Check if File System Access API is available (most secure method)
-            if ("showSaveFilePicker" in window) {
-              // Modern browsers with File System Access API
-              (window as any)
-                .showSaveFilePicker({
-                  suggestedName: filename,
-                  types: [
-                    {
-                      description: "PNG Images",
-                      accept: { "image/png": [".png"] },
-                    },
-                  ],
-                })
-                .then((fileHandle: any) => {
-                  return fileHandle.createWritable();
-                })
-                .then((writable: any) => {
-                  writable.write(blob);
-                  return writable.close();
-                })
-                .catch((e: Error) => {
-                  // User cancelled or error occurred, fallback to blob URL
-                  if (e.name !== "AbortError") {
-                    console.log(
-                      "File System API failed, using fallback:",
-                      e.message
-                    );
-                    triggerBlobDownload(blob, filename);
-                  }
-                });
-            } else {
-              // Fallback for browsers without File System Access API
-              triggerBlobDownload(blob, filename);
-            }
-          } catch (e) {
-            console.error("Download failed:", e);
-            triggerBlobDownload(blob, filename);
-          }
-
-          console.log("High-quality PNG download initiated");
-        },
-        "image/png",
-        1.0
-      );
+      
+      // Convert canvas to data URL and trigger download
+      const dataURL = exportCanvas.toDataURL("image/png", 1.0);
+      const filename = `wish-maker-${selectedImage?.occasion || "image"}-${Date.now()}.png`;
+      
+      // Create link element
+      const link = document.createElement("a");
+      link.download = filename;
+      link.href = dataURL;
+      
+      // Use modern event dispatch approach instead of DOM manipulation
+      const clickEvent = new MouseEvent("click", {
+        view: window,
+        bubbles: false,
+        cancelable: true
+      });
+      
+      // Dispatch the click event - no DOM insertion needed
+      link.dispatchEvent(clickEvent);
+      
+      console.log("Download completed successfully");
     } catch (err) {
-      console.error("Error downloading image:", err);
-      setError(
-        `Failed to download image: ${
-          err instanceof Error ? err.message : "Unknown error"
-        }`
-      );
+      console.error("Download error:", err);
+      setError(`Download failed: ${err instanceof Error ? err.message : "Unknown error"}`);
     } finally {
       setLoading(false);
     }
-  };
-
-  // Utility function for blob downloads without DOM conflicts
-  const triggerBlobDownload = (blob: Blob, filename: string) => {
-    const url = URL.createObjectURL(blob);
-
-    // Check for legacy IE/Edge support
-    if ((navigator as any).msSaveBlob) {
-      (navigator as any).msSaveBlob(blob, filename);
-      URL.revokeObjectURL(url);
-      return;
-    }
-
-    // Modern approach Use programmatic click without DOM insertion
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = filename;
-
-    // Trigger download without adding to DOM (React-safe)
-    link.style.display = "none";
-    link.click();
-
-    // Clean up immediately
-    setTimeout(() => {
-      URL.revokeObjectURL(url);
-    }, 100);
   };
 
   if (error && !fabric && !fabricCanvasRef.current) {
