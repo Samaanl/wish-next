@@ -484,29 +484,33 @@ const TextEditor: React.FC<TextEditorProps> = ({
     }
 
     try {
-      setLoading(true);
       console.log("Starting download process...");
 
-      // Use fabric's built-in export functionality instead of manual canvas creation
+      // Use fabric's built-in export functionality
       const fabricCanvas = fabricCanvasRef.current;
 
-      // First, try to export using fabric's toDataURL which handles scaling better
+      // Export using fabric's toDataURL which handles scaling better
       const dataURL = fabricCanvas.toDataURL({
         format: "png",
         quality: 1.0,
         multiplier: 2, // Double resolution for better quality
       });
 
-      // Convert data URL to blob
-      const response = await fetch(dataURL);
-      const blob = await response.blob();
-
+      // Create filename
       const filename = `wish-maker-${
         selectedImage?.occasion || "image"
       }-${Date.now()}.png`;
 
-      // Simple, reliable download method
-      triggerBlobDownload(blob, filename);
+      // Use the simplest possible download method to avoid React conflicts
+      // Create a temporary anchor element and trigger download
+      const tempLink = document.createElement("a");
+      tempLink.href = dataURL;
+      tempLink.download = filename;
+
+      // Add to document briefly, click, then remove immediately
+      document.body.appendChild(tempLink);
+      tempLink.click();
+      document.body.removeChild(tempLink);
 
       console.log("Download completed successfully");
     } catch (err) {
@@ -516,44 +520,8 @@ const TextEditor: React.FC<TextEditorProps> = ({
           err instanceof Error ? err.message : "Unknown error"
         }`
       );
-    } finally {
-      setLoading(false);
-    }
-  }; // Utility function for blob downloads without DOM conflicts
-  const triggerBlobDownload = (blob: Blob, filename: string) => {
-    try {
-      // Check for legacy IE/Edge support first
-      if ((navigator as any).msSaveBlob) {
-        (navigator as any).msSaveBlob(blob, filename);
-        return;
-      }
-
-      // Modern browsers - Use URL.createObjectURL with link click
-      const url = URL.createObjectURL(blob);
-
-      // Create link element without adding to DOM
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = filename;
-
-      // Use a more reliable click method that doesn't require DOM insertion
-      // This approach is React-safe and avoids DOM manipulation conflicts
-      const clickEvent = new MouseEvent("click", {
-        view: window,
-        bubbles: true,
-        cancelable: true,
-      });
-
-      link.dispatchEvent(clickEvent);
-
-      // Clean up URL immediately
-      URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error("Download failed:", error);
-      setError("Download failed. Please try again.");
     }
   };
-
   if (error && !fabric && !fabricCanvasRef.current) {
     return (
       <div className="w-full text-center py-8">
@@ -636,18 +604,13 @@ const TextEditor: React.FC<TextEditorProps> = ({
                 className="px-6 py-3 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors font-medium"
               >
                 ← Back{" "}
-              </button>
+              </button>{" "}
               {!loading && !error && canvasReady && (
                 <button
                   onClick={handleDownload}
-                  disabled={loading}
-                  className={`px-6 py-3 rounded-lg font-medium transition-colors ${
-                    loading
-                      ? "bg-green-400 cursor-not-allowed text-white"
-                      : "bg-green-600 hover:bg-green-700 text-white"
-                  }`}
+                  className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors"
                 >
-                  {loading ? "Processing..." : "⬇️ Download"}
+                  ⬇️ Download
                 </button>
               )}
             </div>
@@ -818,18 +781,13 @@ const TextEditor: React.FC<TextEditorProps> = ({
             className="flex-1 px-4 py-3 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors font-medium"
           >
             ← Back{" "}
-          </button>
+          </button>{" "}
           {!loading && !error && canvasReady && (
             <button
               onClick={handleDownload}
-              disabled={loading}
-              className={`flex-1 px-4 py-3 rounded-lg font-medium transition-colors ${
-                loading
-                  ? "bg-green-400 cursor-not-allowed text-white"
-                  : "bg-green-600 hover:bg-green-700 text-white"
-              }`}
+              className="flex-1 px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors"
             >
-              {loading ? "⬇️..." : "⬇️ Download"}
+              ⬇️ Download
             </button>
           )}
         </div>
