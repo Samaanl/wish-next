@@ -17,7 +17,11 @@ export default function PaymentDebugPage() {
     setLoading(true);
     try {
       // Test the Lemon Squeezy API directly
-      const response = await axios.get(`/api/test-payment-lookup?email=${encodeURIComponent(currentUser.email)}`);
+      const response = await axios.get(
+        `/api/test-payment-lookup?email=${encodeURIComponent(
+          currentUser.email
+        )}`
+      );
       setResult(response.data);
     } catch (error: any) {
       setResult({ error: error.response?.data || error.message });
@@ -51,30 +55,43 @@ export default function PaymentDebugPage() {
     <div className="min-h-screen bg-gray-100 p-8">
       <div className="max-w-4xl mx-auto">
         <h1 className="text-3xl font-bold mb-8">Payment Debug Console</h1>
-        
         {currentUser ? (
           <div className="bg-white p-6 rounded-lg shadow mb-6">
             <h2 className="text-xl font-semibold mb-4">Current User</h2>
-            <p><strong>ID:</strong> {currentUser.id}</p>
-            <p><strong>Email:</strong> {currentUser.email}</p>
-            <p><strong>Credits:</strong> {currentUser.credits}</p>
+            <p>
+              <strong>ID:</strong> {currentUser.id}
+            </p>
+            <p>
+              <strong>Email:</strong> {currentUser.email}
+            </p>
+            <p>
+              <strong>Credits:</strong> {currentUser.credits}
+            </p>
           </div>
         ) : (
           <div className="bg-yellow-100 p-4 rounded-lg mb-6">
             <p>Please log in to test payment lookup</p>
           </div>
-        )}
-
+        )}{" "}
         <div className="bg-white p-6 rounded-lg shadow mb-6">
           <h2 className="text-xl font-semibold mb-4">LocalStorage Debug</h2>
           <pre className="bg-gray-100 p-4 rounded text-sm overflow-auto">
-            {JSON.stringify({
-              checkoutUserInfo: localStorage.getItem("checkoutUserInfo"),
-              lastPaymentCheck: localStorage.getItem("lastPaymentCheck")
-            }, null, 2)}
+            {JSON.stringify(
+              {
+                checkoutUserInfo:
+                  typeof window !== "undefined"
+                    ? localStorage.getItem("checkoutUserInfo")
+                    : "N/A (SSR)",
+                lastPaymentCheck:
+                  typeof window !== "undefined"
+                    ? localStorage.getItem("lastPaymentCheck")
+                    : "N/A (SSR)",
+              },
+              null,
+              2
+            )}
           </pre>
         </div>
-
         <div className="flex gap-4 mb-6">
           <button
             onClick={testPaymentLookup}
@@ -83,7 +100,7 @@ export default function PaymentDebugPage() {
           >
             {loading ? "Testing..." : "Test Lemon Squeezy API"}
           </button>
-          
+
           <button
             onClick={testPaymentStatus}
             disabled={loading}
@@ -92,7 +109,6 @@ export default function PaymentDebugPage() {
             {loading ? "Testing..." : "Test Payment Status API"}
           </button>
         </div>
-
         {result && (
           <div className="bg-white p-6 rounded-lg shadow">
             <h2 className="text-xl font-semibold mb-4">Test Result</h2>

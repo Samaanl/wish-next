@@ -62,9 +62,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 }) => {
   const [currentUser, setCurrentUser] = useState<UserData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-
   useEffect(() => {
     const checkUser = async () => {
+      // Only run in browser
+      if (typeof window === "undefined") {
+        setIsLoading(false);
+        return;
+      }
+
       setIsLoading(true);
       try {
         // First try to get the stored user from localStorage
@@ -99,9 +104,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
             console.warn("Could not verify stored user with Appwrite:", error);
             // Will continue to fallback methods
           }
-        }
-
-        // Always create a guest user first if needed
+        } // Always create a guest user first if needed
         if (!localStorage.getItem(GUEST_USER_KEY)) {
           const newGuestUser = getGuestUser();
           setCurrentUser(newGuestUser);
@@ -197,7 +200,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     setCurrentUser(user);
   };
   const refreshUserCredits = async () => {
-    if (!currentUser) return;
+    if (!currentUser || typeof window === "undefined") return;
 
     console.log("Refreshing user credits for:", currentUser.id);
 
@@ -238,9 +241,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     } catch (error) {
       console.error("Error refreshing user credits:", error);
     }
-  };
-  // Force refresh the entire user session - useful after OAuth login
+  }; // Force refresh the entire user session - useful after OAuth login
   const refreshUserSession = async () => {
+    if (typeof window === "undefined") return null;
+
     // Add throttling to prevent excessive refreshes
     const lastRefreshTime = parseInt(
       localStorage.getItem("last_session_refresh") || "0"

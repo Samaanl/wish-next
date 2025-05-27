@@ -14,17 +14,21 @@ export default function PendingPaymentCheck() {
   ) => {
     setProcessingMessage(message);
     setTimeout(() => setProcessingMessage(""), 5000);
-  };  // Check for completed payments when user returns
+  }; // Check for completed payments when user returns
   const checkForCompletedPayments = async () => {
     if (!currentUser?.id || isChecking) return;
 
     try {
       setIsChecking(true);
       console.log("🔍 Checking for completed payments...");
-      console.log("👤 Current user:", { id: currentUser.id, email: currentUser.email });
-
-      // Check localStorage for debugging
-      const checkoutInfo = localStorage.getItem("checkoutUserInfo");
+      console.log("👤 Current user:", {
+        id: currentUser.id,
+        email: currentUser.email,
+      }); // Check localStorage for debugging
+      const checkoutInfo =
+        typeof window !== "undefined"
+          ? localStorage.getItem("checkoutUserInfo")
+          : null;
       console.log("💾 Checkout info in localStorage:", checkoutInfo);
 
       // Check if user has any recent unprocessed orders in Lemon Squeezy
@@ -41,15 +45,18 @@ export default function PendingPaymentCheck() {
           `Payment found! ${response.data.credits} credits added to your account.`,
           "success"
         );
-        
+
         // Refresh user credits
         await refreshUserCredits();
-        
         // Clear any stored checkout info
-        localStorage.removeItem("checkoutUserInfo");
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("checkoutUserInfo");
+        }
       } else if (response.data.paymentFound && response.data.alreadyProcessed) {
         console.log("ℹ️ Payment already processed");
-        localStorage.removeItem("checkoutUserInfo");
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("checkoutUserInfo");
+        }
       } else {
         console.log("❌ No payment found or not processed");
       }
@@ -60,9 +67,10 @@ export default function PendingPaymentCheck() {
       setIsChecking(false);
     }
   };
-
   // Check if user has pending checkout and should be monitored
   const shouldMonitorPayments = () => {
+    if (typeof window === "undefined") return false;
+
     const checkoutInfo = localStorage.getItem("checkoutUserInfo");
     if (!checkoutInfo) return false;
 
