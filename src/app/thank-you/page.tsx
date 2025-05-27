@@ -683,13 +683,46 @@ function ThankYouContent() {
               />
             </svg>
           </div>
-        </div>
+        </div>{" "}
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
           Thank You for Your Purchase!
         </h1>
         <p className="text-lg text-gray-600 dark:text-gray-300 mb-6">
           Your payment has been processed successfully.
         </p>
+        {/* Important Notice about payment completion */}
+        <div className="mb-6 p-4 bg-amber-50 dark:bg-amber-900/30 border-l-4 border-amber-400 rounded-lg">
+          <div className="flex items-start">
+            <div className="flex-shrink-0">
+              <svg
+                className="h-5 w-5 text-amber-400"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                📋 Important: If you see a payment success overlay
+              </h3>
+              <div className="mt-2 text-sm text-amber-700 dark:text-amber-300">
+                <p>
+                  If you see a{" "}
+                  <strong>"Thanks for your order! Payment successful"</strong>{" "}
+                  overlay from Lemon Squeezy, please click the{" "}
+                  <strong>"Continue"</strong> button instead of your browser's
+                  back button. This ensures your credits are properly added to
+                  your account.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
         {processingStatus && (
           <div
             className={`mb-4 px-4 py-2 rounded-lg ${
