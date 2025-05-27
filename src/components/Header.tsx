@@ -26,18 +26,23 @@ const Header: React.FC<HeaderProps> = ({ onLogin, onBuyCredits }) => {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-
-  const handleDropdownToggle = () => {
+  const handleDropdownToggle = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     setIsDropdownOpen(!isDropdownOpen);
   };
-
-  const handleBuyCreditsClick = () => {
+  const handleBuyCreditsClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     console.log("BUY CREDITS CLICKED!");
+    console.log("onBuyCredits function:", typeof onBuyCredits);
     setIsDropdownOpen(false);
     onBuyCredits();
   };
 
-  const handleSignOutClick = async () => {
+  const handleSignOutClick = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     console.log("SIGN OUT CLICKED!");
     setIsSigningOut(true);
     try {
@@ -66,7 +71,7 @@ const Header: React.FC<HeaderProps> = ({ onLogin, onBuyCredits }) => {
           <>
             <CreditDisplay onBuyCredits={onBuyCredits} />
 
-            <div className="relative" ref={dropdownRef}>
+            <div className="relative z-50" ref={dropdownRef}>
               <button
                 onClick={handleDropdownToggle}
                 className="flex items-center space-x-2 px-3 py-2 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200"
@@ -91,10 +96,9 @@ const Header: React.FC<HeaderProps> = ({ onLogin, onBuyCredits }) => {
                     clipRule="evenodd"
                   />
                 </svg>
-              </button>
-
+              </button>{" "}
               {isDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 py-2 z-50 animate-slide-in">
+                <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 py-2 z-[9999] animate-slide-in">
                   <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
                     <div className="flex items-center space-x-3">
                       <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center text-white font-medium">
@@ -116,7 +120,7 @@ const Header: React.FC<HeaderProps> = ({ onLogin, onBuyCredits }) => {
                   <div className="py-1">
                     <button
                       onClick={handleBuyCreditsClick}
-                      className="flex items-center w-full px-4 py-3 text-left text-gray-700 dark:text-gray-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors cursor-pointer"
+                      className="flex items-center w-full px-4 py-3 text-left text-gray-700 dark:text-gray-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors cursor-pointer border-0 bg-transparent"
                       type="button"
                     >
                       <svg
@@ -132,7 +136,7 @@ const Header: React.FC<HeaderProps> = ({ onLogin, onBuyCredits }) => {
                     <button
                       onClick={handleSignOutClick}
                       disabled={isSigningOut}
-                      className="flex items-center w-full px-4 py-3 text-left text-gray-700 dark:text-gray-300 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400 transition-colors cursor-pointer disabled:opacity-50"
+                      className="flex items-center w-full px-4 py-3 text-left text-gray-700 dark:text-gray-300 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400 transition-colors cursor-pointer disabled:opacity-50 border-0 bg-transparent"
                       type="button"
                     >
                       {isSigningOut ? (
