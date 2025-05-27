@@ -46,6 +46,7 @@ const Header: React.FC<HeaderProps> = ({ onLogin, onBuyCredits }) => {
     e.stopPropagation();
     console.log("SIGN OUT CLICKED!");
     console.log("Event target:", e.target);
+    if (isSigningOut) return; // Prevent multiple clicks
     setIsSigningOut(true);
     try {
       await logOut();
@@ -99,10 +100,13 @@ const Header: React.FC<HeaderProps> = ({ onLogin, onBuyCredits }) => {
                   />
                 </svg>{" "}
               </button>
-
               {isDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 py-2 z-[9999] animate-slide-in">
-                  <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+                <div
+                  className="fixed right-6 top-16 w-56 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden"
+                  style={{ zIndex: 99999 }}
+                >
+                  {/* User Info Header */}
+                  <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-750">
                     <div className="flex items-center space-x-3">
                       <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center text-white font-medium">
                         {displayName.charAt(0).toUpperCase()}
@@ -118,68 +122,72 @@ const Header: React.FC<HeaderProps> = ({ onLogin, onBuyCredits }) => {
                         )}
                       </div>
                     </div>
-                  </div>
-
-                  <div className="py-1">
-                    {/* Test button for debugging */}
-                    <button
-                      onClick={() => {
-                        console.log("TEST BUTTON CLICKED!");
-                        alert("Test button works!");
+                  </div>{" "}
+                  {/* Menu Items */}
+                  <div className="bg-white dark:bg-gray-800">
+                    {/* Test Item */}
+                    <div
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        alert("TEST CLICK WORKS!");
+                        console.log("Test click detected!");
                       }}
-                      className="flex items-center w-full px-4 py-2 text-left text-green-700 hover:bg-green-50 transition-colors cursor-pointer"
-                      type="button"
+                      className="px-4 py-2 bg-green-100 hover:bg-green-200 cursor-pointer transition-colors border-b border-gray-100 dark:border-gray-700 select-none"
                     >
-                      <span className="font-medium">🔧 Test Button</span>
-                    </button>
-                    <button
-                      onClick={handleBuyCreditsClick}
-                      className="flex items-center w-full px-4 py-3 text-left text-gray-700 dark:text-gray-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors cursor-pointer border-0 bg-transparent pointer-events-auto"
-                      type="button"
-                      style={{ pointerEvents: "auto" }}
+                      <div className="flex items-center text-green-800">
+                        <span className="font-medium">🧪 TEST - Click Me</span>
+                      </div>
+                    </div>
+                    {/* Buy Credits */}
+                    <div
+                      onMouseDown={handleBuyCreditsClick}
+                      className="px-4 py-3 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 cursor-pointer transition-colors border-b border-gray-100 dark:border-gray-700 select-none"
                     >
-                      <svg
-                        className="w-5 h-5 mr-3 text-yellow-500"
-                        fill="currentColor"
-                        viewBox="0 0 20 20"
-                      >
-                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                      </svg>
-                      <span className="font-medium">Buy Credits</span>
-                    </button>{" "}
-                    <button
-                      onClick={handleSignOutClick}
-                      disabled={isSigningOut}
-                      className="flex items-center w-full px-4 py-3 text-left text-gray-700 dark:text-gray-300 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400 transition-colors cursor-pointer disabled:opacity-50 border-0 bg-transparent pointer-events-auto"
-                      type="button"
-                      style={{ pointerEvents: "auto" }}
+                      <div className="flex items-center text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400">
+                        <svg
+                          className="w-5 h-5 mr-3 text-yellow-500"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                        </svg>
+                        <span className="font-medium">Buy Credits</span>
+                      </div>
+                    </div>
+                    {/* Sign Out */}
+                    <div
+                      onMouseDown={handleSignOutClick}
+                      className="px-4 py-3 hover:bg-red-50 dark:hover:bg-red-900/20 cursor-pointer transition-colors select-none"
                     >
-                      {isSigningOut ? (
-                        <>
-                          <div className="w-5 h-5 mr-3">
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600"></div>
-                          </div>
-                          <span className="font-medium">Signing Out...</span>
-                        </>
-                      ) : (
-                        <>
-                          <svg
-                            className="w-5 h-5 mr-3 text-gray-400"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-                            />
-                          </svg>
-                          <span className="font-medium">Sign Out</span>
-                        </>
-                      )}
-                    </button>
+                      <div className="flex items-center text-gray-700 dark:text-gray-300 hover:text-red-600 dark:hover:text-red-400">
+                        {isSigningOut ? (
+                          <>
+                            <div className="w-5 h-5 mr-3">
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600"></div>
+                            </div>
+                            <span className="font-medium">Signing Out...</span>
+                          </>
+                        ) : (
+                          <>
+                            <svg
+                              className="w-5 h-5 mr-3 text-gray-400"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                              />
+                            </svg>
+                            <span className="font-medium">Sign Out</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
