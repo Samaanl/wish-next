@@ -42,7 +42,7 @@ console.log("Appwrite Configuration:", {
   projectId: process.env.NEXT_PUBLIC_APPWRITE_PROJECT,
 });
 
-// Helper to check if we should try to use Appwrite authentication
+// Helper to works check if we should try to use Appwrite authentication
 export const shouldUseAppwrite = () => {
   // Check if we're in the browser
   if (typeof window === "undefined") return false;
