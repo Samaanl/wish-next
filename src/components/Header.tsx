@@ -11,14 +11,14 @@ const Header: React.FC<HeaderProps> = ({ onLogin, onBuyCredits }) => {
   const { currentUser, logOut } = useAuth();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null); // Close dropdown when clicking outside
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      console.log("Click detected, target:", event.target);
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(event.target as Node)
-      ) {
+      const target = event.target as HTMLElement;
+      console.log("Click detected on:", target.tagName, target.className);
+
+      if (dropdownRef.current && !dropdownRef.current.contains(target)) {
         console.log("Clicking outside dropdown, closing it");
         setIsDropdownOpen(false);
       } else {
@@ -27,11 +27,14 @@ const Header: React.FC<HeaderProps> = ({ onLogin, onBuyCredits }) => {
     };
 
     if (isDropdownOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
+      // Use a slight delay to ensure the dropdown is fully rendered
+      setTimeout(() => {
+        document.addEventListener("click", handleClickOutside);
+      }, 0);
     }
 
     return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("click", handleClickOutside);
     };
   }, [isDropdownOpen]);
 
@@ -127,11 +130,11 @@ const Header: React.FC<HeaderProps> = ({ onLogin, onBuyCredits }) => {
                           </p>
                         )}
                       </div>
-                    </div>
-                  </div>{" "}
+                    </div>{" "}
+                  </div>
+
                   {/* Menu Items */}
                   <div className="py-1">
-                    {" "}
                     <button
                       onClick={() => {
                         console.log("Buy Credits button clicked!");
@@ -149,6 +152,7 @@ const Header: React.FC<HeaderProps> = ({ onLogin, onBuyCredits }) => {
                       </svg>
                       <span className="font-medium">Buy Credits</span>
                     </button>
+
                     <button
                       onClick={() => {
                         console.log("Sign Out button clicked!");
