@@ -159,7 +159,6 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
           <h2 className="text-2xl font-bold mb-6 text-center text-gray-900 dark:text-white">
             Buy Credits
           </h2>
-
           {isGuestUser && (
             <div className="mb-4 p-3 bg-blue-50 text-blue-700 border border-blue-100 rounded">
               <p className="font-medium">Sign in required</p>
@@ -174,13 +173,11 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
               </button>
             </div>
           )}
-
           {error && (
             <div className="mb-4 p-3 bg-red-100 text-red-700 rounded">
               {error}
             </div>
           )}
-
           <div className="space-y-4">
             {CREDIT_PACKAGES.map((pkg) => (
               <div
@@ -216,7 +213,6 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
               </div>
             ))}{" "}
           </div>
-
           {/* Payment completion instructions */}
           <div className="mt-6 p-3 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg">
             <div className="flex items-start">
@@ -244,16 +240,26 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
                 </p>
               </div>
             </div>
-          </div>
-
+          </div>{" "}
           <div className="mt-6 text-center text-xs text-gray-500 dark:text-gray-400">
             Secure payment powered by Lemon Squeezy. All purchases are final.
           </div>
-
+          {/* More prominent close button */}
+          <div className="mt-4 text-center">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              disabled={isLoading}
+            >
+              Close
+            </button>
+          </div>
+          {/* Smaller X button for quick access */}
           <button
             onClick={onClose}
-            className="absolute top-2 right-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+            className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
             disabled={isLoading}
+            aria-label="Close"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"

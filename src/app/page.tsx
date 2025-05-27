@@ -146,13 +146,12 @@ export default function Home() {
       {/* Background decorations */}
       <div className="fixed inset-0 pointer-events-none opacity-40">
         <WishBackground />
-      </div>
-
+      </div>{" "}
       <Header
         onLogin={() => setAuthModalOpen(true)}
         onBuyCredits={handleBuyCredits}
+        onCloseCreditSection={() => setShowPurchaseModal(false)}
       />
-
       <div className="container mx-auto px-4 py-8 relative z-10">
         <motion.div
           initial={{ opacity: 0, y: -20 }}
@@ -247,14 +246,12 @@ export default function Home() {
           <p>Powered by Gemini AI • {new Date().getFullYear()}</p>
         </footer>
       </div>
-
       {/* Authentication Modal */}
       <AuthModal
         isOpen={authModalOpen}
         onClose={() => setAuthModalOpen(false)}
         onSuccess={handleAuthSuccess}
       />
-
       {/* Purchase Modal */}
       <PurchaseModal
         isOpen={showPurchaseModal}
