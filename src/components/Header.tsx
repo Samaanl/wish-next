@@ -11,14 +11,13 @@ const Header: React.FC<HeaderProps> = ({ onLogin, onBuyCredits }) => {
   const { currentUser, logOut } = useAuth();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
-
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      // If clicking outside the dropdown area, close it
       if (isDropdownOpen) {
         const target = event.target as Element;
-        if (!target.closest(".dropdown-container")) {
+        const dropdownContainer = target.closest(".dropdown-container");
+        if (!dropdownContainer) {
           setIsDropdownOpen(false);
         }
       }
@@ -64,18 +63,10 @@ const Header: React.FC<HeaderProps> = ({ onLogin, onBuyCredits }) => {
                   <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
                 </svg>
               </button>
-            </div>
-            {/* Dropdown Menu - Rendered as Portal-like fixed positioned element */}
-            {isDropdownOpen && (
-              <>
-                {/* Backdrop to close dropdown */}
-                <div
-                  className="fixed inset-0 z-40"
-                  onClick={() => setIsDropdownOpen(false)}
-                />
 
-                {/* Actual Dropdown Menu */}
-                <div className="fixed top-16 right-6 z-50 w-56 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1">
+              {/* Dropdown Menu */}
+              {isDropdownOpen && (
+                <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-50">
                   {/* User Info */}
                   <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
                     <div className="flex items-center space-x-3">
@@ -99,7 +90,9 @@ const Header: React.FC<HeaderProps> = ({ onLogin, onBuyCredits }) => {
                   <div className="py-1">
                     {/* Buy Credits Button */}
                     <button
-                      onClick={() => {
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
                         console.log("Buy Credits clicked!");
                         setIsDropdownOpen(false);
                         onBuyCredits();
@@ -118,13 +111,15 @@ const Header: React.FC<HeaderProps> = ({ onLogin, onBuyCredits }) => {
 
                     {/* Sign Out Button */}
                     <button
-                      onClick={async () => {
+                      type="button"
+                      onClick={async (e) => {
+                        e.stopPropagation();
                         console.log("Sign Out clicked!");
                         if (isSigningOut) return;
                         setIsSigningOut(true);
+                        setIsDropdownOpen(false);
                         try {
                           await logOut();
-                          setIsDropdownOpen(false);
                         } catch (error) {
                           console.error("Sign out error:", error);
                         } finally {
@@ -162,8 +157,8 @@ const Header: React.FC<HeaderProps> = ({ onLogin, onBuyCredits }) => {
                     </button>
                   </div>
                 </div>
-              </>
-            )}
+              )}
+            </div>
           </>
         ) : (
           <button
