@@ -12,24 +12,29 @@ const Header: React.FC<HeaderProps> = ({ onLogin, onBuyCredits }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
-
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(event.target as Node)
-      ) {
+      const target = event.target as HTMLElement;
+
+      // Don't close if clicking on buttons inside dropdown
+      if (target.closest("button") && dropdownRef.current?.contains(target)) {
+        console.log("Clicked button inside dropdown - keeping open");
+        return;
+      }
+
+      if (dropdownRef.current && !dropdownRef.current.contains(target)) {
+        console.log("Clicked outside dropdown - closing");
         setIsDropdownOpen(false);
       }
     };
 
     if (isDropdownOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("click", handleClickOutside);
     }
 
     return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("click", handleClickOutside);
     };
   }, [isDropdownOpen]);
 
@@ -56,14 +61,15 @@ const Header: React.FC<HeaderProps> = ({ onLogin, onBuyCredits }) => {
     setIsDropdownOpen(false);
     onBuyCredits();
   };
+  const handleBuyCreditsClick = () => {
+    console.log("Buy Credits button clicked!");
+    setIsDropdownOpen(false);
+    onBuyCredits();
+  };
 
-  const handleDropdownButtonClick = (callback: () => void) => {
-    return (e: React.MouseEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      console.log("Button clicked inside dropdown");
-      callback();
-    };
+  const handleSignOutClick = () => {
+    console.log("Sign Out button clicked!");
+    handleSignOut();
   };
 
   // Get display name with fallback
@@ -134,12 +140,11 @@ const Header: React.FC<HeaderProps> = ({ onLogin, onBuyCredits }) => {
                         )}
                       </div>
                     </div>
-                  </div>
-
+                  </div>{" "}
                   {/* Menu Items */}
                   <div className="py-1">
                     <button
-                      onClick={handleDropdownButtonClick(handleBuyCredits)}
+                      onClick={handleBuyCreditsClick}
                       className="flex items-center w-full text-left px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors duration-150 group cursor-pointer"
                       type="button"
                     >
@@ -154,7 +159,7 @@ const Header: React.FC<HeaderProps> = ({ onLogin, onBuyCredits }) => {
                     </button>
 
                     <button
-                      onClick={handleDropdownButtonClick(handleSignOut)}
+                      onClick={handleSignOutClick}
                       disabled={isSigningOut}
                       className="flex items-center w-full text-left px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400 transition-colors duration-150 group disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                       type="button"
@@ -198,7 +203,7 @@ const Header: React.FC<HeaderProps> = ({ onLogin, onBuyCredits }) => {
             Sign In
           </button>
         )}
-      </div>{" "}
+      </div>
     </header>
   );
 };
