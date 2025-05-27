@@ -96,9 +96,8 @@ export const initializeCheckout = async (
     // Final check for guest users
     if (finalUserId.startsWith("guest-")) {
       throw new Error("Please sign up or log in to purchase credits");
-    }
-
-    // Save user info to localStorage for after-checkout recovery
+    } // Generate unique session tracking ID
+    const sessionTrackingId = `checkout_${finalUserId}_${Date.now()}`; // Save user info to localStorage for after-checkout recovery
     try {
       localStorage.setItem(
         "checkoutUserInfo",
@@ -108,14 +107,17 @@ export const initializeCheckout = async (
           package: packageId,
           credits: selectedPackage.credits,
           timestamp: new Date().toISOString(),
+          sessionId: sessionTrackingId,
+          needsMonitoring: true, // Flag to start payment monitoring
         })
       );
-      console.log("Saved checkout info to localStorage for recovery");
+      console.log(
+        "Saved checkout info to localStorage for recovery and monitoring"
+      );
     } catch (storageError) {
       console.error("Failed to save to localStorage:", storageError);
       // Non-critical error, continue with checkout
     }
-
     console.log("Making API request with:", {
       packageId: selectedPackage.lemonSqueezyId,
       userId: finalUserId,
@@ -124,6 +126,7 @@ export const initializeCheckout = async (
         user_id: finalUserId,
         package_id: packageId,
         credits: String(selectedPackage.credits),
+        session_tracking_id: sessionTrackingId,
       },
     });
 
@@ -136,6 +139,7 @@ export const initializeCheckout = async (
         user_id: finalUserId,
         package_id: packageId,
         credits: String(selectedPackage.credits),
+        session_tracking_id: sessionTrackingId,
       },
     });
 
@@ -204,4 +208,75 @@ export const getStoredCheckoutInfo = () => {
     console.error("Failed to retrieve checkout info:", e);
   }
   return null;
+};
+
+// Enhanced checkout info storage with session tracking
+export const storeCheckoutSession = (
+  sessionId: string,
+  userId: string,
+  userEmail: string,
+  packageId: string,
+  credits: number
+) => {
+  try {
+    const checkoutInfo = {
+      sessionId,
+      id: userId,
+      email: userEmail,
+      package: packageId,
+      credits,
+      timestamp: new Date().toISOString(),
+    };
+
+    localStorage.setItem("checkoutUserInfo", JSON.stringify(checkoutInfo));
+
+    // Also store with session-specific key for easier lookup
+    localStorage.setItem(
+      `checkout_session_${sessionId}`,
+      JSON.stringify(checkoutInfo)
+    );
+
+    console.log("Stored checkout session info:", checkoutInfo);
+  } catch (error) {
+    console.error("Failed to store checkout session:", error);
+  }
+};
+
+// Get checkout info by session ID
+export const getCheckoutSessionInfo = (sessionId: string) => {
+  try {
+    const sessionInfo = localStorage.getItem(`checkout_session_${sessionId}`);
+    return sessionInfo ? JSON.parse(sessionInfo) : null;
+  } catch (error) {
+    console.error("Failed to get checkout session info:", error);
+    return null;
+  }
+};
+
+// Clean up old checkout sessions
+export const cleanupOldCheckoutSessions = () => {
+  try {
+    const keys = Object.keys(localStorage);
+    const checkoutKeys = keys.filter((key) =>
+      key.startsWith("checkout_session_")
+    );
+    const now = new Date().getTime();
+
+    checkoutKeys.forEach((key) => {
+      try {
+        const info = JSON.parse(localStorage.getItem(key) || "{}");
+        const timestamp = new Date(info.timestamp).getTime();
+
+        // Remove sessions older than 7 days
+        if (now - timestamp > 7 * 24 * 60 * 60 * 1000) {
+          localStorage.removeItem(key);
+        }
+      } catch (e) {
+        // Remove invalid entries
+        localStorage.removeItem(key);
+      }
+    });
+  } catch (error) {
+    console.error("Failed to cleanup old checkout sessions:", error);
+  }
 };

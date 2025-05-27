@@ -238,6 +238,84 @@ function ThankYouContent() {
     setProcessingStatus,
   ]);
 
+  // Enhanced payment verification using our new API
+  const verifyAndProcessPayment = useCallback(async () => {
+    try {
+      setProcessingStatus("Verifying payment with Lemon Squeezy...");
+
+      // Call our enhanced verification API
+      const response = await makeAuthenticatedRequest(
+        "/api/verify-payment",
+        {
+          sessionId,
+          packageId,
+        } as Record<string, unknown>,
+        "POST"
+      );
+
+      if (response.data.success) {
+        setProcessingStatus("Payment verified and credits added!");
+
+        // Update debug info
+        setDebugInfo((prev) => ({
+          ...(prev || {
+            packageId,
+            sessionId,
+            packageCredits:
+              CREDIT_PACKAGES.find((pkg) => pkg.id === packageId)?.credits ||
+              10,
+          }),
+          userId: response.data.userId,
+          userEmail: response.data.userEmail,
+          manualProcessAttempted: true,
+          manualProcessResult: response.data,
+        }));
+
+        // Refresh user data
+        await refreshUserCredits();
+
+        // Get fresh user data
+        const updatedUser = await getCurrentUser();
+        if (updatedUser) {
+          setFinalCredits(updatedUser.credits);
+        }
+
+        // Mark this purchase as processed
+        const sessionKey = `processed_${sessionId}`;
+        sessionStorage.setItem(sessionKey, Date.now().toString());
+
+        // Mark for home page refresh
+        localStorage.setItem("credits_need_refresh", "true");
+
+        setIsLoading(false);
+      } else {
+        // If verification fails, fall back to direct credit update
+        console.log("Payment verification failed, trying direct update...");
+        await directCreditUpdate();
+      }
+    } catch (error) {
+      const err = error as Error;
+      console.error("Payment verification failed:", err);
+
+      // Fall back to direct credit update
+      console.log("Falling back to direct credit update...");
+      try {
+        await directCreditUpdate();
+      } catch (fallbackError) {
+        console.error("Direct credit update also failed:", fallbackError);
+        setProcessingStatus(
+          "Error processing payment. Please contact support."
+        );
+        setErrorDetails({
+          message: err.message,
+          stack: err.stack,
+          response: error instanceof AxiosError ? error.response?.data : null,
+        });
+        setIsLoading(false);
+      }
+    }
+  }, [sessionId, packageId, refreshUserCredits, directCreditUpdate]);
+
   useEffect(() => {
     // If there's no session ID, redirect to homepage
     if (!sessionId) {
@@ -329,24 +407,24 @@ function ThankYouContent() {
             packageCredits: 0, // Will be updated later
             authInfo: authResponse.data,
           });
-        }
-
-        // If not authenticated, try direct update without authentication
+        } // If not authenticated, try enhanced payment verification anyway
         if (!authResponse.data.authenticated) {
-          console.warn("Not authenticated, trying direct credit update");
-          await directCreditUpdate();
+          console.warn(
+            "Not authenticated, trying enhanced payment verification"
+          );
+          await verifyAndProcessPayment();
           return;
         }
 
-        // Continue with credit processing
-        await processCredits();
+        // Continue with enhanced payment verification
+        await verifyAndProcessPayment();
       } catch (error) {
-        console.error("Auth check error:", error);
-
-        // Try direct update as fallback
+        console.error("Auth check error:", error); // Try enhanced payment verification as fallback
         try {
-          console.log("Auth check failed, trying direct update as fallback");
-          await directCreditUpdate();
+          console.log(
+            "Auth check failed, trying enhanced payment verification as fallback"
+          );
+          await verifyAndProcessPayment();
         } catch (_) {
           // Authentication error fallback
           setProcessingStatus(

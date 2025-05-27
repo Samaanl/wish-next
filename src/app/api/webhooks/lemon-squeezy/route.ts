@@ -51,11 +51,20 @@ export async function POST(request: NextRequest) {
     const { meta, data } = body;
     const eventName = meta?.event_name;
 
-    console.log("Processing webhook event:", eventName);
-
-    // Extract common data
+    console.log("Processing webhook event:", eventName); // Extract common data
     const customData = data?.meta?.custom_data;
     const total = data?.attributes?.total || 0;
+    const orderId = data?.id;
+    const orderAttributes = data?.attributes;
+
+    // Enhanced logging for debugging
+    console.log("Webhook payload analysis:", {
+      eventName,
+      orderId,
+      customData,
+      total,
+      orderAttributes: orderAttributes ? Object.keys(orderAttributes) : null,
+    });
 
     // Validate custom data
     if (
@@ -68,6 +77,7 @@ export async function POST(request: NextRequest) {
         customData,
         eventName,
         data,
+        orderId,
       });
       return NextResponse.json(
         { error: "Missing required custom data" },
@@ -78,18 +88,32 @@ export async function POST(request: NextRequest) {
     switch (eventName) {
       case "order_created":
         console.log("Processing new purchase:", {
+          orderId,
           userId: customData.user_id,
           packageId: customData.package_id,
           credits: customData.credits,
           total,
         });
 
-        await recordPurchase(
-          customData.user_id,
-          customData.package_id,
-          total,
-          customData.credits
-        );
+        try {
+          await recordPurchase(
+            customData.user_id,
+            customData.package_id,
+            total,
+            customData.credits
+          );
+          console.log("✅ Purchase successfully recorded via webhook");
+        } catch (error) {
+          console.error("❌ Failed to record purchase via webhook:", error);
+          // Don't fail the webhook response to avoid retries for legitimate duplicates
+          if (error instanceof Error && error.message.includes("already")) {
+            console.log(
+              "Purchase already processed, this is expected behavior"
+            );
+          } else {
+            throw error; // Re-throw unexpected errors
+          }
+        }
         break;
 
       case "order_refunded":
