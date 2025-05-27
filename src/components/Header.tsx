@@ -11,16 +11,18 @@ const Header: React.FC<HeaderProps> = ({ onLogin, onBuyCredits }) => {
   const { currentUser, logOut } = useAuth();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-  // Close dropdown when clicking outside
+  const dropdownRef = useRef<HTMLDivElement>(null); // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
+      console.log("Click detected, target:", event.target);
       if (
         dropdownRef.current &&
         !dropdownRef.current.contains(event.target as Node)
       ) {
         console.log("Clicking outside dropdown, closing it");
         setIsDropdownOpen(false);
+      } else {
+        console.log("Click is inside dropdown, keeping it open");
       }
     };
 
@@ -126,15 +128,13 @@ const Header: React.FC<HeaderProps> = ({ onLogin, onBuyCredits }) => {
                         )}
                       </div>
                     </div>
-                  </div>
-
+                  </div>{" "}
                   {/* Menu Items */}
                   <div className="py-1">
                     {" "}
                     <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
+                      onClick={() => {
+                        console.log("Buy Credits button clicked!");
                         handleBuyCredits();
                       }}
                       className="flex items-center w-full text-left px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors duration-150 group cursor-pointer"
@@ -148,11 +148,10 @@ const Header: React.FC<HeaderProps> = ({ onLogin, onBuyCredits }) => {
                         <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                       </svg>
                       <span className="font-medium">Buy Credits</span>
-                    </button>{" "}
+                    </button>
                     <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
+                      onClick={() => {
+                        console.log("Sign Out button clicked!");
                         handleSignOut();
                       }}
                       disabled={isSigningOut}
