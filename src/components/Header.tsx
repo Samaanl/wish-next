@@ -10,20 +10,21 @@ interface HeaderProps {
 const Header: React.FC<HeaderProps> = ({ onLogin, onBuyCredits }) => {
   const { currentUser, logOut } = useAuth();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [isSigningOut, setIsSigningOut] = useState(false);
-  // Close dropdown when clicking outside
+  const [isSigningOut, setIsSigningOut] = useState(false); // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (isDropdownOpen) {
-        const target = event.target as Element;
-        const dropdownContainer = target.closest(".dropdown-container");
-        if (!dropdownContainer) {
-          setIsDropdownOpen(false);
-        }
+      const target = event.target as Element;
+      const dropdown = target.closest("[data-dropdown]");
+
+      if (!dropdown && isDropdownOpen) {
+        setIsDropdownOpen(false);
       }
     };
 
-    document.addEventListener("mousedown", handleClickOutside);
+    if (isDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isDropdownOpen]);
 
@@ -42,12 +43,13 @@ const Header: React.FC<HeaderProps> = ({ onLogin, onBuyCredits }) => {
         {currentUser ? (
           <>
             <CreditDisplay onBuyCredits={onBuyCredits} />{" "}
-            {/* User Menu - Completely New Implementation */}
-            <div className="relative dropdown-container">
+            {/* User Dropdown Menu */}
+            <div className="relative" data-dropdown>
               {/* User Avatar Button */}
               <button
+                type="button"
                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                className="flex items-center space-x-2 px-3 py-2 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200"
+                className="flex items-center space-x-2 px-3 py-2 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               >
                 <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center text-white font-medium text-sm">
                   {displayName.charAt(0).toUpperCase()}
@@ -66,7 +68,10 @@ const Header: React.FC<HeaderProps> = ({ onLogin, onBuyCredits }) => {
 
               {/* Dropdown Menu */}
               {isDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-50">
+                <div
+                  className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1"
+                  style={{ zIndex: 9999 }}
+                >
                   {/* User Info */}
                   <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
                     <div className="flex items-center space-x-3">
@@ -91,13 +96,11 @@ const Header: React.FC<HeaderProps> = ({ onLogin, onBuyCredits }) => {
                     {/* Buy Credits Button */}
                     <button
                       type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        console.log("Buy Credits clicked!");
+                      onClick={() => {
                         setIsDropdownOpen(false);
                         onBuyCredits();
                       }}
-                      className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center transition-colors"
+                      className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center transition-colors focus:outline-none focus:bg-indigo-50 dark:focus:bg-indigo-900/20"
                     >
                       <svg
                         className="w-4 h-4 mr-3 text-yellow-500"
@@ -112,9 +115,7 @@ const Header: React.FC<HeaderProps> = ({ onLogin, onBuyCredits }) => {
                     {/* Sign Out Button */}
                     <button
                       type="button"
-                      onClick={async (e) => {
-                        e.stopPropagation();
-                        console.log("Sign Out clicked!");
+                      onClick={async () => {
                         if (isSigningOut) return;
                         setIsSigningOut(true);
                         setIsDropdownOpen(false);
@@ -127,7 +128,7 @@ const Header: React.FC<HeaderProps> = ({ onLogin, onBuyCredits }) => {
                         }
                       }}
                       disabled={isSigningOut}
-                      className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400 flex items-center transition-colors disabled:opacity-50"
+                      className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400 flex items-center transition-colors disabled:opacity-50 focus:outline-none focus:bg-red-50 dark:focus:bg-red-900/20"
                     >
                       {isSigningOut ? (
                         <>
