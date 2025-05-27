@@ -12,29 +12,24 @@ const Header: React.FC<HeaderProps> = ({ onLogin, onBuyCredits }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as HTMLElement;
-      console.log("Click detected on:", target.tagName, target.className);
-
-      if (dropdownRef.current && !dropdownRef.current.contains(target)) {
-        console.log("Clicking outside dropdown, closing it");
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
         setIsDropdownOpen(false);
-      } else {
-        console.log("Click is inside dropdown, keeping it open");
       }
     };
 
     if (isDropdownOpen) {
-      // Use a slight delay to ensure the dropdown is fully rendered
-      setTimeout(() => {
-        document.addEventListener("click", handleClickOutside);
-      }, 0);
+      document.addEventListener("mousedown", handleClickOutside);
     }
 
     return () => {
-      document.removeEventListener("click", handleClickOutside);
+      document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [isDropdownOpen]);
 
@@ -62,10 +57,18 @@ const Header: React.FC<HeaderProps> = ({ onLogin, onBuyCredits }) => {
     onBuyCredits();
   };
 
+  const handleDropdownButtonClick = (callback: () => void) => {
+    return (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log("Button clicked inside dropdown");
+      callback();
+    };
+  };
+
   // Get display name with fallback
   const displayName =
     currentUser?.name || currentUser?.email?.split("@")[0] || "User";
-
   return (
     <header className="py-4 px-6 flex justify-between items-center border-b border-gray-200 dark:border-gray-700 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
       <div className="flex items-center">
@@ -73,7 +76,6 @@ const Header: React.FC<HeaderProps> = ({ onLogin, onBuyCredits }) => {
           Wish Generator
         </h1>
       </div>
-
       <div className="flex items-center space-x-4">
         {currentUser ? (
           <>
@@ -91,6 +93,7 @@ const Header: React.FC<HeaderProps> = ({ onLogin, onBuyCredits }) => {
                 }}
                 aria-haspopup="true"
                 aria-expanded={isDropdownOpen}
+                type="button"
               >
                 <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center text-white font-medium text-sm">
                   {displayName.charAt(0).toUpperCase()}
@@ -130,16 +133,13 @@ const Header: React.FC<HeaderProps> = ({ onLogin, onBuyCredits }) => {
                           </p>
                         )}
                       </div>
-                    </div>{" "}
+                    </div>
                   </div>
 
                   {/* Menu Items */}
                   <div className="py-1">
                     <button
-                      onClick={() => {
-                        console.log("Buy Credits button clicked!");
-                        handleBuyCredits();
-                      }}
+                      onClick={handleDropdownButtonClick(handleBuyCredits)}
                       className="flex items-center w-full text-left px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors duration-150 group cursor-pointer"
                       type="button"
                     >
@@ -154,10 +154,7 @@ const Header: React.FC<HeaderProps> = ({ onLogin, onBuyCredits }) => {
                     </button>
 
                     <button
-                      onClick={() => {
-                        console.log("Sign Out button clicked!");
-                        handleSignOut();
-                      }}
+                      onClick={handleDropdownButtonClick(handleSignOut)}
                       disabled={isSigningOut}
                       className="flex items-center w-full text-left px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400 transition-colors duration-150 group disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                       type="button"
@@ -201,7 +198,7 @@ const Header: React.FC<HeaderProps> = ({ onLogin, onBuyCredits }) => {
             Sign In
           </button>
         )}
-      </div>
+      </div>{" "}
     </header>
   );
 };
