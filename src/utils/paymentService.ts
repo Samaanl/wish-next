@@ -108,12 +108,9 @@ export const initializeCheckout = async (
           credits: selectedPackage.credits,
           timestamp: new Date().toISOString(),
           sessionId: sessionTrackingId,
-          needsMonitoring: true, // Flag to start payment monitoring
         })
       );
-      console.log(
-        "Saved checkout info to localStorage for recovery and monitoring"
-      );
+      console.log("Saved checkout info to localStorage for recovery");
     } catch (storageError) {
       console.error("Failed to save to localStorage:", storageError);
       // Non-critical error, continue with checkout

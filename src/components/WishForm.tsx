@@ -157,12 +157,10 @@ export default function WishForm({ onSubmit, isLoading }: FormProps) {
     }
   };
   const canProceedStep1 =
-    (inputs.occasion && inputs.occasion !== "Other") ||
-    (inputs.occasion === "Other" &&
-      customOccasion.trim() &&
-      inputs.tone &&
-      inputs.tone !== "Other") ||
-    (inputs.tone === "Other" && customTone.trim());
+    inputs.occasion &&
+    inputs.tone &&
+    (inputs.occasion !== "Other" || customOccasion.trim()) &&
+    (inputs.tone !== "Other" || customTone.trim());
   const canProceedStep2 = inputs.recipientName && inputs.relationship;
   const canProceedStep3 = true; // Step 3 has only optional fields
   const canProceedStep4 = inputs.messageLength && inputs.messageFormat;
@@ -185,14 +183,13 @@ export default function WishForm({ onSubmit, isLoading }: FormProps) {
                 <p className="text-sm text-gray-500 dark:text-gray-400">
                   Select the occasion and tone for your wish.
                 </p>
-              </div>
-
+              </div>{" "}
               <div className="group">
                 <label
                   htmlFor="occasion"
                   className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300 group-focus-within:text-indigo-600 dark:group-focus-within:text-indigo-400"
                 >
-                  Select Occasion
+                  Select Occasion *
                 </label>
                 <div className="relative">
                   <select
@@ -228,14 +225,31 @@ export default function WishForm({ onSubmit, isLoading }: FormProps) {
                     </svg>
                   </div>
                 </div>
+                {/* Custom Occasion Input - directly below dropdown */}
+                {inputs.occasion === "Other" && (
+                  <div className="mt-3">
+                    <input
+                      type="text"
+                      id="customOccasion"
+                      name="customOccasion"
+                      value={customOccasion}
+                      onChange={handleCustomOccasionChange}
+                      placeholder="Enter your custom occasion"
+                      required
+                      className="block w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-lg shadow-sm 
+                               focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 
+                               bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
+                               transition duration-150 ease-in-out"
+                    />
+                  </div>
+                )}
               </div>
-
               <div className="group">
                 <label
                   htmlFor="tone"
                   className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300 group-focus-within:text-indigo-600 dark:group-focus-within:text-indigo-400"
                 >
-                  Choose Tone
+                  Choose Tone *
                 </label>
                 <div className="relative">
                   <select
@@ -271,57 +285,25 @@ export default function WishForm({ onSubmit, isLoading }: FormProps) {
                     </svg>{" "}
                   </div>
                 </div>
+                {/* Custom Tone Input - directly below dropdown */}
+                {inputs.tone === "Other" && (
+                  <div className="mt-3">
+                    <input
+                      type="text"
+                      id="customTone"
+                      name="customTone"
+                      value={customTone}
+                      onChange={handleCustomToneChange}
+                      placeholder="Enter your custom tone (e.g., mysterious, witty, nostalgic)"
+                      required
+                      className="block w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-lg shadow-sm 
+                               focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 
+                               bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
+                               transition duration-150 ease-in-out"
+                    />
+                  </div>
+                )}
               </div>
-
-              {/* Custom Occasion Input */}
-              {inputs.occasion === "Other" && (
-                <div className="group">
-                  <label
-                    htmlFor="customOccasion"
-                    className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300 group-focus-within:text-indigo-600 dark:group-focus-within:text-indigo-400"
-                  >
-                    Enter Custom Occasion
-                  </label>
-                  <input
-                    type="text"
-                    id="customOccasion"
-                    name="customOccasion"
-                    value={customOccasion}
-                    onChange={handleCustomOccasionChange}
-                    placeholder="Enter your custom occasion"
-                    required
-                    className="block w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-lg shadow-sm 
-                             focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 
-                             bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
-                             transition duration-150 ease-in-out"
-                  />
-                </div>
-              )}
-
-              {/* Custom Tone Input */}
-              {inputs.tone === "Other" && (
-                <div className="group">
-                  <label
-                    htmlFor="customTone"
-                    className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300 group-focus-within:text-indigo-600 dark:group-focus-within:text-indigo-400"
-                  >
-                    Enter Custom Tone
-                  </label>
-                  <input
-                    type="text"
-                    id="customTone"
-                    name="customTone"
-                    value={customTone}
-                    onChange={handleCustomToneChange}
-                    placeholder="Enter your custom tone (e.g., mysterious, witty, nostalgic)"
-                    required
-                    className="block w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-lg shadow-sm 
-                             focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 
-                             bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
-                             transition duration-150 ease-in-out"
-                  />
-                </div>
-              )}
             </div>
           </motion.div>
         );
@@ -494,14 +476,13 @@ export default function WishForm({ onSubmit, isLoading }: FormProps) {
                 <p className="text-sm text-gray-500 dark:text-gray-400">
                   Choose the length and format that best suits your needs.
                 </p>
-              </div>
-
+              </div>{" "}
               <div className="group">
                 <label
                   htmlFor="messageLength"
                   className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300 group-focus-within:text-indigo-600 dark:group-focus-within:text-indigo-400"
                 >
-                  Message Length
+                  Message Length *
                 </label>
                 <div className="relative">
                   <select
@@ -537,14 +518,13 @@ export default function WishForm({ onSubmit, isLoading }: FormProps) {
                     </svg>
                   </div>
                 </div>
-              </div>
-
+              </div>{" "}
               <div className="group">
                 <label
                   htmlFor="messageFormat"
                   className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300 group-focus-within:text-indigo-600 dark:group-focus-within:text-indigo-400"
                 >
-                  Message Format
+                  Message Format *
                 </label>
                 <div className="relative">
                   <select
@@ -581,7 +561,6 @@ export default function WishForm({ onSubmit, isLoading }: FormProps) {
                   </div>
                 </div>
               </div>
-
               <div className="pt-6">
                 <p className="text-sm text-center text-gray-500 dark:text-gray-400 mb-2">
                   Perfect! Ready to generate your personalized wish?
@@ -679,6 +658,7 @@ export default function WishForm({ onSubmit, isLoading }: FormProps) {
           </button>
         )}
         <div className={currentStep > 1 ? "ml-auto" : "mx-auto"}>
+          {" "}
           {currentStep < totalSteps ? (
             <button
               type="button"
@@ -695,7 +675,8 @@ export default function WishForm({ onSubmit, isLoading }: FormProps) {
               disabled={
                 (currentStep === 1 && !canProceedStep1) ||
                 (currentStep === 2 && !canProceedStep2) ||
-                (currentStep === 3 && !canProceedStep3)
+                (currentStep === 3 && !canProceedStep3) ||
+                (currentStep === 4 && !canProceedStep4)
               }
               className="px-6 py-2.5 bg-indigo-600 text-white font-medium rounded-lg shadow-md 
                        hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 
@@ -706,10 +687,10 @@ export default function WishForm({ onSubmit, isLoading }: FormProps) {
           ) : (
             <button
               type="submit"
-              disabled={isLoading}
+              disabled={isLoading || !canProceedStep4}
               className="px-6 py-2.5 bg-indigo-600 text-white font-medium rounded-lg shadow-md 
                        hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 
-                       disabled:opacity-70 transition duration-150 ease-in-out flex items-center justify-center gap-2"
+                       disabled:opacity-70 disabled:cursor-not-allowed transition duration-150 ease-in-out flex items-center justify-center gap-2"
             >
               {isLoading ? (
                 <>

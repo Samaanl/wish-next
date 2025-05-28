@@ -121,3 +121,32 @@ export const generateWish = async (
     throw error;
   }
 };
+
+// Function to delete a single wish from the database
+export const deleteWishFromDatabase = async (wishId: string): Promise<void> => {
+  try {
+    await databases.deleteDocument(DATABASE_ID, WISHES_COLLECTION_ID, wishId);
+    console.log("Wish deleted successfully");
+  } catch (error) {
+    console.error("Error deleting wish:", error);
+    throw error;
+  }
+};
+
+// Function to delete multiple wishes from the database
+export const deleteBulkWishesFromDatabase = async (
+  wishIds: string[]
+): Promise<void> => {
+  try {
+    // Delete wishes in parallel for better performance
+    const deletePromises = wishIds.map((id) =>
+      databases.deleteDocument(DATABASE_ID, WISHES_COLLECTION_ID, id)
+    );
+
+    await Promise.all(deletePromises);
+    console.log(`${wishIds.length} wishes deleted successfully`);
+  } catch (error) {
+    console.error("Error deleting wishes:", error);
+    throw error;
+  }
+};
