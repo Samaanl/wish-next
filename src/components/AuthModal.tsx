@@ -24,36 +24,119 @@ const AuthModal: React.FC<AuthModalProps> = ({
   const [name, setName] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-
   // Debug log when modal opens/closes
   useEffect(() => {
     console.log("AuthModal isOpen state changed to:", isOpen);
+    // Reset form when modal closes
+    if (!isOpen) {
+      setEmail("");
+      setPassword("");
+      setName("");
+      setError("");
+      setIsSignUp(false);
+    }
   }, [isOpen]);
 
   // Don't render anything if not open
   if (!isOpen) return null;
 
   console.log("Rendering AuthModal component");
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+
+    // Comprehensive client-side validation
+    const trimmedEmail = email.trim();
+    const trimmedName = name.trim();
+    const trimmedPassword = password.trim();
+
+    if (!trimmedEmail) {
+      setError("Email is required");
+      return;
+    }
+
+    if (!trimmedPassword) {
+      setError("Password is required");
+      return;
+    }
+
+    if (isSignUp && !trimmedName) {
+      setError("Name is required");
+      return;
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(trimmedEmail)) {
+      setError("Please enter a valid email address");
+      return;
+    }
+
+    // Validate password
+    if (trimmedPassword.length < 8) {
+      setError("Password must be at least 8 characters long");
+      return;
+    }
+
+    // Check for password strength
+    if (!/(?=.*[a-zA-Z])/.test(trimmedPassword)) {
+      setError("Password must contain at least one letter");
+      return;
+    }
+
+    if (isSignUp && trimmedName.length < 2) {
+      setError("Name must be at least 2 characters long");
+      return;
+    }
+
+    // Check for invalid characters in name
+    if (isSignUp && !/^[a-zA-Z0-9\s\-'.,]+$/.test(trimmedName)) {
+      setError(
+        "Name contains invalid characters. Please use only letters, numbers, spaces, and basic punctuation"
+      );
+      return;
+    }
+
     setIsLoading(true);
 
     try {
       if (isSignUp) {
-        await signUpWithEmail(email, password, name);
+        console.log("Attempting to sign up with:", {
+          email: trimmedEmail,
+          name: trimmedName,
+        });
+        await signUpWithEmail(trimmedEmail, trimmedPassword, trimmedName);
       } else {
-        await signInWithEmail(email, password);
+        console.log("Attempting to sign in with:", { email: trimmedEmail });
+        await signInWithEmail(trimmedEmail, trimmedPassword);
       }
       onSuccess();
       onClose();
     } catch (err: Error | unknown) {
-      setError(
+      console.error("Authentication error:", err);
+
+      const errorMessage =
         err instanceof Error
           ? err.message
-          : "Authentication failed. Please try again."
-      );
+          : "Authentication failed. Please try again.";
+
+      // Provide user-friendly error messages
+      if (errorMessage.includes("Rate limit") || errorMessage.includes("429")) {
+        setError("Too many requests. Please wait a moment and try again.");
+      } else if (errorMessage.includes("user_already_exists")) {
+        setError(
+          "An account with this email already exists. Please try signing in instead."
+        );
+        setIsSignUp(false); // Switch to sign in mode
+      } else if (errorMessage.includes("Invalid credentials")) {
+        setError("Invalid email or password. Please check your credentials.");
+      } else if (errorMessage.includes("user_not_found")) {
+        setError(
+          "No account found with this email. Please check your email or create a new account."
+        );
+      } else {
+        setError(errorMessage);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -97,7 +180,6 @@ const AuthModal: React.FC<AuthModalProps> = ({
             ✕
           </button>
         </div>
-
         {/* Google Sign-In Button */}
         <button
           onClick={handleGoogleSignIn}
@@ -125,13 +207,11 @@ const AuthModal: React.FC<AuthModalProps> = ({
           </svg>
           Continue with Google
         </button>
-
         <div className="relative flex items-center justify-center mb-4">
           <div className="border-t border-gray-300 flex-grow"></div>
           <span className="mx-2 text-sm text-gray-500">OR</span>
           <div className="border-t border-gray-300 flex-grow"></div>
-        </div>
-
+        </div>{" "}
         <form onSubmit={handleSubmit} className="space-y-4">
           {isSignUp && (
             <div>
@@ -144,6 +224,9 @@ const AuthModal: React.FC<AuthModalProps> = ({
                 onChange={(e) => setName(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 required
+                minLength={2}
+                maxLength={50}
+                placeholder="Enter your full name"
               />
             </div>
           )}
@@ -158,6 +241,7 @@ const AuthModal: React.FC<AuthModalProps> = ({
               onChange={(e) => setEmail(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               required
+              placeholder="Enter your email address"
             />
           </div>
 
@@ -171,6 +255,12 @@ const AuthModal: React.FC<AuthModalProps> = ({
               onChange={(e) => setPassword(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               required
+              minLength={8}
+              placeholder={
+                isSignUp
+                  ? "Create a password (min 8 characters)"
+                  : "Enter your password"
+              }
             />
           </div>
 
@@ -183,11 +273,14 @@ const AuthModal: React.FC<AuthModalProps> = ({
           >
             {isLoading ? "Loading..." : isSignUp ? "Create Account" : "Sign In"}
           </button>
-        </form>
-
+        </form>{" "}
         <div className="mt-4 text-center">
           <button
-            onClick={() => setIsSignUp(!isSignUp)}
+            onClick={() => {
+              setIsSignUp(!isSignUp);
+              setError(""); // Clear any existing errors
+              setPassword(""); // Clear password when switching modes
+            }}
             className="text-blue-600 hover:text-blue-800"
             type="button"
           >

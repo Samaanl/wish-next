@@ -26,6 +26,9 @@ export interface AppwriteUser {
 // Local storage key for guest user
 export const GUEST_USER_KEY = "wishmaker_guest_user";
 
+// Utility function to add delay (kept minimal for basic use)
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 // Creates a guest user with default credits
 export const createGuestUser = (): UserData => {
   const guestId = `guest-${Date.now()}-${Math.random()
@@ -257,25 +260,100 @@ export const signInWithGoogle = async () => {
   }
 };
 
-export const signInWithEmail = async (email: string, password: string) => {
+export const signInWithEmail = async (
+  email: string,
+  password: string
+): Promise<UserData> => {
   try {
+    // Comprehensive input validation
+    if (!email?.trim()) {
+      throw new Error("Email is required");
+    }
+    if (!password?.trim()) {
+      throw new Error("Password is required");
+    }
+
+    // Clean inputs
+    const cleanEmail = email.trim().toLowerCase();
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(cleanEmail)) {
+      throw new Error("Please enter a valid email address");
+    }
+
+    console.log(`Starting sign in process for: ${cleanEmail}`);
+
     // Clear any existing session before creating a new session
     try {
       await account.deleteSession("current");
       console.log("Cleared existing session before sign in");
     } catch (sessionError) {
-      // No existing session or failed to clear - that's fine, continue
-      console.log(
-        "No existing session to clear or failed to clear:",
-        sessionError
+      // No session to clear - that's fine
+      console.log("No existing session to clear");
+    }
+
+    // Create session with email and password
+    console.log("Creating email session...");
+    try {
+      await account.createEmailPasswordSession(cleanEmail, password);
+      console.log("Session created successfully");
+    } catch (sessionError) {
+      console.error("Session creation error:", sessionError);
+
+      if (sessionError instanceof Error) {
+        if (
+          sessionError.message.includes("Invalid credentials") ||
+          sessionError.message.includes("invalid_credentials") ||
+          sessionError.message.includes("Invalid email or password")
+        ) {
+          throw new Error(
+            "Invalid email or password. Please check your credentials and try again."
+          );
+        }
+
+        if (
+          sessionError.message.includes("user_not_found") ||
+          sessionError.message.includes("User not found")
+        ) {
+          throw new Error(
+            "No account found with this email. Please check your email or create a new account."
+          );
+        }
+
+        if (
+          sessionError.message.includes("Rate limit") ||
+          sessionError.message.includes("429")
+        ) {
+          throw new Error(
+            "Too many sign-in attempts. Please wait a moment and try again."
+          );
+        }
+      }
+
+      throw new Error(
+        "Sign in failed. Please check your credentials and try again."
       );
     }
 
-    await account.createSession(email, password);
-    return await getCurrentUser();
+    // Get the current user data
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+      throw new Error(
+        "Sign in successful but failed to retrieve user data. Please try again."
+      );
+    }
+
+    return currentUser;
   } catch (error) {
     console.error("Error during sign in:", error);
-    throw error;
+
+    // Make sure we provide user-friendly error messages
+    if (error instanceof Error) {
+      throw error; // Re-throw our custom errors as-is
+    }
+
+    throw new Error("Unable to sign in. Please try again.");
   }
 };
 
@@ -283,30 +361,138 @@ export const signUpWithEmail = async (
   email: string,
   password: string,
   name: string
-) => {
+): Promise<UserData> => {
   try {
-    // Clear any existing session before creating a new account
+    // Comprehensive input validation
+    if (!email?.trim()) {
+      throw new Error("Email is required");
+    }
+    if (!password?.trim()) {
+      throw new Error("Password is required");
+    }
+    if (!name?.trim()) {
+      throw new Error("Name is required");
+    }
+
+    // Clean inputs
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanName = name.trim();
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(cleanEmail)) {
+      throw new Error("Please enter a valid email address");
+    }
+
+    // Validate password
+    if (password.length < 8) {
+      throw new Error("Password must be at least 8 characters long");
+    }
+
+    // Validate name
+    if (cleanName.length < 2) {
+      throw new Error("Name must be at least 2 characters long");
+    }
+
+    console.log(`Starting sign up process for: ${cleanEmail}`);
+
+    // Ensure we start with a clean slate - clear any existing session
     try {
       await account.deleteSession("current");
       console.log("Cleared existing session before sign up");
     } catch (sessionError) {
-      // No existing session or failed to clear - that's fine, continue
-      console.log(
-        "No existing session to clear or failed to clear:",
-        sessionError
+      // No session to clear - that's fine
+      console.log("No existing session to clear");
+    }
+
+    // First, try to create the account
+    console.log("Creating account with Appwrite...");
+    let user;
+    try {
+      user = await account.create(ID.unique(), cleanEmail, password, cleanName);
+      console.log("Account created successfully:", user.$id);
+    } catch (createError) {
+      console.error("Account creation error:", createError);
+
+      if (createError instanceof Error) {
+        // Handle specific account creation errors
+        if (
+          createError.message.includes("user_already_exists") ||
+          createError.message.includes(
+            "A user with the same email already exists"
+          )
+        ) {
+          throw new Error(
+            "An account with this email already exists. Please try signing in instead."
+          );
+        }
+
+        if (createError.message.includes("Invalid password")) {
+          throw new Error(
+            "Password must be at least 8 characters long with no spaces at the beginning or end."
+          );
+        }
+
+        if (createError.message.includes("Invalid email")) {
+          throw new Error("Please enter a valid email address.");
+        }
+
+        if (createError.message.includes("Invalid name")) {
+          throw new Error(
+            "Name contains invalid characters. Please use only letters, numbers, and basic punctuation."
+          );
+        }
+      }
+
+      // Re-throw with more context
+      throw new Error(
+        `Account creation failed: ${
+          createError instanceof Error ? createError.message : "Unknown error"
+        }`
       );
     }
 
-    const user = await account.create(ID.unique(), email, password, name);
-    await account.createSession(email, password);
+    // Create session after successful account creation
+    console.log("Creating email session...");
+    try {
+      await account.createEmailPasswordSession(cleanEmail, password);
+      console.log("Session created successfully");
+    } catch (sessionError) {
+      console.error("Session creation error:", sessionError);
+      throw new Error(
+        "Account created but failed to sign in. Please try signing in manually."
+      );
+    }
 
-    // Create user in database
-    await createUserInDatabase(user.$id, email, name);
+    // Create user record in database
+    console.log("Creating user in database...");
+    try {
+      await createUserInDatabase(user.$id, cleanEmail, cleanName);
+      console.log("User created in database successfully");
+    } catch (dbError) {
+      console.error("Database creation error:", dbError);
+      // Account and session exist, but database failed - that's recoverable
+      console.log("Will try to retrieve user data without database record");
+    }
 
-    return await getCurrentUser();
+    // Get the current user data
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+      throw new Error(
+        "Account created but failed to retrieve user data. Please try signing in."
+      );
+    }
+
+    return currentUser;
   } catch (error) {
     console.error("Error during sign up:", error);
-    throw error;
+
+    // Make sure we provide user-friendly error messages
+    if (error instanceof Error) {
+      throw error; // Re-throw our custom errors as-is
+    }
+
+    throw new Error("Unable to create account. Please try again.");
   }
 };
 
@@ -417,5 +603,22 @@ export const getUserById = async (userId: string): Promise<UserData | null> => {
   } catch (error) {
     console.error("Error getting user by ID:", error);
     return null;
+  }
+};
+
+// Health check function to verify Appwrite connection
+export const checkAppwriteConnection = async (): Promise<boolean> => {
+  try {
+    // Try to get current session info (this will work even without being logged in)
+    await account.get();
+    return true;
+  } catch (error) {
+    // If error is about being unauthorized, that means connection is working
+    if (error instanceof Error && error.message.includes("unauthorized")) {
+      return true;
+    }
+
+    console.error("Appwrite connection test failed:", error);
+    return false;
   }
 };

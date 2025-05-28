@@ -9,7 +9,7 @@ import { Client, Account } from "appwrite";
 
 export async function GET(request: NextRequest) {
   try {
-    // Extract auth cookies from the request directly
+    // Extract auth cookies from the request directlys
     const appwriteCookies: Record<string, string> = {};
 
     // Get all cookies from the request
