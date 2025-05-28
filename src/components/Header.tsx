@@ -88,58 +88,11 @@ const Header: React.FC<HeaderProps> = ({
       <div className="flex items-center space-x-2 sm:space-x-3">
         {currentUser && !currentUser.isGuest ? (
           <>
+            {" "}
             {/* Desktop: Credits Display */}
             <div className="hidden lg:block">
               <CreditDisplay onBuyCredits={onBuyCredits} />
             </div>
-
-            {/* Desktop: Action Buttons */}
-            <div className="hidden md:flex items-center space-x-2">
-              {" "}
-              {/* View Saved Wishes Button */}
-              <button
-                type="button"
-                onClick={() => {
-                  if (onViewSavedWishes) {
-                    onViewSavedWishes();
-                  }
-                }}
-                className="flex items-center space-x-2 px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 min-h-[44px] text-sm font-medium"
-                title="View Saved Wishes"
-              >
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
-                  />
-                </svg>
-                <span className="hidden lg:inline">Saved</span>
-              </button>
-              {/* Buy Credits Button */}
-              <button
-                type="button"
-                onClick={onBuyCredits}
-                className="flex items-center space-x-2 px-3 py-2 rounded-lg bg-gradient-to-r from-yellow-500 to-orange-500 text-white hover:from-yellow-600 hover:to-orange-600 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-yellow-500 min-h-[44px] text-sm font-medium shadow-sm"
-                title="Buy Credits"
-              >
-                <svg
-                  className="w-4 h-4"
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                >
-                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                </svg>
-                <span className="hidden lg:inline">Buy Credits</span>
-              </button>
-            </div>
-
             {/* User Menu */}
             <div className="relative" ref={menuRef}>
               <button
@@ -187,16 +140,13 @@ const Header: React.FC<HeaderProps> = ({
                       </div>
                     </div>
                   </div>
-
                   {/* Credits Display (Mobile/Tablet) */}
                   <div className="block lg:hidden px-4 py-4 bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700">
                     <CreditDisplay onBuyCredits={handleBuyCredits} />
-                  </div>
-
+                  </div>{" "}
                   {/* Menu Items */}
                   <div className="py-2">
-                    {" "}
-                    {/* Mobile: View Saved Wishes */}
+                    {/* View Saved Wishes - Available for all screen sizes */}
                     <button
                       type="button"
                       onClick={() => {
@@ -205,7 +155,7 @@ const Header: React.FC<HeaderProps> = ({
                           onViewSavedWishes();
                         }
                       }}
-                      className="md:hidden w-full text-left px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center transition-colors min-h-[48px] cursor-pointer"
+                      className="w-full text-left px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center transition-colors min-h-[48px] cursor-pointer"
                     >
                       <svg
                         className="w-5 h-5 mr-3 text-indigo-500"
@@ -222,7 +172,8 @@ const Header: React.FC<HeaderProps> = ({
                       </svg>
                       <span className="font-medium">View Saved Wishes</span>
                     </button>
-                    {/* Mobile: Buy Credits */}
+
+                    {/* Buy Credits - Mobile only (since desktop has it in credits display) */}
                     <button
                       type="button"
                       onClick={handleBuyCredits}
