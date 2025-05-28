@@ -22,7 +22,8 @@ export default function WishForm({ onSubmit, isLoading }: FormProps) {
   });
   const [currentStep, setCurrentStep] = useState(1);
   const totalSteps = 4;
-
+  const [customOccasion, setCustomOccasion] = useState("");
+  const [customTone, setCustomTone] = useState("");
   const occasions = [
     "Birthday",
     "Anniversary",
@@ -36,6 +37,7 @@ export default function WishForm({ onSubmit, isLoading }: FormProps) {
     "Promotion",
     "Baby Shower",
     "Recovery",
+    "Other",
   ];
   const tones = [
     "Funny",
@@ -50,6 +52,7 @@ export default function WishForm({ onSubmit, isLoading }: FormProps) {
     "Professional",
     "Casual",
     "Poetic",
+    "Other",
   ];
 
   const messageLengths = [
@@ -69,7 +72,6 @@ export default function WishForm({ onSubmit, isLoading }: FormProps) {
     "Facebook Post",
     "LinkedIn Message",
   ];
-
   const handleChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
@@ -80,8 +82,25 @@ export default function WishForm({ onSubmit, isLoading }: FormProps) {
       ...prev,
       [name]: value,
     }));
+
+    // Handle custom occasion/tone selection
+    if (name === "occasion" && value !== "Other") {
+      setCustomOccasion("");
+    }
+    if (name === "tone" && value !== "Other") {
+      setCustomTone("");
+    }
   };
 
+  const handleCustomOccasionChange = (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    setCustomOccasion(e.target.value);
+  };
+
+  const handleCustomToneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setCustomTone(e.target.value);
+  };
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     console.log(
@@ -98,9 +117,16 @@ export default function WishForm({ onSubmit, isLoading }: FormProps) {
       return;
     }
 
+    // Prepare inputs with custom values if "Other" is selected
+    const finalInputs = {
+      ...inputs,
+      occasion: inputs.occasion === "Other" ? customOccasion : inputs.occasion,
+      tone: inputs.tone === "Other" ? customTone : inputs.tone,
+    };
+
     // Otherwise proceed with form submission
     console.log("Proceeding with form submission");
-    onSubmit(inputs);
+    onSubmit(finalInputs);
   };
 
   const nextStep = () => {
@@ -130,7 +156,13 @@ export default function WishForm({ onSubmit, isLoading }: FormProps) {
       setCurrentStep(currentStep - 1);
     }
   };
-  const canProceedStep1 = inputs.occasion && inputs.tone;
+  const canProceedStep1 =
+    (inputs.occasion && inputs.occasion !== "Other") ||
+    (inputs.occasion === "Other" &&
+      customOccasion.trim() &&
+      inputs.tone &&
+      inputs.tone !== "Other") ||
+    (inputs.tone === "Other" && customTone.trim());
   const canProceedStep2 = inputs.recipientName && inputs.relationship;
   const canProceedStep3 = true; // Step 3 has only optional fields
   const canProceedStep4 = inputs.messageLength && inputs.messageFormat;
@@ -236,10 +268,60 @@ export default function WishForm({ onSubmit, isLoading }: FormProps) {
                         d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
                         clipRule="evenodd"
                       />
-                    </svg>
+                    </svg>{" "}
                   </div>
                 </div>
               </div>
+
+              {/* Custom Occasion Input */}
+              {inputs.occasion === "Other" && (
+                <div className="group">
+                  <label
+                    htmlFor="customOccasion"
+                    className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300 group-focus-within:text-indigo-600 dark:group-focus-within:text-indigo-400"
+                  >
+                    Enter Custom Occasion
+                  </label>
+                  <input
+                    type="text"
+                    id="customOccasion"
+                    name="customOccasion"
+                    value={customOccasion}
+                    onChange={handleCustomOccasionChange}
+                    placeholder="Enter your custom occasion"
+                    required
+                    className="block w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-lg shadow-sm 
+                             focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 
+                             bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
+                             transition duration-150 ease-in-out"
+                  />
+                </div>
+              )}
+
+              {/* Custom Tone Input */}
+              {inputs.tone === "Other" && (
+                <div className="group">
+                  <label
+                    htmlFor="customTone"
+                    className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300 group-focus-within:text-indigo-600 dark:group-focus-within:text-indigo-400"
+                  >
+                    Enter Custom Tone
+                  </label>
+                  <input
+                    type="text"
+                    id="customTone"
+                    name="customTone"
+                    value={customTone}
+                    onChange={handleCustomToneChange}
+                    placeholder="Enter your custom tone (e.g., mysterious, witty, nostalgic)"
+                    required
+                    className="block w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-lg shadow-sm 
+                             focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 
+                             bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
+                             transition duration-150 ease-in-out"
+                  />
+                </div>
+              )}
             </div>
           </motion.div>
         );
