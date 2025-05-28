@@ -165,24 +165,13 @@ export default function Home() {
         </motion.div>
 
         <main className="max-w-5xl mx-auto mt-12 relative">
-          {/* Decorative sparkles */}
+          {/* Decorative sparkles */}{" "}
           <div className="absolute inset-0 overflow-hidden pointer-events-none -z-0 opacity-70">
             <Sparkle top="-10%" right="10%" size={14} />
             <Sparkle bottom="-5%" left="5%" size={10} delay={1.3} />
             <Sparkle top="50%" left="-5%" size={12} delay={0.7} />
             <Sparkle bottom="30%" right="-3%" size={8} delay={2} />
           </div>{" "}
-          {/* Credit display for logged in users */}
-          {currentUser && (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-              className="mb-8 flex justify-center"
-            >
-              <CreditDisplay onBuyCredits={handleBuyCredits} />
-            </motion.div>
-          )}
           {error && (
             <motion.div
               initial={{ opacity: 0 }}

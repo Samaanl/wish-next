@@ -44,25 +44,19 @@ const CreditDisplay: React.FC<CreditDisplayProps> = ({ onBuyCredits }) => {
   const creditsToShow =
     displayCredits !== null ? displayCredits : currentUser.credits || 0;
   return (
-    <div className="flex items-center space-x-1 sm:space-x-2">
-      <div className="px-2 py-1 sm:px-3 sm:py-1 bg-indigo-100 dark:bg-indigo-900 rounded-full flex items-center">
-        <span className="mr-1 sm:mr-1.5 text-yellow-500 text-sm sm:text-base">
-          ⭐
+    <button
+      onClick={onBuyCredits}
+      className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 shadow-sm hover:shadow-md transform hover:scale-105"
+    >
+      <div className="flex items-center space-x-1">
+        <span className="text-yellow-300 text-lg">⭐</span>
+        <span className="font-semibold">
+          {creditsToShow} {creditsToShow === 1 ? "Credit" : "Credits"}
         </span>
-        <span className="text-indigo-800 dark:text-indigo-200 font-medium text-xs sm:text-sm">
-          <span className="hidden sm:inline">
-            {creditsToShow} {creditsToShow === 1 ? "Credit" : "Credits"}
-          </span>
-          <span className="sm:hidden">{creditsToShow}</span>
-        </span>
-      </div>{" "}
-      <button
-        onClick={onBuyCredits}
-        className="text-xs px-2 py-1 sm:px-2 sm:py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded touch-manipulation min-h-[32px] font-medium"
-      >
-        Buy Credit
-      </button>
-    </div>
+      </div>
+      <div className="w-px h-4 bg-white/30"></div>
+      <span className="text-sm font-medium">Buy More</span>
+    </button>
   );
 };
 
