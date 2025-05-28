@@ -89,8 +89,8 @@ const Header: React.FC<HeaderProps> = ({
         {currentUser && !currentUser.isGuest ? (
           <>
             {" "}
-            {/* Desktop: Credits Display */}
-            <div className="hidden lg:block">
+            {/* Credits Display - Always visible */}
+            <div>
               <CreditDisplay onBuyCredits={onBuyCredits} />
             </div>
             {/* User Menu */}
@@ -143,11 +143,6 @@ const Header: React.FC<HeaderProps> = ({
                   </div>{" "}
                   {/* Menu Items */}
                   <div className="py-2">
-                    {/* Mobile Credits Display */}
-                    <div className="lg:hidden px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-                      <CreditDisplay onBuyCredits={handleBuyCredits} />
-                    </div>
-
                     {/* My Wishes Library - Available for all screen sizes */}
                     <button
                       type="button"

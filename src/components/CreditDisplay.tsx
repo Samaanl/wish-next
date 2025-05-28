@@ -46,16 +46,22 @@ const CreditDisplay: React.FC<CreditDisplayProps> = ({ onBuyCredits }) => {
   return (
     <button
       onClick={onBuyCredits}
-      className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 shadow-sm hover:shadow-md transform hover:scale-105"
+      className="flex items-center space-x-1 sm:space-x-2 px-2 sm:px-4 py-1.5 sm:py-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 shadow-sm hover:shadow-md transform hover:scale-105 text-sm"
     >
       <div className="flex items-center space-x-1">
-        <span className="text-yellow-300 text-lg">⭐</span>
-        <span className="font-semibold">
-          {creditsToShow} {creditsToShow === 1 ? "Credit" : "Credits"}
+        <span className="text-yellow-300 text-base sm:text-lg">⭐</span>
+        <span className="font-semibold text-xs sm:text-sm">
+          <span className="hidden xs:inline">
+            {creditsToShow} {creditsToShow === 1 ? "Credit" : "Credits"}
+          </span>
+          <span className="xs:hidden">{creditsToShow}</span>
         </span>
       </div>
-      <div className="w-px h-4 bg-white/30"></div>
-      <span className="text-sm font-medium">Buy More</span>
+      <div className="w-px h-3 sm:h-4 bg-white/30 hidden sm:block"></div>
+      <span className="text-xs sm:text-sm font-medium hidden sm:inline">
+        Buy More
+      </span>
+      <span className="text-xs font-medium sm:hidden">+</span>
     </button>
   );
 };
