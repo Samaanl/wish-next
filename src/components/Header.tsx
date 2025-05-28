@@ -19,10 +19,9 @@ const Header: React.FC<HeaderProps> = ({
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-
   // Close menu when clicking outside
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setIsMenuOpen(false);
       }
@@ -30,6 +29,7 @@ const Header: React.FC<HeaderProps> = ({
 
     if (isMenuOpen) {
       document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("touchstart", handleClickOutside);
       // Prevent body scroll when menu is open on mobile
       document.body.style.overflow = "hidden";
     } else {
@@ -38,18 +38,24 @@ const Header: React.FC<HeaderProps> = ({
 
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
       document.body.style.overflow = "unset";
     };
   }, [isMenuOpen]);
 
   const displayName =
     currentUser?.name || currentUser?.email?.split("@")[0] || "User";
-
   const handleBuyCredits = () => {
+    console.log("Buy Credits clicked");
     setIsMenuOpen(false);
-    onBuyCredits();
+    // Small delay to ensure menu closes before calling parent
+    setTimeout(() => {
+      onBuyCredits();
+    }, 100);
   };
+
   const handleSignOut = async () => {
+    console.log("Sign Out clicked");
     if (isSigningOut) return;
     setIsSigningOut(true);
     setIsMenuOpen(false);
@@ -218,12 +224,18 @@ const Header: React.FC<HeaderProps> = ({
           <div
             className="fixed inset-0 bg-black bg-opacity-50 z-40 sm:hidden"
             onClick={() => setIsMenuOpen(false)}
+            onTouchStart={(e) => {
+              e.preventDefault();
+              setIsMenuOpen(false);
+            }}
           />{" "}
           {/* Slide-out Panel */}
           <div
             className={`fixed top-0 right-0 h-full w-80 max-w-[85vw] bg-white dark:bg-gray-800 shadow-xl z-50 sm:hidden transform transition-transform duration-300 ease-in-out ${
               isMenuOpen ? "translate-x-0" : "translate-x-full"
             }`}
+            onClick={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
           >
             {" "}
             {/* Header */}
@@ -276,10 +288,25 @@ const Header: React.FC<HeaderProps> = ({
             </div>{" "}
             {/* Menu Items */}
             <div className="p-4 space-y-3">
+              {" "}
               <button
                 type="button"
-                onClick={handleBuyCredits}
-                className="w-full text-left px-4 py-4 text-gray-700 dark:text-gray-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center transition-colors rounded-lg touch-manipulation min-h-[56px] active:bg-indigo-100 dark:active:bg-indigo-800/30"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleBuyCredits();
+                }}
+                onTouchEnd={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleBuyCredits();
+                }}
+                className="w-full text-left px-4 py-4 text-gray-700 dark:text-gray-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center transition-colors rounded-lg touch-manipulation min-h-[56px] active:bg-indigo-100 dark:active:bg-indigo-800/30 cursor-pointer"
+                style={{
+                  WebkitTapHighlightColor: "transparent",
+                  userSelect: "none",
+                  WebkitUserSelect: "none",
+                }}
               >
                 <svg
                   className="w-6 h-6 mr-3 text-yellow-500 flex-shrink-0"
@@ -289,12 +316,26 @@ const Header: React.FC<HeaderProps> = ({
                   <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                 </svg>
                 <span className="font-medium text-base">Buy Credits</span>
-              </button>
+              </button>{" "}
               <button
                 type="button"
-                onClick={handleSignOut}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleSignOut();
+                }}
+                onTouchEnd={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleSignOut();
+                }}
                 disabled={isSigningOut}
-                className="w-full text-left px-4 py-4 text-gray-700 dark:text-gray-300 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400 flex items-center transition-colors rounded-lg disabled:opacity-50 touch-manipulation min-h-[56px] active:bg-red-100 dark:active:bg-red-800/30"
+                className="w-full text-left px-4 py-4 text-gray-700 dark:text-gray-300 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400 flex items-center transition-colors rounded-lg disabled:opacity-50 touch-manipulation min-h-[56px] active:bg-red-100 dark:active:bg-red-800/30 cursor-pointer"
+                style={{
+                  WebkitTapHighlightColor: "transparent",
+                  userSelect: "none",
+                  WebkitUserSelect: "none",
+                }}
               >
                 {isSigningOut ? (
                   <>
