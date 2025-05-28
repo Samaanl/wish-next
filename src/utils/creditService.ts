@@ -4,6 +4,7 @@ import {
   USERS_COLLECTION_ID,
   PURCHASES_COLLECTION_ID,
 } from "./appwrite";
+import { markGuestCreditsAsUsed } from "./authService";
 
 // Local storage key for guest user - must be the same as in authService.ts
 const GUEST_USER_KEY = "wishmaker_guest_user";
@@ -61,6 +62,10 @@ export const deductCredits = async (
     if (guestUser) {
       const newCreditBalance = Math.max(0, guestUser.credits - credits);
       updateGuestUserInLocalStorage(newCreditBalance);
+
+      // Mark free credits as used on this device to prevent abuse
+      markGuestCreditsAsUsed();
+
       return newCreditBalance;
     }
     throw new Error("Guest user not found");

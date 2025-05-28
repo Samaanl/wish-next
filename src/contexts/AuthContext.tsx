@@ -134,8 +134,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     setIsLoading(true);
     try {
       await signOut();
-      // After logging out, create a new guest user
-      const guestUser = createGuestUser();
+      // After logging out, get guest user (respects credit abuse prevention)
+      const guestUser = getGuestUser();
       setCurrentUser(guestUser);
       return true;
     } catch (error) {

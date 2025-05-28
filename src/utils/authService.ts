@@ -25,20 +25,36 @@ export interface AppwriteUser {
 
 // Local storage key for guest user
 export const GUEST_USER_KEY = "wishmaker_guest_user";
+// Local storage key to track if free credits have been used on this device
+export const FREE_CREDITS_USED_KEY = "wishmaker_free_credits_used";
 
 // Utility function to add delay (kept minimal for basic use)
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-// Creates a guest user with default credits
+// Check if free credits have already been used on this device
+const hasFreeCreditsBeenUsed = (): boolean => {
+  return localStorage.getItem(FREE_CREDITS_USED_KEY) === "true";
+};
+
+// Mark free credits as used on this device
+const markFreeCreditsAsUsed = (): void => {
+  localStorage.setItem(FREE_CREDITS_USED_KEY, "true");
+};
+
+// Creates a guest user with appropriate credits based on device usage
 export const createGuestUser = (): UserData => {
   const guestId = `guest-${Date.now()}-${Math.random()
     .toString(36)
     .substring(2, 9)}`;
+
+  // If free credits have been used on this device, give 0 credits
+  const credits = hasFreeCreditsBeenUsed() ? 0 : DEFAULT_FREE_CREDITS;
+
   const guestUser = {
     id: guestId,
     email: `guest-${guestId}@example.com`,
     name: "Guest User",
-    credits: DEFAULT_FREE_CREDITS,
+    credits: credits,
     isGuest: true,
   };
 
@@ -48,12 +64,23 @@ export const createGuestUser = (): UserData => {
 };
 
 // Gets guest user from local storage or creates a new one
-export const getGuestUser = (): UserData | null => {
+export const getGuestUser = (): UserData => {
   const storedUser = localStorage.getItem(GUEST_USER_KEY);
   if (storedUser) {
-    return JSON.parse(storedUser);
+    const user = JSON.parse(storedUser);
+    // Double-check: if this device has used free credits but user has credits, reset to 0
+    if (hasFreeCreditsBeenUsed() && user.credits > 0) {
+      user.credits = 0;
+      localStorage.setItem(GUEST_USER_KEY, JSON.stringify(user));
+    }
+    return user;
   }
   return createGuestUser();
+};
+
+// Function to mark free credits as used (should be called when guest user uses credits)
+export const markGuestCreditsAsUsed = (): void => {
+  markFreeCreditsAsUsed();
 };
 
 // Add a new function to store authenticated user in local storage for better persistence
