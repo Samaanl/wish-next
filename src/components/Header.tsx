@@ -8,6 +8,7 @@ interface HeaderProps {
   onBuyCredits: () => void;
   onCloseCreditSection?: () => void;
   onViewSavedWishes?: () => void;
+  onResetToStart?: () => void;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -15,6 +16,7 @@ const Header: React.FC<HeaderProps> = ({
   onBuyCredits,
   onCloseCreditSection,
   onViewSavedWishes,
+  onResetToStart,
 }) => {
   const router = useRouter();
   const { currentUser, logOut } = useAuth();
@@ -64,11 +66,18 @@ const Header: React.FC<HeaderProps> = ({
       setIsSigningOut(false);
     }
   };
-
   const handleLogoClick = () => {
+    // Close any open sections first
     if (onCloseCreditSection) {
       onCloseCreditSection();
     }
+
+    // Reset the entire application to starting state
+    if (onResetToStart) {
+      onResetToStart();
+    }
+
+    // Navigate to home page
     router.push("/");
   };
   const handleSignIn = () => {

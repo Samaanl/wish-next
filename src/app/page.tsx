@@ -80,11 +80,27 @@ export default function Home() {
       setIsLoading(false);
     }
   };
-
   const handleStartOver = () => {
     setGeneratedWish(null);
     setError(null);
     setInsufficientCredits(false);
+  };
+
+  // Complete reset function to return to starting state
+  const handleResetToStart = () => {
+    // Reset all main states
+    setGeneratedWish(null);
+    setError(null);
+    setInsufficientCredits(false);
+    setAuthModalOpen(false);
+    setShowPurchaseModal(false);
+    setShowSavedWishes(false);
+    setIsLoading(false);
+
+    // Clear any URL parameters
+    if (typeof window !== "undefined") {
+      window.history.replaceState({}, "", window.location.pathname);
+    }
   };
 
   const handleBuyCredits = () => {
@@ -154,6 +170,7 @@ export default function Home() {
         onBuyCredits={handleBuyCredits}
         onCloseCreditSection={() => setShowPurchaseModal(false)}
         onViewSavedWishes={() => setShowSavedWishes(true)}
+        onResetToStart={handleResetToStart}
       />
       <div className="container mx-auto px-4 py-8 relative z-10">
         <motion.div
