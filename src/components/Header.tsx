@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import CreditDisplay from "./CreditDisplay";
@@ -19,15 +19,18 @@ const Header: React.FC<HeaderProps> = ({
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null); // Close menu when clicking outside
+
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setIsMenuOpen(false);
       }
     };
 
     if (isMenuOpen) {
+      // Use both mouse and touch events for better mobile support
       document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("touchstart", handleClickOutside);
       // Prevent body scroll when menu is open on mobile
       document.body.style.overflow = "hidden";
     } else {
@@ -36,6 +39,7 @@ const Header: React.FC<HeaderProps> = ({
 
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
       document.body.style.overflow = "unset";
     };
   }, [isMenuOpen]);
@@ -43,16 +47,16 @@ const Header: React.FC<HeaderProps> = ({
   const displayName =
     currentUser?.name || currentUser?.email?.split("@")[0] || "User";
   const handleBuyCredits = () => {
-    console.log("Buy Credits clicked");
+    console.log("Buy Credits clicked - Mobile");
     setIsMenuOpen(false);
-    // Small delay to ensure menu closes before calling parent
-    setTimeout(() => {
+    // Ensure the function is called after menu closes
+    requestAnimationFrame(() => {
       onBuyCredits();
-    }, 100);
+    });
   };
 
   const handleSignOut = async () => {
-    console.log("Sign Out clicked");
+    console.log("Sign Out clicked - Mobile");
     if (isSigningOut) return;
     setIsSigningOut(true);
     setIsMenuOpen(false);
@@ -222,6 +226,9 @@ const Header: React.FC<HeaderProps> = ({
           <div
             className="fixed inset-0 bg-black bg-opacity-50 z-40 sm:hidden"
             onClick={() => setIsMenuOpen(false)}
+            style={{
+              WebkitTapHighlightColor: "transparent",
+            }}
           />{" "}
           {/* Slide-out Panel */}
           <div
@@ -234,11 +241,23 @@ const Header: React.FC<HeaderProps> = ({
             <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                 Account
-              </h3>
-              <button
-                type="button"
+              </h3>{" "}
+              <div
                 onClick={() => setIsMenuOpen(false)}
-                className="p-2 rounded-lg text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 touch-manipulation min-h-[44px] min-w-[44px] flex items-center justify-center"
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setIsMenuOpen(false);
+                  }
+                }}
+                className="p-2 rounded-lg text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer select-none min-h-[44px] min-w-[44px] flex items-center justify-center"
+                style={{
+                  WebkitTapHighlightColor: "transparent",
+                  WebkitUserSelect: "none",
+                  userSelect: "none",
+                }}
                 aria-label="Close menu"
               >
                 <svg
@@ -254,7 +273,7 @@ const Header: React.FC<HeaderProps> = ({
                     d="M6 18L18 6M6 6l12 12"
                   />
                 </svg>
-              </button>
+              </div>
             </div>
             {/* User Info */}
             <div className="p-4 border-b border-gray-200 dark:border-gray-700">
@@ -280,11 +299,22 @@ const Header: React.FC<HeaderProps> = ({
             </div>{" "}
             {/* Menu Items */}
             <div className="p-4 space-y-3">
-              {" "}
-              <button
-                type="button"
+              <div
                 onClick={handleBuyCredits}
-                className="w-full text-left px-6 py-5 text-gray-700 dark:text-gray-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center transition-colors rounded-lg touch-manipulation min-h-[60px] active:bg-indigo-100 dark:active:bg-indigo-800/30 cursor-pointer border-0 outline-0"
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    handleBuyCredits();
+                  }
+                }}
+                className="w-full text-left px-6 py-5 text-gray-700 dark:text-gray-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center transition-colors rounded-lg cursor-pointer select-none"
+                style={{
+                  WebkitTapHighlightColor: "transparent",
+                  WebkitUserSelect: "none",
+                  userSelect: "none",
+                }}
               >
                 <svg
                   className="w-6 h-6 mr-4 text-yellow-500 flex-shrink-0"
@@ -294,12 +324,26 @@ const Header: React.FC<HeaderProps> = ({
                   <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                 </svg>
                 <span className="font-semibold text-lg">Buy Credits</span>
-              </button>{" "}
-              <button
-                type="button"
-                onClick={handleSignOut}
-                disabled={isSigningOut}
-                className="w-full text-left px-6 py-5 text-gray-700 dark:text-gray-300 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400 flex items-center transition-colors rounded-lg disabled:opacity-50 touch-manipulation min-h-[60px] active:bg-red-100 dark:active:bg-red-800/30 cursor-pointer border-0 outline-0"
+              </div>
+
+              <div
+                onClick={isSigningOut ? undefined : handleSignOut}
+                role="button"
+                tabIndex={isSigningOut ? -1 : 0}
+                onKeyDown={(e) => {
+                  if (!isSigningOut && (e.key === "Enter" || e.key === " ")) {
+                    e.preventDefault();
+                    handleSignOut();
+                  }
+                }}
+                className={`w-full text-left px-6 py-5 text-gray-700 dark:text-gray-300 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400 flex items-center transition-colors rounded-lg cursor-pointer select-none ${
+                  isSigningOut ? "opacity-50 cursor-not-allowed" : ""
+                }`}
+                style={{
+                  WebkitTapHighlightColor: "transparent",
+                  WebkitUserSelect: "none",
+                  userSelect: "none",
+                }}
               >
                 {isSigningOut ? (
                   <>
@@ -328,7 +372,7 @@ const Header: React.FC<HeaderProps> = ({
                     <span className="font-semibold text-lg">Sign Out</span>
                   </>
                 )}
-              </button>
+              </div>
             </div>
           </div>
         </>
