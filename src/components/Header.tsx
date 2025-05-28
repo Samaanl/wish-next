@@ -224,10 +224,12 @@ const Header: React.FC<HeaderProps> = ({
           {" "}
           {/* Backdrop */}
           <div
-            className="fixed inset-0 bg-black bg-opacity-50 z-40 sm:hidden"
+            className="fixed inset-0 bg-black bg-opacity-50 z-40 sm:hidden touch-manipulation"
             onClick={() => setIsMenuOpen(false)}
+            onTouchEnd={() => setIsMenuOpen(false)}
             style={{
               WebkitTapHighlightColor: "transparent",
+              touchAction: "manipulation",
             }}
           />{" "}
           {/* Slide-out Panel */}
@@ -242,21 +244,13 @@ const Header: React.FC<HeaderProps> = ({
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                 Account
               </h3>{" "}
-              <div
+              <button
+                type="button"
                 onClick={() => setIsMenuOpen(false)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    setIsMenuOpen(false);
-                  }
-                }}
-                className="p-2 rounded-lg text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer select-none min-h-[44px] min-w-[44px] flex items-center justify-center"
+                className="p-2 rounded-lg text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center touch-manipulation"
                 style={{
                   WebkitTapHighlightColor: "transparent",
-                  WebkitUserSelect: "none",
-                  userSelect: "none",
+                  touchAction: "manipulation",
                 }}
                 aria-label="Close menu"
               >
@@ -273,7 +267,7 @@ const Header: React.FC<HeaderProps> = ({
                     d="M6 18L18 6M6 6l12 12"
                   />
                 </svg>
-              </div>
+              </button>
             </div>
             {/* User Info */}
             <div className="p-4 border-b border-gray-200 dark:border-gray-700">
@@ -297,23 +291,18 @@ const Header: React.FC<HeaderProps> = ({
             <div className="p-4 border-b border-gray-200 dark:border-gray-700">
               <CreditDisplay onBuyCredits={handleBuyCredits} />
             </div>{" "}
-            {/* Menu Items */}
+            {/* Menu idk Items */}
             <div className="p-4 space-y-3">
-              <div
-                onClick={handleBuyCredits}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    handleBuyCredits();
-                  }
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleBuyCredits();
                 }}
-                className="w-full text-left px-6 py-5 text-gray-700 dark:text-gray-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center transition-colors rounded-lg cursor-pointer select-none"
+                className="w-full text-left px-6 py-5 text-gray-700 dark:text-gray-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center transition-colors rounded-lg cursor-pointer touch-manipulation"
                 style={{
                   WebkitTapHighlightColor: "transparent",
-                  WebkitUserSelect: "none",
-                  userSelect: "none",
+                  touchAction: "manipulation",
                 }}
               >
                 <svg
@@ -324,25 +313,21 @@ const Header: React.FC<HeaderProps> = ({
                   <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                 </svg>
                 <span className="font-semibold text-lg">Buy Credits</span>
-              </div>
+              </button>
 
-              <div
-                onClick={isSigningOut ? undefined : handleSignOut}
-                role="button"
-                tabIndex={isSigningOut ? -1 : 0}
-                onKeyDown={(e) => {
-                  if (!isSigningOut && (e.key === "Enter" || e.key === " ")) {
-                    e.preventDefault();
-                    handleSignOut();
-                  }
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleSignOut();
                 }}
-                className={`w-full text-left px-6 py-5 text-gray-700 dark:text-gray-300 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400 flex items-center transition-colors rounded-lg cursor-pointer select-none ${
+                disabled={isSigningOut}
+                className={`w-full text-left px-6 py-5 text-gray-700 dark:text-gray-300 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400 flex items-center transition-colors rounded-lg cursor-pointer touch-manipulation ${
                   isSigningOut ? "opacity-50 cursor-not-allowed" : ""
                 }`}
                 style={{
                   WebkitTapHighlightColor: "transparent",
-                  WebkitUserSelect: "none",
-                  userSelect: "none",
+                  touchAction: "manipulation",
                 }}
               >
                 {isSigningOut ? (
@@ -372,7 +357,7 @@ const Header: React.FC<HeaderProps> = ({
                     <span className="font-semibold text-lg">Sign Out</span>
                   </>
                 )}
-              </div>
+              </button>
             </div>
           </div>
         </>
