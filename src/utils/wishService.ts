@@ -1,4 +1,11 @@
-import { functions } from "./appwrite";
+import {
+  functions,
+  databases,
+  DATABASE_ID,
+  WISHES_COLLECTION_ID,
+  ID,
+  Query,
+} from "./appwrite";
 import { ExecutionMethod } from "appwrite";
 import { hasEnoughCredits, deductCredits } from "./creditService";
 
@@ -18,6 +25,51 @@ export interface WishResult {
   wish: string;
   creditsRemaining: number;
 }
+
+// Function to save a wish to the database
+export const saveWishToDatabase = async (
+  userId: string,
+  wishText: string,
+  occasion: string
+): Promise<void> => {
+  try {
+    await databases.createDocument(
+      DATABASE_ID,
+      WISHES_COLLECTION_ID,
+      ID.unique(),
+      {
+        user_id: userId,
+        wish_text: wishText,
+        occasion: occasion,
+        created_at: new Date().toISOString(),
+      }
+    );
+    console.log("Wish saved to database successfully");
+  } catch (error) {
+    console.error("Error saving wish to database:", error);
+    // Don't throw the error to avoid breaking the main flow
+    // The wish generation was successful, saving is just a bonus feature
+  }
+};
+
+// Function to retrieve saved wishes for a user
+export const getSavedWishes = async (userId: string) => {
+  try {
+    const response = await databases.listDocuments(
+      DATABASE_ID,
+      WISHES_COLLECTION_ID,
+      [
+        Query.equal("user_id", userId),
+        Query.orderDesc("created_at"),
+        Query.limit(50), // Limit to last 50 wishes
+      ]
+    );
+    return response.documents;
+  } catch (error) {
+    console.error("Error fetching saved wishes:", error);
+    return [];
+  }
+};
 
 export const generateWish = async (
   inputs: WishInputs,
@@ -46,6 +98,17 @@ export const generateWish = async (
       const creditsRemaining = await deductCredits(userId);
 
       const result = JSON.parse(execution.responseBody);
+
+      // Save the wish to database if user is authenticated (not a guest user)
+      if (userId && !userId.startsWith("guest_")) {
+        try {
+          await saveWishToDatabase(userId, result.wish, inputs.occasion);
+        } catch (saveError) {
+          console.warn("Failed to save wish to database:", saveError);
+          // Continue with the normal flow even if saving fails
+        }
+      }
+
       return {
         wish: result.wish,
         creditsRemaining,
