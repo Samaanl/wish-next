@@ -55,14 +55,12 @@ const CreditDisplay: React.FC<CreditDisplayProps> = ({ onBuyCredits }) => {
           </span>
           <span className="sm:hidden">{creditsToShow}</span>
         </span>
-      </div>
-
+      </div>{" "}
       <button
         onClick={onBuyCredits}
         className="text-xs px-2 py-1 sm:px-2 sm:py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded touch-manipulation min-h-[32px] font-medium"
       >
-        <span className="hidden sm:inline">Buy More</span>
-        <span className="sm:hidden">Buy</span>
+        Buy Credit
       </button>
     </div>
   );
