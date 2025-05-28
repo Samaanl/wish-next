@@ -43,21 +43,26 @@ const CreditDisplay: React.FC<CreditDisplayProps> = ({ onBuyCredits }) => {
   // Use displayCredits as fallback if available, otherwise use current user credits
   const creditsToShow =
     displayCredits !== null ? displayCredits : currentUser.credits || 0;
-
   return (
-    <div className="flex items-center space-x-2">
-      <div className="px-3 py-1 bg-indigo-100 dark:bg-indigo-900 rounded-full flex items-center">
-        <span className="mr-1.5 text-yellow-500">⭐</span>
-        <span className="text-indigo-800 dark:text-indigo-200 font-medium">
-          {creditsToShow} {creditsToShow === 1 ? "Credit" : "Credits"}
+    <div className="flex items-center space-x-1 sm:space-x-2">
+      <div className="px-2 py-1 sm:px-3 sm:py-1 bg-indigo-100 dark:bg-indigo-900 rounded-full flex items-center">
+        <span className="mr-1 sm:mr-1.5 text-yellow-500 text-sm sm:text-base">
+          ⭐
+        </span>
+        <span className="text-indigo-800 dark:text-indigo-200 font-medium text-xs sm:text-sm">
+          <span className="hidden sm:inline">
+            {creditsToShow} {creditsToShow === 1 ? "Credit" : "Credits"}
+          </span>
+          <span className="sm:hidden">{creditsToShow}</span>
         </span>
       </div>
 
       <button
         onClick={onBuyCredits}
-        className="text-xs px-2 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded"
+        className="text-xs px-2 py-1 sm:px-2 sm:py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded touch-manipulation min-h-[32px] font-medium"
       >
-        Buy More
+        <span className="hidden sm:inline">Buy More</span>
+        <span className="sm:hidden">Buy</span>
       </button>
     </div>
   );

@@ -76,40 +76,41 @@ const Header: React.FC<HeaderProps> = ({
   return (
     <>
       {" "}
-      <header className="py-4 px-6 flex justify-between items-center border-b border-gray-200 dark:border-gray-700 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm relative z-40">
+      <header className="py-3 px-4 sm:py-4 sm:px-6 flex justify-between items-center border-b border-gray-200 dark:border-gray-700 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm relative z-40">
         <div className="flex items-center">
           <button
             onClick={handleLogoClick}
-            className="text-2xl font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-lg px-2 py-1"
+            className="text-lg sm:text-2xl font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-lg px-2 py-1"
           >
-            Wish Generator
+            <span className="hidden sm:inline">Wish Generator</span>
+            <span className="sm:hidden">Wish Gen</span>
           </button>
         </div>{" "}
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center space-x-2 sm:space-x-4">
           {currentUser && !currentUser.isGuest ? (
             <>
-              {/* Credits display - hide on mobile when menu is open */}
+              {" "}
+              {/* Credits display - show simplified version on mobile */}
               <div className={`${isMenuOpen ? "hidden sm:block" : "block"}`}>
                 <CreditDisplay onBuyCredits={onBuyCredits} />
               </div>
-
               {/* User Menu Button */}
               <div className="relative" ref={menuRef}>
                 <button
                   type="button"
                   onClick={() => setIsMenuOpen(!isMenuOpen)}
-                  className="flex items-center space-x-2 px-3 py-2 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="flex items-center space-x-1 sm:space-x-2 px-2 sm:px-3 py-2 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 touch-manipulation min-h-[44px]"
                   aria-expanded={isMenuOpen}
                   aria-haspopup="true"
                 >
-                  <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center text-white font-medium text-sm">
+                  <div className="w-7 h-7 sm:w-8 sm:h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center text-white font-medium text-xs sm:text-sm">
                     {displayName.charAt(0).toUpperCase()}
                   </div>
-                  <span className="font-medium hidden sm:inline">
+                  <span className="font-medium hidden sm:inline text-sm">
                     {displayName}
                   </span>
                   <svg
-                    className={`h-4 w-4 transition-transform duration-200 ${
+                    className={`h-3 w-3 sm:h-4 sm:w-4 transition-transform duration-200 ${
                       isMenuOpen ? "rotate-180" : ""
                     }`}
                     fill="currentColor"
@@ -149,10 +150,11 @@ const Header: React.FC<HeaderProps> = ({
 
                   {/* Menu Items */}
                   <div className="py-2">
+                    {" "}
                     <button
                       type="button"
                       onClick={handleBuyCredits}
-                      className="w-full text-left px-4 py-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center transition-colors"
+                      className="w-full text-left px-4 py-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center transition-colors touch-manipulation min-h-[44px]"
                     >
                       <svg
                         className="w-5 h-5 mr-3 text-yellow-500"
@@ -163,12 +165,11 @@ const Header: React.FC<HeaderProps> = ({
                       </svg>
                       Buy Credits
                     </button>
-
                     <button
                       type="button"
                       onClick={handleSignOut}
                       disabled={isSigningOut}
-                      className="w-full text-left px-4 py-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400 flex items-center transition-colors disabled:opacity-50"
+                      className="w-full text-left px-4 py-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400 flex items-center transition-colors disabled:opacity-50 touch-manipulation min-h-[44px]"
                     >
                       {isSigningOut ? (
                         <>
@@ -203,7 +204,7 @@ const Header: React.FC<HeaderProps> = ({
           ) : (
             <button
               onClick={handleSignIn}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-3 sm:px-4 rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm touch-manipulation min-h-[44px]"
             >
               Sign In
             </button>
@@ -217,8 +218,7 @@ const Header: React.FC<HeaderProps> = ({
           <div
             className="fixed inset-0 bg-black bg-opacity-50 z-40 sm:hidden"
             onClick={() => setIsMenuOpen(false)}
-          />
-
+          />{" "}
           {/* Slide-out Panel */}
           <div
             className={`fixed top-0 right-0 h-full w-80 max-w-[85vw] bg-white dark:bg-gray-800 shadow-xl z-50 sm:hidden transform transition-transform duration-300 ease-in-out ${
@@ -234,7 +234,7 @@ const Header: React.FC<HeaderProps> = ({
               <button
                 type="button"
                 onClick={() => setIsMenuOpen(false)}
-                className="p-2 rounded-lg text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="p-2 rounded-lg text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 touch-manipulation min-h-[44px] min-w-[44px] flex items-center justify-center"
                 aria-label="Close menu"
               >
                 <svg
@@ -276,10 +276,11 @@ const Header: React.FC<HeaderProps> = ({
             </div>
             {/* Menu Items */}
             <div className="p-4 space-y-2">
+              {" "}
               <button
                 type="button"
                 onClick={handleBuyCredits}
-                className="w-full text-left px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center transition-colors rounded-lg"
+                className="w-full text-left px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center transition-colors rounded-lg touch-manipulation min-h-[48px]"
               >
                 <svg
                   className="w-5 h-5 mr-3 text-yellow-500"
@@ -290,12 +291,11 @@ const Header: React.FC<HeaderProps> = ({
                 </svg>
                 <span className="font-medium">Buy Credits</span>
               </button>
-
               <button
                 type="button"
                 onClick={handleSignOut}
                 disabled={isSigningOut}
-                className="w-full text-left px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400 flex items-center transition-colors rounded-lg disabled:opacity-50"
+                className="w-full text-left px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400 flex items-center transition-colors rounded-lg disabled:opacity-50 touch-manipulation min-h-[48px]"
               >
                 {isSigningOut ? (
                   <>
