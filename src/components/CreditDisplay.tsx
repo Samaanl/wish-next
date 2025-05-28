@@ -38,11 +38,17 @@ const CreditDisplay: React.FC<CreditDisplayProps> = ({ onBuyCredits }) => {
     }
   }, [currentUser, refreshUserCredits]);
 
+  // The AuthContext already handles guest users properly with localStorage persistence
+  // So we can trust currentUser to always have the correct credit information
+  const creditsToShow = currentUser
+    ? displayCredits !== null
+      ? displayCredits
+      : currentUser.credits || 0
+    : 0; // Will be 0 only during loading, AuthContext will set guest user
+
+  // Don't render if no user (still loading)
   if (!currentUser) return null;
 
-  // Use displayCredits as fallback if available, otherwise use current user credits
-  const creditsToShow =
-    displayCredits !== null ? displayCredits : currentUser.credits || 0;
   return (
     <button
       onClick={onBuyCredits}

@@ -86,13 +86,13 @@ const Header: React.FC<HeaderProps> = ({
         </button>
       </div>{" "}
       <div className="flex items-center space-x-2 sm:space-x-3">
+        {/* Credits Display - Always visible for all users */}
+        <div>
+          <CreditDisplay onBuyCredits={onBuyCredits} />
+        </div>
+
         {currentUser && !currentUser.isGuest ? (
           <>
-            {" "}
-            {/* Credits Display - Always visible */}
-            <div>
-              <CreditDisplay onBuyCredits={onBuyCredits} />
-            </div>
             {/* User Menu */}
             <div className="relative" ref={menuRef}>
               <button
