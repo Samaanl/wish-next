@@ -165,13 +165,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
     console.log("Refreshing user credits for:", currentUser.id);
 
-    // For guest users, just get the current state from localStorage
+    // For guest users, just get the current state from localStorage without resetting
     if (currentUser.isGuest) {
-      const updatedGuestUser = getGuestUser();
-      if (updatedGuestUser) {
-        setCurrentUser(updatedGuestUser);
+      const storedUser = localStorage.getItem(GUEST_USER_KEY);
+      if (storedUser) {
+        try {
+          const parsedUser = JSON.parse(storedUser);
+          setCurrentUser(parsedUser);
+          console.log(
+            "Guest user credits refreshed from localStorage:",
+            parsedUser.credits
+          );
+        } catch (e) {
+          console.error("Error parsing guest user from localStorage:", e);
+        }
       }
-      console.log("Guest user credits refreshed");
       return;
     }
 
