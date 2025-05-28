@@ -10,6 +10,8 @@ export interface WishInputs {
   memorableEvent?: string;
   hobby?: string;
   age?: string;
+  messageLength?: string;
+  messageFormat?: string;
 }
 
 export interface WishResult {

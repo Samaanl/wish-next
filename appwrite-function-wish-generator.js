@@ -83,9 +83,7 @@ export default async ({ req, res, log, error }) => {
     try {
       // Parse the request body
       const body = req.body;
-      log("Wish generator request body: " + JSON.stringify(body));
-
-      // Extract parameters from the request
+      log("Wish generator request body: " + JSON.stringify(body)); // Extract parameters from the request
       const {
         occasion,
         tone,
@@ -94,6 +92,8 @@ export default async ({ req, res, log, error }) => {
         memorableEvent,
         hobby,
         age,
+        messageLength,
+        messageFormat,
       } = body;
 
       // Validate required fields
@@ -107,10 +107,8 @@ export default async ({ req, res, log, error }) => {
           },
           400
         );
-      }
-
-      // Build a prompt for the Gemini API
-      let prompt = `Generate a ${tone} wish for ${recipientName} for their ${occasion}.`;
+      } // Build a prompt for the Gemini API
+      let prompt = `You are a professional wish writer. Generate a ${tone} wish for ${recipientName} for their ${occasion}.`;
       prompt += ` They are my ${relationship}.`;
 
       if (memorableEvent) {
@@ -128,9 +126,53 @@ export default async ({ req, res, log, error }) => {
       ) {
         prompt += ` They are turning ${age} years old or we have been together for ${age} years.`;
       }
-
       prompt +=
-        " Please create a beautifully written, heartfelt wish that feels personal and sincere. The wish should be about 4-6 sentences long, well-structured, and with appropriate line breaks.";
+        " Create a single, beautifully written, heartfelt wish that feels personal and sincere.";
+
+      // Add length specification
+      if (messageLength) {
+        if (messageLength.includes("Short")) {
+          prompt += " Keep the message short and concise, about 1-2 sentences.";
+        } else if (messageLength.includes("Medium")) {
+          prompt += " Make the message medium length, about 3-4 sentences.";
+        } else if (messageLength.includes("Long")) {
+          prompt +=
+            " Create a longer, more detailed message with 5-6 sentences.";
+        }
+      } else {
+        prompt += " The message should be about 4-6 sentences long.";
+      }
+
+      // Add format specification
+      if (messageFormat) {
+        if (
+          messageFormat === "Text Message" ||
+          messageFormat === "WhatsApp Message"
+        ) {
+          prompt +=
+            " Format it as a casual text message with emojis where appropriate.";
+        } else if (messageFormat === "Email") {
+          prompt += " Format it as a professional yet warm email message.";
+        } else if (
+          messageFormat === "Social Media Post" ||
+          messageFormat === "Instagram Caption" ||
+          messageFormat === "Facebook Post"
+        ) {
+          prompt +=
+            " Format it as an engaging social media post with relevant hashtags and emojis.";
+        } else if (messageFormat === "Card/Letter") {
+          prompt +=
+            " Format it as a formal, elegant message suitable for a greeting card or letter.";
+        } else if (messageFormat === "Speech/Verbal") {
+          prompt +=
+            " Format it as a speech that flows naturally when spoken aloud.";
+        } else if (messageFormat === "LinkedIn Message") {
+          prompt +=
+            " Format it as a professional LinkedIn message, maintaining a business-appropriate tone.";
+        }
+      }
+      prompt +=
+        " Ensure appropriate line breaks and structure for readability. IMPORTANT: Provide only ONE single wish message without any introductory text, options, explanations, or commentary. Do not include phrases like 'Here are some options', 'Option 1', or any other meta-commentary. Simply provide the direct wish message and nothing else.";
 
       log("Calling Gemini API with wish prompt: " + prompt);
 

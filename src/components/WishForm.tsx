@@ -17,10 +17,11 @@ export default function WishForm({ onSubmit, isLoading }: FormProps) {
     memorableEvent: "",
     hobby: "",
     age: "",
+    messageLength: "",
+    messageFormat: "",
   });
-
   const [currentStep, setCurrentStep] = useState(1);
-  const totalSteps = 3;
+  const totalSteps = 4;
 
   const occasions = [
     "Birthday",
@@ -36,7 +37,6 @@ export default function WishForm({ onSubmit, isLoading }: FormProps) {
     "Baby Shower",
     "Recovery",
   ];
-
   const tones = [
     "Funny",
     "Emotional",
@@ -50,6 +50,24 @@ export default function WishForm({ onSubmit, isLoading }: FormProps) {
     "Professional",
     "Casual",
     "Poetic",
+  ];
+
+  const messageLengths = [
+    "Short (1-2 sentences)",
+    "Medium (3-4 sentences)",
+    "Long (5-6 sentences)",
+  ];
+
+  const messageFormats = [
+    "Text Message",
+    "WhatsApp Message",
+    "Email",
+    "Social Media Post",
+    "Card/Letter",
+    "Speech/Verbal",
+    "Instagram Caption",
+    "Facebook Post",
+    "LinkedIn Message",
   ];
 
   const handleChange = (
@@ -112,9 +130,9 @@ export default function WishForm({ onSubmit, isLoading }: FormProps) {
       setCurrentStep(currentStep - 1);
     }
   };
-
   const canProceedStep1 = inputs.occasion && inputs.tone;
   const canProceedStep2 = inputs.recipientName && inputs.relationship;
+  const canProceedStep3 = inputs.messageLength && inputs.messageFormat;
 
   const renderStepContent = () => {
     switch (currentStep) {
@@ -329,7 +347,6 @@ export default function WishForm({ onSubmit, isLoading }: FormProps) {
                   Add details that make your wish unique and meaningful.
                 </p>
               </div>
-
               <div className="group">
                 <label
                   htmlFor="memorableEvent"
@@ -350,7 +367,6 @@ export default function WishForm({ onSubmit, isLoading }: FormProps) {
                   rows={3}
                 />
               </div>
-
               <div className="group">
                 <label
                   htmlFor="hobby"
@@ -370,11 +386,122 @@ export default function WishForm({ onSubmit, isLoading }: FormProps) {
                            bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
                            transition duration-150 ease-in-out"
                 />
+              </div>{" "}
+              <div className="pt-6">
+                <p className="text-sm text-center text-gray-500 dark:text-gray-400 mb-2">
+                  Almost there! Let's customize your message format.
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        );
+      case 4:
+        return (
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ duration: 0.3 }}
+          >
+            <div className="space-y-6">
+              <div className="mb-8">
+                <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-2">
+                  Message Preferences
+                </h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Choose the length and format that best suits your needs.
+                </p>
+              </div>
+
+              <div className="group">
+                <label
+                  htmlFor="messageLength"
+                  className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300 group-focus-within:text-indigo-600 dark:group-focus-within:text-indigo-400"
+                >
+                  Message Length
+                </label>
+                <div className="relative">
+                  <select
+                    id="messageLength"
+                    name="messageLength"
+                    value={inputs.messageLength}
+                    onChange={handleChange}
+                    required
+                    className="block w-full px-4 py-3 appearance-none border border-gray-300 dark:border-gray-700 rounded-lg shadow-sm 
+                              focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 
+                              bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
+                              transition duration-150 ease-in-out"
+                  >
+                    <option value="">-- Select message length --</option>
+                    {messageLengths.map((length) => (
+                      <option key={length} value={length}>
+                        {length}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
+                    <svg
+                      className="w-5 h-5 text-gray-400"
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+
+              <div className="group">
+                <label
+                  htmlFor="messageFormat"
+                  className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300 group-focus-within:text-indigo-600 dark:group-focus-within:text-indigo-400"
+                >
+                  Message Format
+                </label>
+                <div className="relative">
+                  <select
+                    id="messageFormat"
+                    name="messageFormat"
+                    value={inputs.messageFormat}
+                    onChange={handleChange}
+                    required
+                    className="block w-full px-4 py-3 appearance-none border border-gray-300 dark:border-gray-700 rounded-lg shadow-sm 
+                              focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 
+                              bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
+                              transition duration-150 ease-in-out"
+                  >
+                    <option value="">-- Select message format --</option>
+                    {messageFormats.map((format) => (
+                      <option key={format} value={format}>
+                        {format}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
+                    <svg
+                      className="w-5 h-5 text-gray-400"
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  </div>
+                </div>
               </div>
 
               <div className="pt-6">
                 <p className="text-sm text-center text-gray-500 dark:text-gray-400 mb-2">
-                  Ready to generate your personalized wish?
+                  Perfect! Ready to generate your personalized wish?
                 </p>
               </div>
             </div>
@@ -389,7 +516,8 @@ export default function WishForm({ onSubmit, isLoading }: FormProps) {
       e.preventDefault(); // Prevent form submission
       if (
         (currentStep === 1 && canProceedStep1) ||
-        (currentStep === 2 && canProceedStep2)
+        (currentStep === 2 && canProceedStep2) ||
+        (currentStep === 3 && canProceedStep3)
       ) {
         nextStep();
       }
@@ -403,8 +531,9 @@ export default function WishForm({ onSubmit, isLoading }: FormProps) {
       noValidate
     >
       <div className="mb-8">
+        {" "}
         <div className="flex justify-between items-center mb-4">
-          {[1, 2, 3].map((step) => (
+          {[1, 2, 3, 4].map((step) => (
             <div
               key={step}
               className={`flex flex-col items-center ${
@@ -439,9 +568,15 @@ export default function WishForm({ onSubmit, isLoading }: FormProps) {
                 ) : (
                   step
                 )}
-              </div>
+              </div>{" "}
               <span className="text-xs">
-                {step === 1 ? "Basic" : step === 2 ? "Details" : "Personal"}
+                {step === 1
+                  ? "Basic"
+                  : step === 2
+                  ? "Details"
+                  : step === 3
+                  ? "Personal"
+                  : "Format"}
               </span>
             </div>
           ))}
@@ -478,7 +613,8 @@ export default function WishForm({ onSubmit, isLoading }: FormProps) {
               }}
               disabled={
                 (currentStep === 1 && !canProceedStep1) ||
-                (currentStep === 2 && !canProceedStep2)
+                (currentStep === 2 && !canProceedStep2) ||
+                (currentStep === 3 && !canProceedStep3)
               }
               className="px-6 py-2.5 bg-indigo-600 text-white font-medium rounded-lg shadow-md 
                        hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 

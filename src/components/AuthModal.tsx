@@ -1,11 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import {
-  signInWithEmail,
-  signUpWithEmail,
-  signInWithGoogle,
-} from "@/utils/authService";
+import { signInWithGoogle } from "@/utils/authService";
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -18,129 +14,19 @@ const AuthModal: React.FC<AuthModalProps> = ({
   onClose,
   onSuccess,
 }) => {
-  const [isSignUp, setIsSignUp] = useState(false);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
   const [error, setError] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  // Debug log when modal opens/closes
+  const [isLoading, setIsLoading] = useState(false); // Debug log when modal opens/closes
   useEffect(() => {
     console.log("AuthModal isOpen state changed to:", isOpen);
     // Reset form when modal closes
     if (!isOpen) {
-      setEmail("");
-      setPassword("");
-      setName("");
       setError("");
-      setIsSignUp(false);
     }
   }, [isOpen]);
 
   // Don't render anything if not open
   if (!isOpen) return null;
-
   console.log("Rendering AuthModal component");
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-
-    // Comprehensive client-side validation
-    const trimmedEmail = email.trim();
-    const trimmedName = name.trim();
-    const trimmedPassword = password.trim();
-
-    if (!trimmedEmail) {
-      setError("Email is required");
-      return;
-    }
-
-    if (!trimmedPassword) {
-      setError("Password is required");
-      return;
-    }
-
-    if (isSignUp && !trimmedName) {
-      setError("Name is required");
-      return;
-    }
-
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(trimmedEmail)) {
-      setError("Please enter a valid email address");
-      return;
-    }
-
-    // Validate password
-    if (trimmedPassword.length < 8) {
-      setError("Password must be at least 8 characters long");
-      return;
-    }
-
-    // Check for password strength
-    if (!/(?=.*[a-zA-Z])/.test(trimmedPassword)) {
-      setError("Password must contain at least one letter");
-      return;
-    }
-
-    if (isSignUp && trimmedName.length < 2) {
-      setError("Name must be at least 2 characters long");
-      return;
-    }
-
-    // Check for invalid characters in name
-    if (isSignUp && !/^[a-zA-Z0-9\s\-'.,]+$/.test(trimmedName)) {
-      setError(
-        "Name contains invalid characters. Please use only letters, numbers, spaces, and basic punctuation"
-      );
-      return;
-    }
-
-    setIsLoading(true);
-
-    try {
-      if (isSignUp) {
-        console.log("Attempting to sign up with:", {
-          email: trimmedEmail,
-          name: trimmedName,
-        });
-        await signUpWithEmail(trimmedEmail, trimmedPassword, trimmedName);
-      } else {
-        console.log("Attempting to sign in with:", { email: trimmedEmail });
-        await signInWithEmail(trimmedEmail, trimmedPassword);
-      }
-      onSuccess();
-      onClose();
-    } catch (err: Error | unknown) {
-      console.error("Authentication error:", err);
-
-      const errorMessage =
-        err instanceof Error
-          ? err.message
-          : "Authentication failed. Please try again.";
-
-      // Provide user-friendly error messages
-      if (errorMessage.includes("Rate limit") || errorMessage.includes("429")) {
-        setError("Too many requests. Please wait a moment and try again.");
-      } else if (errorMessage.includes("user_already_exists")) {
-        setError(
-          "An account with this email already exists. Please try signing in instead."
-        );
-        setIsSignUp(false); // Switch to sign in mode
-      } else if (errorMessage.includes("Invalid credentials")) {
-        setError("Invalid email or password. Please check your credentials.");
-      } else if (errorMessage.includes("user_not_found")) {
-        setError(
-          "No account found with this email. Please check your email or create a new account."
-        );
-      } else {
-        setError(errorMessage);
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const handleGoogleSignIn = async () => {
     setError("");
@@ -170,7 +56,7 @@ const AuthModal: React.FC<AuthModalProps> = ({
       <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold text-gray-900">
-            {isSignUp ? "Create Account" : "Sign In"}
+            Sign In with Google
           </h2>
           <button
             onClick={onClose}
@@ -180,11 +66,18 @@ const AuthModal: React.FC<AuthModalProps> = ({
             ✕
           </button>
         </div>
+
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 text-red-700 border border-red-100 rounded">
+            {error}
+          </div>
+        )}
+
         {/* Google Sign-In Button */}
         <button
           onClick={handleGoogleSignIn}
           disabled={isLoading}
-          className="w-full flex justify-center items-center bg-white border border-gray-300 rounded-md py-2 px-4 text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 mb-4"
+          className="w-full flex justify-center items-center bg-white border border-gray-300 rounded-md py-3 px-4 text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 mb-4"
           type="button"
         >
           <svg className="h-5 w-5 mr-2" viewBox="0 0 24 24">
@@ -205,89 +98,13 @@ const AuthModal: React.FC<AuthModalProps> = ({
               fill="#EA4335"
             />
           </svg>
-          Continue with Google
+          {isLoading ? "Signing in..." : "Continue with Google"}
         </button>
-        <div className="relative flex items-center justify-center mb-4">
-          <div className="border-t border-gray-300 flex-grow"></div>
-          <span className="mx-2 text-sm text-gray-500">OR</span>
-          <div className="border-t border-gray-300 flex-grow"></div>
-        </div>{" "}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {isSignUp && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Name
-              </label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-                minLength={2}
-                maxLength={50}
-                placeholder="Enter your full name"
-              />
-            </div>
-          )}
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Email
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
-              placeholder="Enter your email address"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Password
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
-              minLength={8}
-              placeholder={
-                isSignUp
-                  ? "Create a password (min 8 characters)"
-                  : "Enter your password"
-              }
-            />
-          </div>
-
-          {error && <div className="text-red-500 text-sm mt-2">{error}</div>}
-
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50"
-          >
-            {isLoading ? "Loading..." : isSignUp ? "Create Account" : "Sign In"}
-          </button>
-        </form>{" "}
-        <div className="mt-4 text-center">
-          <button
-            onClick={() => {
-              setIsSignUp(!isSignUp);
-              setError(""); // Clear any existing errors
-              setPassword(""); // Clear password when switching modes
-            }}
-            className="text-blue-600 hover:text-blue-800"
-            type="button"
-          >
-            {isSignUp
-              ? "Already have an account? Sign In"
-              : "Don't have an account? Sign Up"}
-          </button>
+        <div className="text-center text-sm text-gray-600">
+          <p>
+            Sign in securely with your Google account to access all features
+          </p>
         </div>
       </div>
     </div>
