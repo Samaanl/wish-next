@@ -122,6 +122,7 @@ const Header: React.FC<HeaderProps> = ({
               {/* Dropdown Menu */}
               {isMenuOpen && (
                 <div className="absolute right-0 mt-2 w-72 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 z-50 overflow-hidden">
+                  {" "}
                   {/* User Info */}
                   <div className="px-4 py-4 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-gray-700 dark:to-gray-800 border-b border-gray-200 dark:border-gray-700">
                     <div className="flex items-center space-x-3">
@@ -139,14 +140,15 @@ const Header: React.FC<HeaderProps> = ({
                         )}
                       </div>
                     </div>
-                  </div>
-                  {/* Credits Display (Mobile/Tablet) */}
-                  <div className="block lg:hidden px-4 py-4 bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700">
-                    <CreditDisplay onBuyCredits={handleBuyCredits} />
                   </div>{" "}
                   {/* Menu Items */}
                   <div className="py-2">
-                    {/* View Saved Wishes - Available for all screen sizes */}
+                    {/* Mobile Credits Display */}
+                    <div className="lg:hidden px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+                      <CreditDisplay onBuyCredits={handleBuyCredits} />
+                    </div>
+
+                    {/* My Wishes Library - Available for all screen sizes */}
                     <button
                       type="button"
                       onClick={() => {
@@ -167,29 +169,15 @@ const Header: React.FC<HeaderProps> = ({
                           strokeLinecap="round"
                           strokeLinejoin="round"
                           strokeWidth={2}
-                          d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
+                          d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
                         />
                       </svg>
-                      <span className="font-medium">View Saved Wishes</span>
+                      <span className="font-medium">My Wishes Library</span>
                     </button>
 
-                    {/* Buy Credits - Mobile only (since desktop has it in credits display) */}
-                    <button
-                      type="button"
-                      onClick={handleBuyCredits}
-                      className="md:hidden w-full text-left px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-yellow-50 dark:hover:bg-yellow-900/20 hover:text-yellow-600 dark:hover:text-yellow-400 flex items-center transition-colors min-h-[48px] cursor-pointer"
-                    >
-                      <svg
-                        className="w-5 h-5 mr-3 text-yellow-500"
-                        fill="currentColor"
-                        viewBox="0 0 20 20"
-                      >
-                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                      </svg>
-                      <span className="font-medium">Buy Credits</span>
-                    </button>
                     {/* Divider */}
                     <div className="my-2 border-t border-gray-200 dark:border-gray-700"></div>
+
                     {/* Sign Out */}
                     <button
                       type="button"
