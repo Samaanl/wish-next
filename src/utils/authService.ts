@@ -215,6 +215,19 @@ export const createUserInDatabase = async (
 export const signInWithGoogle = async () => {
   try {
     console.log("Starting Google OAuth flow");
+
+    // Clear any existing session before starting OAuth
+    try {
+      await account.deleteSession("current");
+      console.log("Cleared existing session before Google OAuth");
+    } catch (sessionError) {
+      // No existing session or failed to clear - that's fine, continue
+      console.log(
+        "No existing session to clear or failed to clear:",
+        sessionError
+      );
+    }
+
     // Remove any previous guest user when starting OAuth flow
     localStorage.removeItem(GUEST_USER_KEY);
 
@@ -246,6 +259,18 @@ export const signInWithGoogle = async () => {
 
 export const signInWithEmail = async (email: string, password: string) => {
   try {
+    // Clear any existing session before creating a new session
+    try {
+      await account.deleteSession("current");
+      console.log("Cleared existing session before sign in");
+    } catch (sessionError) {
+      // No existing session or failed to clear - that's fine, continue
+      console.log(
+        "No existing session to clear or failed to clear:",
+        sessionError
+      );
+    }
+
     await account.createSession(email, password);
     return await getCurrentUser();
   } catch (error) {
@@ -260,6 +285,18 @@ export const signUpWithEmail = async (
   name: string
 ) => {
   try {
+    // Clear any existing session before creating a new account
+    try {
+      await account.deleteSession("current");
+      console.log("Cleared existing session before sign up");
+    } catch (sessionError) {
+      // No existing session or failed to clear - that's fine, continue
+      console.log(
+        "No existing session to clear or failed to clear:",
+        sessionError
+      );
+    }
+
     const user = await account.create(ID.unique(), email, password, name);
     await account.createSession(email, password);
 
