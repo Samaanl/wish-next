@@ -132,7 +132,8 @@ export default function WishForm({ onSubmit, isLoading }: FormProps) {
   };
   const canProceedStep1 = inputs.occasion && inputs.tone;
   const canProceedStep2 = inputs.recipientName && inputs.relationship;
-  const canProceedStep3 = inputs.messageLength && inputs.messageFormat;
+  const canProceedStep3 = true; // Step 3 has only optional fields
+  const canProceedStep4 = inputs.messageLength && inputs.messageFormat;
 
   const renderStepContent = () => {
     switch (currentStep) {
@@ -508,9 +509,7 @@ export default function WishForm({ onSubmit, isLoading }: FormProps) {
           </motion.div>
         );
     }
-  };
-
-  // Add this function to handle key press events
+  }; // Add this function to handle key press events
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && currentStep < totalSteps) {
       e.preventDefault(); // Prevent form submission
