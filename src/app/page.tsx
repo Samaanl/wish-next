@@ -12,7 +12,7 @@ import NotEnoughCredits from "@/components/NotEnoughCredits";
 import CreditDisplay from "@/components/CreditDisplay";
 import SavedTextWishes from "@/components/SavedTextWishes";
 import Header from "@/components/Header";
-import Banner from "@/components/Banner";
+import FirstTimeOverlay from "@/components/FirstTimeOverlay";
 import { getCurrentUser } from "@/utils/authService";
 import { initializeCheckout } from "@/utils/paymentService";
 import { WishBackground, WishEffect, Sparkle } from "@/components/Decorations";
@@ -26,6 +26,20 @@ export default function Home() {
   const [insufficientCredits, setInsufficientCredits] = useState(false);
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
   const [showSavedWishes, setShowSavedWishes] = useState(false);
+  const [showFirstTimeOverlay, setShowFirstTimeOverlay] = useState(false);
+
+  // Check for first time visit
+  useEffect(() => {
+    const hasSeenOverlay = localStorage.getItem("hasSeenWishOverlay");
+    if (!hasSeenOverlay) {
+      setShowFirstTimeOverlay(true);
+    }
+  }, []);
+
+  const handleCloseFirstTimeOverlay = () => {
+    setShowFirstTimeOverlay(false);
+    localStorage.setItem("hasSeenWishOverlay", "true");
+  };
   // Check if user has returned from checkout
   useEffect(() => {
     const checkPurchaseReturn = async () => {
@@ -171,17 +185,9 @@ export default function Home() {
         onCloseCreditSection={() => setShowPurchaseModal(false)}
         onViewSavedWishes={() => setShowSavedWishes(true)}
         onResetToStart={handleResetToStart}
-      />
-      <div className="container mx-auto px-4 py-8 relative z-10">
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-        >
-          <Banner />
-        </motion.div>
-
-        <main className="max-w-5xl mx-auto mt-12 relative">
+      />{" "}
+      <div className="container mx-auto px-4 py-4 relative z-10">
+        <main className="max-w-5xl mx-auto relative">
           {/* Decorative sparkles */}{" "}
           <div className="absolute inset-0 overflow-hidden pointer-events-none -z-0 opacity-70">
             <Sparkle top="-10%" right="10%" size={14} />
@@ -217,11 +223,12 @@ export default function Home() {
               <WishEffect />
 
               <div className="relative p-8 md:p-10">
+                {" "}
                 <div className="mb-8 text-center">
-                  <div className="flex justify-center mb-3">
-                    <span className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-indigo-100 dark:bg-indigo-900">
+                  <div className="flex justify-center mb-4">
+                    <span className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 shadow-lg">
                       <svg
-                        className="w-6 h-6 text-indigo-600 dark:text-indigo-400"
+                        className="w-8 h-8 text-white"
                         xmlns="http://www.w3.org/2000/svg"
                         fill="none"
                         viewBox="0 0 24 24"
@@ -236,15 +243,14 @@ export default function Home() {
                       </svg>
                     </span>
                   </div>
-                  <h2 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400">
-                    Create Your Personalized Wish
-                  </h2>
-                  <p className="mt-2 text-gray-600 dark:text-gray-400">
-                    Fill in the details below to generate a unique and heartfelt
-                    message
+                  <h1 className="text-4xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400 mb-3">
+                    Create Your Perfect Wish
+                  </h1>
+                  <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+                    Generate personalized, heartfelt messages for any occasion
+                    in seconds
                   </p>
                 </div>
-
                 <WishForm onSubmit={handleGenerateWish} isLoading={isLoading} />
               </div>
             </motion.div>
@@ -266,12 +272,17 @@ export default function Home() {
         isOpen={showPurchaseModal}
         onClose={() => setShowPurchaseModal(false)}
         onPurchase={handlePurchase}
-      />
+      />{" "}
       {/* Saved Text Wishes Modal */}
       <SavedTextWishes
         userId={currentUser?.id || ""}
         isVisible={showSavedWishes}
         onClose={() => setShowSavedWishes(false)}
+      />
+      {/* First Time Overlay */}
+      <FirstTimeOverlay
+        isVisible={showFirstTimeOverlay}
+        onClose={handleCloseFirstTimeOverlay}
       />
     </div>
   );

@@ -1,8 +1,15 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { CREDIT_PACKAGES } from "@/utils/paymentService";
 import { initializeCheckout } from "@/utils/paymentService";
 import { useAuth } from "@/contexts/AuthContext";
 import AuthModal from "@/components/AuthModal";
+import {
+  XMarkIcon,
+  SparklesIcon,
+  CreditCardIcon,
+  GiftIcon,
+} from "@heroicons/react/24/outline";
 
 interface PurchaseModalProps {
   isOpen: boolean;
@@ -129,156 +136,293 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Direct signin button for testing
-  const openSignInModal = () => {
-    console.log("Opening auth modal directly");
-    setShowAuthModal(true);
-  };
-
   return (
-    <>
-      {/* Debugging button */}
-      <div className="fixed top-4 left-4 z-50">
-        <button
-          onClick={openSignInModal}
-          className="bg-red-500 text-white px-4 py-1 rounded text-sm"
-        >
-          Debug: Open Auth
-        </button>
-      </div>
+    <AnimatePresence>
+      {isOpen && (
+        <>
+          {/* AuthModal with higher z-index */}
+          <AuthModal
+            isOpen={showAuthModal}
+            onClose={handleAuthClose}
+            onSuccess={handleAuthSuccess}
+          />
 
-      {/* Force the AuthModal to always be in the DOM, just control visibility with isOpen prop */}
-      <AuthModal
-        isOpen={showAuthModal}
-        onClose={handleAuthClose}
-        onSuccess={handleAuthSuccess}
-      />
-
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-10">
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-8 max-w-md w-full">
-          <h2 className="text-2xl font-bold mb-6 text-center text-gray-900 dark:text-white">
-            Buy Credits
-          </h2>
-          {isGuestUser && (
-            <div className="mb-4 p-3 bg-blue-50 text-blue-700 border border-blue-100 rounded">
-              <p className="font-medium">Sign in required</p>
-              <p className="text-sm">
-                Please sign in or create an account to purchase credits.
-              </p>
-              <button
-                onClick={() => setShowAuthModal(true)}
-                className="mt-2 w-full bg-blue-600 text-white py-1 px-2 rounded text-sm"
-              >
-                Sign in now
-              </button>
-            </div>
-          )}
-          {error && (
-            <div className="mb-4 p-3 bg-red-100 text-red-700 rounded">
-              {error}
-            </div>
-          )}
-          <div className="space-y-4">
-            {CREDIT_PACKAGES.map((pkg) => (
-              <div
-                key={pkg.id}
-                className="border rounded-lg p-4 hover:border-indigo-500 transition-colors"
-              >
-                <div className="flex justify-between items-center mb-2">
-                  <h3 className="font-semibold text-lg">{pkg.name}</h3>
-                  <span className="text-2xl font-bold">${pkg.price}</span>
-                </div>
-
-                <div className="mb-3">
-                  <span className="text-lg font-medium text-indigo-600 dark:text-indigo-400">
-                    {pkg.credits} Credits
-                  </span>
-                </div>
-
-                <div className="text-gray-500 dark:text-gray-400 text-sm mb-4">
-                  {pkg.description}
-                </div>
-
-                <button
-                  onClick={() => !isLoading && handlePurchase(pkg.id)}
-                  disabled={isLoading}
-                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded font-medium transition disabled:opacity-50 cursor-pointer"
-                >
-                  {isLoading
-                    ? "Processing..."
-                    : isGuestUser
-                    ? "Sign in to Buy"
-                    : "Buy Now"}
-                </button>
-              </div>
-            ))}{" "}
-          </div>
-          {/* Payment completion instructions */}
-          <div className="mt-6 p-3 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg">
-            <div className="flex items-start">
-              <div className="flex-shrink-0">
-                <svg
-                  className="h-4 w-4 text-blue-500 mt-0.5"
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-              </div>
-              <div className="ml-2">
-                <p className="text-xs font-medium text-blue-800 dark:text-blue-200">
-                  💡 After payment completion
-                </p>
-                <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
-                  When you see the success overlay, click{" "}
-                  <strong>"Continue"</strong> instead of the back button to
-                  ensure your credits are added.
-                </p>
-              </div>
-            </div>
-          </div>{" "}
-          <div className="mt-6 text-center text-xs text-gray-500 dark:text-gray-400">
-            Secure payment powered by Lemon Squeezy. All purchases are final.
-          </div>
-          {/* More prominent close button */}
-          <div className="mt-4 text-center">
+          {/* Natural Page-like Purchase Interface */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-white dark:bg-gray-900 z-50 overflow-y-auto"
+          >
+            {/* Close button */}
             <button
               onClick={onClose}
-              className="px-4 py-2 text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              className="fixed top-6 right-6 z-60 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
               disabled={isLoading}
+              aria-label="Close"
             >
-              Close
+              <XMarkIcon className="h-6 w-6" />
             </button>
-          </div>
-          {/* Smaller X button for quick access */}
-          <button
-            onClick={onClose}
-            className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
-            disabled={isLoading}
-            aria-label="Close"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-6 w-6"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </button>
-        </div>
-      </div>
-    </>
+
+            {/* Main Content */}
+            <div className="min-h-screen py-12 px-6">
+              <motion.div
+                initial={{ y: 30, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ duration: 0.5 }}
+                className="max-w-6xl mx-auto"
+              >
+                {/* Header Section */}
+                <div className="text-center mb-16">
+                  <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full mb-8">
+                    <SparklesIcon className="h-10 w-10 text-white" />
+                  </div>
+                  <h1 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-6">
+                    Get More Credits
+                  </h1>
+                  <p className="text-xl text-gray-600 dark:text-gray-400 max-w-3xl mx-auto leading-relaxed">
+                    Choose a plan that works for you and unlock unlimited
+                    creativity for all your special occasions.
+                  </p>
+                </div>
+                {/* Important Checkout Warning */}
+                <div className="max-w-4xl mx-auto mb-12 p-6 bg-amber-50 dark:bg-amber-900/20 border-l-4 border-amber-400 dark:border-amber-500">
+                  <div className="flex items-start space-x-4">
+                    <div className="flex-shrink-0">
+                      <div className="w-8 h-8 bg-amber-100 dark:bg-amber-800 rounded-full flex items-center justify-center">
+                        <span className="text-amber-600 dark:text-amber-400 text-lg font-bold">
+                          !
+                        </span>
+                      </div>
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-amber-800 dark:text-amber-200 mb-2">
+                        Important: Complete Your Purchase
+                      </h3>
+                      <p className="text-amber-700 dark:text-amber-300">
+                        After completing payment on Lemon Squeezy,{" "}
+                        <strong>
+                          make sure to click "Continue" or "Return to Merchant"
+                        </strong>{" "}
+                        to return to our website. This ensures your credits are
+                        properly added to your account.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                {/* Auth Required Notice */}
+                {isGuestUser && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="max-w-4xl mx-auto mb-12 p-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700"
+                  >
+                    <div className="flex items-center space-x-4">
+                      <div className="flex-shrink-0 w-12 h-12 bg-blue-100 dark:bg-blue-800 rounded-full flex items-center justify-center">
+                        <GiftIcon className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-100">
+                          Sign in to continue
+                        </h3>
+                        <p className="text-blue-700 dark:text-blue-300 mb-4">
+                          Create an account to purchase and save your wishes
+                        </p>
+                        <button
+                          onClick={() => setShowAuthModal(true)}
+                          className="bg-blue-600 hover:bg-blue-700 text-white py-3 px-6 font-medium transition-colors"
+                        >
+                          Sign in or Create Account
+                        </button>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+                {/* Error Display */}
+                {error && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="max-w-4xl mx-auto mb-12 p-6 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <div className="w-6 h-6 bg-red-100 dark:bg-red-800 rounded-full flex items-center justify-center">
+                        <span className="text-red-600 dark:text-red-400 text-sm font-bold">
+                          !
+                        </span>
+                      </div>
+                      <p className="text-red-800 dark:text-red-200 font-medium">
+                        {error}
+                      </p>
+                    </div>
+                  </motion.div>
+                )}{" "}
+                {/* Credit Packages - Natural Layout */}
+                <div className="max-w-5xl mx-auto grid md:grid-cols-2 gap-8 mb-16">
+                  {CREDIT_PACKAGES.map((pkg, index) => (
+                    <motion.div
+                      key={pkg.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.2 }}
+                      className={`relative p-8 transition-all duration-300 border-2 flex flex-col h-full ${
+                        pkg.id === "premium"
+                          ? "border-purple-300 dark:border-purple-600 bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-purple-900/10 dark:to-indigo-900/10"
+                          : "border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50"
+                      } hover:border-indigo-400 dark:hover:border-indigo-500 hover:shadow-lg`}
+                    >
+                      {" "}
+                      {/* Popular Badge */}
+                      {pkg.id === "premium" && (
+                        <div className="absolute -top-4 left-8">
+                          <span className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-4 py-2 text-sm font-bold">
+                            Most Popular
+                          </span>
+                        </div>
+                      )}
+                      {/* Card Content - Flex grow to push button to bottom */}
+                      <div className="flex-grow">
+                        <div className="mb-8">
+                          <div className="flex items-start justify-between mb-6">
+                            <div>
+                              <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                                {pkg.name}
+                              </h3>
+                              <p className="text-gray-600 dark:text-gray-400">
+                                {pkg.description}
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-4xl font-bold text-gray-900 dark:text-white">
+                                ${pkg.price}
+                              </div>
+                              {pkg.id === "premium" && (
+                                <div className="text-green-600 dark:text-green-400 font-medium">
+                                  Save 17%
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center space-x-4 mb-6">
+                            <div className="flex items-center space-x-2">
+                              <SparklesIcon className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
+                              <span className="text-xl font-semibold text-indigo-600 dark:text-indigo-400">
+                                {pkg.credits} Credits
+                              </span>
+                            </div>
+                            <div className="text-gray-500 dark:text-gray-400">
+                              ${(pkg.price / pkg.credits).toFixed(2)} per wish
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Features */}
+                        <div className="mb-8 space-y-3">
+                          {pkg.id === "basic" ? (
+                            <>
+                              <div className="flex items-center text-gray-600 dark:text-gray-400">
+                                <span className="text-green-500 mr-3 text-lg">
+                                  ✓
+                                </span>
+                                Perfect for trying out the service
+                              </div>
+                              <div className="flex items-center text-gray-600 dark:text-gray-400">
+                                <span className="text-green-500 mr-3 text-lg">
+                                  ✓
+                                </span>
+                                Generate heartfelt wishes quickly
+                              </div>
+                              <div className="flex items-center text-gray-600 dark:text-gray-400">
+                                <span className="text-green-500 mr-3 text-lg">
+                                  ✓
+                                </span>
+                                Save and edit your favorites
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <div className="flex items-center text-gray-600 dark:text-gray-400">
+                                <span className="text-green-500 mr-3 text-lg">
+                                  ✓
+                                </span>
+                                Best value for regular users
+                              </div>
+                              <div className="flex items-center text-gray-600 dark:text-gray-400">
+                                <span className="text-green-500 mr-3 text-lg">
+                                  ✓
+                                </span>
+                                Create wishes for all occasions
+                              </div>
+                              <div className="flex items-center text-gray-600 dark:text-gray-400">
+                                <span className="text-green-500 mr-3 text-lg">
+                                  ✓
+                                </span>
+                                Build your personal wish library
+                              </div>
+                              <div className="flex items-center text-gray-600 dark:text-gray-400">
+                                <span className="text-green-500 mr-3 text-lg">
+                                  ✓
+                                </span>
+                                Never run out of inspiration
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      {/* Button at bottom */}
+                      <button
+                        onClick={() => !isLoading && handlePurchase(pkg.id)}
+                        disabled={isLoading}
+                        className={`w-full py-4 px-6 text-lg font-semibold transition-all duration-200 flex items-center justify-center space-x-3 ${
+                          pkg.id === "premium"
+                            ? "bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
+                            : "bg-indigo-600 hover:bg-indigo-700 text-white"
+                        } disabled:opacity-50 disabled:cursor-not-allowed`}
+                      >
+                        <CreditCardIcon className="h-5 w-5" />
+                        <span>
+                          {isLoading
+                            ? "Processing..."
+                            : isGuestUser
+                            ? "Sign in to Purchase"
+                            : `Get ${pkg.name} Plan`}
+                        </span>
+                      </button>
+                    </motion.div>
+                  ))}
+                </div>
+                {/* Trust & Security Footer */}
+                <div className="max-w-4xl mx-auto text-center">
+                  <div className="flex items-center justify-center space-x-8 text-gray-500 dark:text-gray-400 mb-8">
+                    <div className="flex items-center space-x-2">
+                      <span className="text-2xl">🔒</span>
+                      <span className="font-medium">SSL Secured</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-2xl">⚡</span>
+                      <span className="font-medium">Instant Delivery</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-2xl">💳</span>
+                      <span className="font-medium">
+                        Powered by Lemon Squeezy
+                      </span>
+                    </div>
+                  </div>
+
+                  <p className="text-gray-500 dark:text-gray-400">
+                    Your payment is processed securely through Lemon Squeezy.
+                    Credits are automatically added to your account upon
+                    successful payment.
+                  </p>
+                </div>
+              </motion.div>
+            </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
   );
 };
 
