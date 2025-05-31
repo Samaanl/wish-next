@@ -308,3 +308,30 @@ export const uploadWishImage = async (
     return null;
   }
 };
+
+// Helper function to create optimized thumbnail URLs
+export const createThumbnailUrl = (image: OccasionImage): string => {
+  if (image.previewUrl.includes("placehold.co")) {
+    // For dummy images, create a smaller placeholder
+    return image.previewUrl.replace("600x600", "100x100");
+  }
+
+  // For real Appwrite images, create a tiny thumbnail
+  // The preview URL contains the file ID, so we can reconstruct a smaller version
+  const fileIdMatch = image.previewUrl.match(/\/files\/([^\/]+)\/preview/);
+  if (fileIdMatch && STORAGE_ID) {
+    const fileId = fileIdMatch[1];
+    // Create a 100x100 thumbnail for instant loading
+    return storage.getFilePreview(STORAGE_ID, fileId, 100, 100).toString();
+  }
+
+  // Fallback: try to modify the URL if possible
+  return image.previewUrl.replace("400/400", "100/100");
+};
+
+// Helper function to create an optimized image object with thumbnail
+export const createOptimizedImage = (image: OccasionImage) => ({
+  ...image,
+  thumbnailUrl: createThumbnailUrl(image),
+  isHighQualityLoaded: false,
+});
