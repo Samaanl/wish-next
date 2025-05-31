@@ -333,5 +333,7 @@ export const createThumbnailUrl = (image: OccasionImage): string => {
 export const createOptimizedImage = (image: OccasionImage) => ({
   ...image,
   thumbnailUrl: createThumbnailUrl(image),
-  isHighQualityLoaded: false,
+  isPreviewLoaded: false, // 400x400 preview loaded
+  isHighQualityLoaded: false, // Full 2048x2048 loaded
+  currentQuality: "thumbnail" as const, // Start with thumbnail quality
 });

@@ -16,9 +16,11 @@ interface ImageGalleryProps {
 
 interface OptimizedImage extends OccasionImage {
   thumbnailUrl: string;
-  isHighQualityLoaded: boolean;
+  isPreviewLoaded: boolean; // 400x400 preview loaded
+  isHighQualityLoaded: boolean; // Full 2048x2048 loaded
   loadStartTime?: number;
   loadDuration?: number;
+  currentQuality: "thumbnail" | "preview" | "full"; // Track current quality level
 }
 
 const ImageGallery: React.FC<ImageGalleryProps> = ({
@@ -34,34 +36,61 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({
     occasionImages: OccasionImage[]
   ): OptimizedImage[] => {
     return occasionImages.map(createOptimizedImage);
-  }; // Handle high-quality image loading when clicked
+  }; // Handle progressive image loading when clicked: thumbnail -> preview -> full
   const handleImageClick = async (image: OptimizedImage) => {
     const startTime = Date.now();
     setLoadingImageId(image.id);
 
-    // Update the image to mark loading start time
+    // Update the image to mark loading start time and show thumbnail immediately
     setImages((prevImages) =>
       prevImages.map((prevImage) =>
         prevImage.id === image.id
-          ? { ...prevImage, loadStartTime: startTime }
+          ? {
+              ...prevImage,
+              loadStartTime: startTime,
+              currentQuality: "thumbnail" as const,
+            }
           : prevImage
       )
     );
 
     try {
-      // Preload the high-quality image
+      // Stage 1: Load 400x400 preview
+      await new Promise<void>((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+          // Update to preview quality
+          setImages((prevImages) =>
+            prevImages.map((prevImage) =>
+              prevImage.id === image.id
+                ? {
+                    ...prevImage,
+                    isPreviewLoaded: true,
+                    currentQuality: "preview" as const,
+                  }
+                : prevImage
+            )
+          );
+          resolve();
+        };
+        img.onerror = reject;
+        img.src = image.previewUrl; // Load 400x400 preview
+      });
+
+      // Stage 2: Load full 2048x2048 image
       await new Promise<void>((resolve, reject) => {
         const img = new Image();
         img.onload = () => {
           const loadDuration = Date.now() - startTime;
 
-          // Update the image to mark high quality as loaded with timing
+          // Update to full quality
           setImages((prevImages) =>
             prevImages.map((prevImage) =>
               prevImage.id === image.id
                 ? {
                     ...prevImage,
                     isHighQualityLoaded: true,
+                    currentQuality: "full" as const,
                     loadDuration: loadDuration,
                   }
                 : prevImage
@@ -70,26 +99,26 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({
           resolve();
         };
         img.onerror = reject;
-        img.src = image.previewUrl; // Load the full preview quality
+        img.src = image.fullUrl; // Load full 2048x2048 image
       });
 
-      // Small delay to show the high-quality image before selecting
+      // Small delay to show the full image before selecting
       setTimeout(() => {
-        // Create a modified image object that uses previewUrl as fullUrl to avoid timeout issues
+        // For the TextEditor, use preview URL to prevent timeout
         const optimizedImageForEditor: OccasionImage = {
           ...image,
-          fullUrl: image.previewUrl, // Use the 400x400 preview instead of full resolution
+          fullUrl: image.previewUrl, // Use 400x400 to prevent canvas timeout
         };
 
         onSelectImage(optimizedImageForEditor);
         setLoadingImageId(null);
       }, 300);
     } catch (error) {
-      console.error("Failed to load high-quality image:", error);
-      // If high-quality loading fails, still proceed with selection using preview URL
+      console.error("Failed to load image:", error);
+      // If loading fails, still proceed with selection using preview URL
       const fallbackImageForEditor: OccasionImage = {
         ...image,
-        fullUrl: image.previewUrl, // Use the 400x400 preview as fallback
+        fullUrl: image.previewUrl, // Use 400x400 as fallback
       };
 
       onSelectImage(fallbackImageForEditor);
@@ -138,26 +167,29 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({
 
     fetchImages();
   }, [occasion.id]);
-
-  // Optional: Preload a few high-quality images in the background for better UX
+  // Optional: Preload preview images in the background for better UX
   useEffect(() => {
     if (images.length > 0 && !useDummyImages) {
       // Preload the first 2 images after a short delay to not interfere with initial page load
       const preloadTimer = setTimeout(() => {
         images.slice(0, 2).forEach((image, index) => {
-          if (!image.isHighQualityLoaded) {
+          if (!image.isPreviewLoaded) {
             setTimeout(() => {
               const img = new Image();
               img.onload = () => {
                 setImages((prevImages) =>
                   prevImages.map((prevImage) =>
                     prevImage.id === image.id
-                      ? { ...prevImage, isHighQualityLoaded: true }
+                      ? {
+                          ...prevImage,
+                          isPreviewLoaded: true,
+                          currentQuality: "preview" as const,
+                        }
                       : prevImage
                   )
                 );
               };
-              img.src = image.previewUrl;
+              img.src = image.previewUrl; // Preload 400x400 preview
             }, index * 1000); // Stagger preloading to avoid overwhelming the network
           }
         });
@@ -193,26 +225,41 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({
                   className="aspect-square rounded-lg overflow-hidden cursor-pointer hover:shadow-lg transition-shadow duration-200 relative"
                   onClick={() => handleImageClick(image)}
                 >
-                  {/* Thumbnail image with blur effect */}
+                  {/* Thumbnail image (100x100) - always visible initially */}
                   <img
                     src={image.thumbnailUrl}
                     alt={`${occasion.name} template thumbnail`}
                     className={`w-full h-full object-cover transition-all duration-500 ${
-                      image.isHighQualityLoaded
-                        ? "opacity-0"
-                        : "opacity-100 filter blur-sm"
+                      image.currentQuality === "thumbnail"
+                        ? "opacity-100 filter blur-sm"
+                        : "opacity-0"
                     }`}
                   />
-
-                  {/* High-quality image overlay */}
-                  {image.isHighQualityLoaded && (
+                  {/* Preview image (400x400) - shows after preview loads */}
+                  {image.isPreviewLoaded && (
                     <img
                       src={image.previewUrl}
-                      alt={`${occasion.name} template`}
-                      className="absolute inset-0 w-full h-full object-cover transition-opacity duration-500 opacity-100"
+                      alt={`${occasion.name} template preview`}
+                      className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${
+                        image.currentQuality === "preview" ||
+                        image.currentQuality === "full"
+                          ? "opacity-100"
+                          : "opacity-0"
+                      }`}
                     />
                   )}
-
+                  {/* Full quality image (2048x2048) - shows after full image loads */}
+                  {image.isHighQualityLoaded && (
+                    <img
+                      src={image.fullUrl}
+                      alt={`${occasion.name} template full quality`}
+                      className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${
+                        image.currentQuality === "full"
+                          ? "opacity-100"
+                          : "opacity-0"
+                      }`}
+                    />
+                  )}
                   {/* Loading overlay */}
                   {loadingImageId === image.id && (
                     <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
@@ -223,20 +270,23 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({
                         </span>
                       </div>
                     </div>
-                  )}
-
+                  )}{" "}
                   {/* Quality indicator */}
                   <div className="absolute top-2 right-2">
                     <div
                       className={`w-2 h-2 rounded-full transition-colors duration-300 ${
-                        image.isHighQualityLoaded
+                        image.currentQuality === "full"
                           ? "bg-green-400"
+                          : image.currentQuality === "preview"
+                          ? "bg-blue-400"
                           : "bg-yellow-400"
                       }`}
                       title={
-                        image.isHighQualityLoaded
-                          ? "High quality"
-                          : "Loading preview..."
+                        image.currentQuality === "full"
+                          ? "Full quality (2048x2048)"
+                          : image.currentQuality === "preview"
+                          ? "Preview quality (400x400)"
+                          : "Thumbnail quality (100x100)"
                       }
                     ></div>
                   </div>
@@ -270,14 +320,15 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({
       <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-4">
         Choose an Image for {occasion.name}
       </h3>{" "}
-      {/* Helpful text about the optimization */}
+      {/* Helpful text about the progressive loading optimization */}
       <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
         <div className="flex items-center space-x-2 text-sm text-blue-700 dark:text-blue-300">
           <span>⚡</span>
           <span>
-            <strong>Smart Loading:</strong> Images load instantly as previews,
-            then upgrade to HD when clicked. Uses optimized resolution to
-            prevent timeouts.
+            <strong>Progressive Loading:</strong> Images start as 100x100
+            thumbnails, upgrade to 400x400 preview, then load full 2048x2048
+            quality when clicked. Editor uses optimized resolution to prevent
+            timeouts.
           </span>
         </div>
       </div>
@@ -290,32 +341,50 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({
             className="aspect-square rounded-lg overflow-hidden cursor-pointer hover:shadow-lg transition-shadow duration-200 relative group"
             onClick={() => handleImageClick(image)}
           >
-            {/* Thumbnail image with blur effect */}
+            {/* Thumbnail image (100x100) - always visible initially */}
             <img
               src={image.thumbnailUrl}
               alt={`${occasion.name} template thumbnail`}
               className={`w-full h-full object-cover transition-all duration-500 ${
-                image.isHighQualityLoaded
-                  ? "opacity-0"
-                  : "opacity-100 filter blur-sm"
+                image.currentQuality === "thumbnail"
+                  ? "opacity-100 filter blur-sm"
+                  : "opacity-0"
               }`}
             />
-
-            {/* High-quality image overlay */}
-            {image.isHighQualityLoaded && (
+            {/* Preview image (400x400) - shows after preview loads */}
+            {image.isPreviewLoaded && (
               <img
                 src={image.previewUrl}
-                alt={`${occasion.name} template`}
-                className="absolute inset-0 w-full h-full object-cover transition-opacity duration-500 opacity-100"
+                alt={`${occasion.name} template preview`}
+                className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${
+                  image.currentQuality === "preview" ||
+                  image.currentQuality === "full"
+                    ? "opacity-100"
+                    : "opacity-0"
+                }`}
               />
             )}
-            {/* Loading overlay */}
+            {/* Full quality image (2048x2048) - shows after full image loads */}
+            {image.isHighQualityLoaded && (
+              <img
+                src={image.fullUrl}
+                alt={`${occasion.name} template full quality`}
+                className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${
+                  image.currentQuality === "full" ? "opacity-100" : "opacity-0"
+                }`}
+              />
+            )}
+            {/* Loading overlay */}{" "}
             {loadingImageId === image.id && (
               <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
                 <div className="flex flex-col items-center space-y-2">
                   <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-white"></div>
                   <span className="text-white text-xs font-medium">
-                    Loading HD...
+                    {image.currentQuality === "thumbnail"
+                      ? "Loading Preview..."
+                      : image.currentQuality === "preview"
+                      ? "Loading Full HD..."
+                      : "Preparing..."}
                   </span>
                   {image.loadStartTime && (
                     <span className="text-white text-xs opacity-75">
@@ -327,47 +396,60 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({
                 </div>
               </div>
             )}
-
-            {/* Quality indicator with performance info */}
+            {/* Quality indicator with progressive loading states */}
             <div className="absolute top-2 right-2 flex flex-col items-end space-y-1">
               <div
                 className={`w-2 h-2 rounded-full transition-colors duration-300 ${
-                  image.isHighQualityLoaded
+                  image.currentQuality === "full"
                     ? "bg-green-400 shadow-lg"
+                    : image.currentQuality === "preview"
+                    ? "bg-blue-400"
                     : "bg-yellow-400"
                 }`}
                 title={
-                  image.isHighQualityLoaded
-                    ? `High quality loaded${
-                        image.loadDuration ? ` in ${image.loadDuration}ms` : ""
+                  image.currentQuality === "full"
+                    ? `Full quality (2048x2048)${
+                        image.loadDuration
+                          ? ` loaded in ${image.loadDuration}ms`
+                          : ""
                       }`
-                    : "Preview quality"
+                    : image.currentQuality === "preview"
+                    ? "Preview quality (400x400)"
+                    : "Thumbnail quality (100x100)"
                 }
               ></div>
 
               {/* Performance badge */}
               {image.isHighQualityLoaded &&
                 image.loadDuration &&
-                image.loadDuration < 1000 && (
+                image.loadDuration < 2000 && (
                   <div className="bg-green-500 text-white text-xs px-1 rounded opacity-75">
                     Fast
                   </div>
                 )}
-            </div>
-            {/* Hover overlay with click hint */}
-            {!image.isHighQualityLoaded && (
+            </div>{" "}
+            {/* Hover overlay with progressive loading hint */}
+            {image.currentQuality === "thumbnail" && (
               <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-end justify-center pb-2">
                 <span className="text-white text-xs font-medium bg-black/50 px-2 py-1 rounded">
                   Click for HD
                 </span>
               </div>
             )}
-
-            {/* Preloaded indicator */}
-            {image.isHighQualityLoaded && loadingImageId !== image.id && (
+            {/* Progressive loading indicator */}
+            {image.currentQuality === "preview" &&
+              loadingImageId !== image.id && (
+                <div className="absolute inset-0 bg-gradient-to-t from-blue-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-end justify-center pb-2">
+                  <span className="text-blue-300 text-xs font-medium bg-blue-900/50 px-2 py-1 rounded">
+                    ✓ HD Preview
+                  </span>
+                </div>
+              )}
+            {/* Full quality ready indicator */}
+            {image.currentQuality === "full" && loadingImageId !== image.id && (
               <div className="absolute inset-0 bg-gradient-to-t from-green-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-end justify-center pb-2">
                 <span className="text-green-300 text-xs font-medium bg-green-900/50 px-2 py-1 rounded">
-                  ✓ HD Ready
+                  ✓ Full Quality
                 </span>
               </div>
             )}
