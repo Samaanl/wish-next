@@ -13,6 +13,7 @@ import CreditDisplay from "@/components/CreditDisplay";
 import SavedTextWishes from "@/components/SavedTextWishes";
 import Header from "@/components/Header";
 import FirstTimeOverlay from "@/components/FirstTimeOverlay";
+import SignInPromptOverlay from "@/components/SignInPromptOverlay";
 import { getCurrentUser } from "@/utils/authService";
 import { initializeCheckout } from "@/utils/paymentService";
 import { WishBackground, WishEffect, Sparkle } from "@/components/Decorations";
@@ -27,6 +28,7 @@ export default function Home() {
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
   const [showSavedWishes, setShowSavedWishes] = useState(false);
   const [showFirstTimeOverlay, setShowFirstTimeOverlay] = useState(false);
+  const [showSignInPrompt, setShowSignInPrompt] = useState(false);
 
   // Check for first time visit
   useEffect(() => {
@@ -35,10 +37,22 @@ export default function Home() {
       setShowFirstTimeOverlay(true);
     }
   }, []);
-
   const handleCloseFirstTimeOverlay = () => {
     setShowFirstTimeOverlay(false);
     localStorage.setItem("hasSeenWishOverlay", "true");
+  };
+
+  // Note: Sign-in prompt will only show when user tries to generate a wish
+  // No automatic timer needed - it's handled in handleGenerateWish function
+
+  const handleCloseSignInPrompt = () => {
+    setShowSignInPrompt(false);
+    localStorage.setItem("hasSeenSignInPrompt", "true");
+  };
+
+  const handleSignInFromPrompt = () => {
+    setShowSignInPrompt(false);
+    setAuthModalOpen(true);
   };
   // Check if user has returned from checkout
   useEffect(() => {
@@ -67,17 +81,23 @@ export default function Home() {
 
     checkPurchaseReturn();
   }, [currentUser, refreshUserCredits]);
-
   const handleGenerateWish = async (inputs: WishInputs) => {
     setIsLoading(true);
     setError(null);
-    setInsufficientCredits(false);
-
-    if (!currentUser) {
-      setAuthModalOpen(true);
+    setInsufficientCredits(false); // Check if user is authenticated (not a guest user)
+    if (!currentUser || currentUser.isGuest) {
+      const hasSeenSignInPrompt = localStorage.getItem("hasSeenSignInPrompt");
+      if (!hasSeenSignInPrompt) {
+        // Show the attractive sign-in prompt first
+        setShowSignInPrompt(true);
+      } else {
+        // User has seen the prompt before, go straight to auth modal
+        setAuthModalOpen(true);
+      }
       setIsLoading(false);
       return;
     }
+
     try {
       const result = await generateWish(inputs, currentUser.id);
       setGeneratedWish(result.wish);
@@ -99,7 +119,6 @@ export default function Home() {
     setError(null);
     setInsufficientCredits(false);
   };
-
   // Complete reset function to return to starting state
   const handleResetToStart = () => {
     // Reset all main states
@@ -109,6 +128,7 @@ export default function Home() {
     setAuthModalOpen(false);
     setShowPurchaseModal(false);
     setShowSavedWishes(false);
+    setShowSignInPrompt(false);
     setIsLoading(false);
 
     // Clear any URL parameters
@@ -278,11 +298,17 @@ export default function Home() {
         userId={currentUser?.id || ""}
         isVisible={showSavedWishes}
         onClose={() => setShowSavedWishes(false)}
-      />
+      />{" "}
       {/* First Time Overlay */}
       <FirstTimeOverlay
         isVisible={showFirstTimeOverlay}
         onClose={handleCloseFirstTimeOverlay}
+      />
+      {/* Sign In Prompt Overlay */}
+      <SignInPromptOverlay
+        isVisible={showSignInPrompt}
+        onClose={handleCloseSignInPrompt}
+        onSignIn={handleSignInFromPrompt}
       />
     </div>
   );

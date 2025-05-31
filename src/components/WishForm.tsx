@@ -150,12 +150,24 @@ export default function WishForm({ onSubmit, isLoading }: FormProps) {
       console.log("Already at final step, cannot proceed further");
     }
   };
-
   const prevStep = () => {
     if (currentStep > 1) {
       setCurrentStep(currentStep - 1);
     }
   };
+
+  const jumpToStep = (step: number) => {
+    // Allow jumping to a step only if all previous steps are completed
+    if (
+      step === 1 ||
+      (step === 2 && canProceedStep1) ||
+      (step === 3 && canProceedStep1 && canProceedStep2) ||
+      (step === 4 && canProceedStep1 && canProceedStep2 && canProceedStep3)
+    ) {
+      setCurrentStep(step);
+    }
+  };
+
   const canProceedStep1 =
     inputs.occasion &&
     inputs.tone &&
@@ -164,6 +176,15 @@ export default function WishForm({ onSubmit, isLoading }: FormProps) {
   const canProceedStep2 = inputs.recipientName && inputs.relationship;
   const canProceedStep3 = true; // Step 3 has only optional fields
   const canProceedStep4 = inputs.messageLength && inputs.messageFormat;
+
+  const isStepAccessible = (step: number) => {
+    return (
+      step === 1 ||
+      (step === 2 && canProceedStep1) ||
+      (step === 3 && canProceedStep1 && canProceedStep2) ||
+      (step === 4 && canProceedStep1 && canProceedStep2 && canProceedStep3)
+    );
+  };
 
   const renderStepContent = () => {
     switch (currentStep) {
@@ -590,62 +611,101 @@ export default function WishForm({ onSubmit, isLoading }: FormProps) {
       className="w-full max-w-md mx-auto"
       noValidate
     >
+      {" "}
       <div className="mb-8">
-        {" "}
+        {/* Helpful hint for clickable navigation */}
+        <div className="text-center mb-3">
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            💡 Click on completed circles to jump between sections
+          </p>
+        </div>{" "}
         <div className="flex justify-between items-center mb-4">
-          {[1, 2, 3, 4].map((step) => (
-            <div
-              key={step}
-              className={`flex flex-col items-center ${
-                currentStep >= step
-                  ? "text-indigo-600 dark:text-indigo-400"
-                  : "text-gray-400 dark:text-gray-600"
-              }`}
-            >
+          {[1, 2, 3, 4].map((step) => {
+            const isAccessible = isStepAccessible(step);
+            const isCompleted = currentStep > step;
+            const isCurrent = currentStep === step;
+
+            return (
               <div
-                className={`flex items-center justify-center w-8 h-8 rounded-full font-medium mb-1
-                ${
-                  currentStep > step
-                    ? "bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-400"
-                    : currentStep === step
-                    ? "bg-indigo-600 dark:bg-indigo-500 text-white"
-                    : "bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
+                key={step}
+                className={`flex flex-col items-center ${
+                  currentStep >= step
+                    ? "text-indigo-600 dark:text-indigo-400"
+                    : "text-gray-400 dark:text-gray-600"
                 }`}
               >
-                {currentStep > step ? (
-                  <svg
-                    className="w-4 h-4"
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                ) : (
-                  step
-                )}
-              </div>{" "}
-              <span className="text-xs">
-                {step === 1
-                  ? "Basic"
-                  : step === 2
-                  ? "Details"
-                  : step === 3
-                  ? "Personal"
-                  : "Format"}
-              </span>
-            </div>
-          ))}
-          <div className="hidden lg:block absolute left-0 top-1/2 transform -translate-y-1/2 w-full h-0.5 bg-gray-200 dark:bg-gray-700 -z-10"></div>
+                <button
+                  type="button"
+                  onClick={() => (isAccessible ? jumpToStep(step) : null)}
+                  disabled={!isAccessible}
+                  className={`flex items-center justify-center w-8 h-8 rounded-full font-medium mb-1 transition-all duration-200 ${
+                    isCompleted
+                      ? "bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-200 dark:hover:bg-indigo-800 cursor-pointer"
+                      : isCurrent
+                      ? "bg-indigo-600 dark:bg-indigo-500 text-white"
+                      : isAccessible
+                      ? "bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-600 cursor-pointer"
+                      : "bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed"
+                  } ${isAccessible ? "hover:scale-105 active:scale-95" : ""}`}
+                  title={
+                    isAccessible
+                      ? `Go to ${
+                          step === 1
+                            ? "Basic"
+                            : step === 2
+                            ? "Details"
+                            : step === 3
+                            ? "Personal"
+                            : "Format"
+                        } section`
+                      : "Complete previous steps to access"
+                  }
+                >
+                  {isCompleted ? (
+                    <svg
+                      className="w-4 h-4"
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  ) : (
+                    step
+                  )}
+                </button>
+                <span
+                  className={`text-xs ${
+                    isAccessible ? "cursor-pointer" : "cursor-not-allowed"
+                  }`}
+                >
+                  {step === 1
+                    ? "Basic"
+                    : step === 2
+                    ? "Details"
+                    : step === 3
+                    ? "Personal"
+                    : "Format"}
+                </span>
+              </div>
+            );
+          })}
+          <div className="hidden lg:block absolute left-0 top-1/2 transform -translate-y-1/2 w-full h-0.5 bg-gray-200 dark:bg-gray-700 -z-10">
+            {/* Progress indicator */}
+            <div
+              className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-all duration-500 ease-in-out"
+              style={{
+                width: `${((currentStep - 1) / 3) * 100}%`,
+              }}
+            />
+          </div>
         </div>
       </div>
-
       {renderStepContent()}
-
       <div className="mt-8 flex justify-between">
         {currentStep > 1 && (
           <button
