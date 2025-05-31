@@ -34,8 +34,7 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({
     occasionImages: OccasionImage[]
   ): OptimizedImage[] => {
     return occasionImages.map(createOptimizedImage);
-  };
-  // Handle high-quality image loading when clicked
+  }; // Handle high-quality image loading when clicked
   const handleImageClick = async (image: OptimizedImage) => {
     const startTime = Date.now();
     setLoadingImageId(image.id);
@@ -76,13 +75,24 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({
 
       // Small delay to show the high-quality image before selecting
       setTimeout(() => {
-        onSelectImage(image);
+        // Create a modified image object that uses previewUrl as fullUrl to avoid timeout issues
+        const optimizedImageForEditor: OccasionImage = {
+          ...image,
+          fullUrl: image.previewUrl, // Use the 400x400 preview instead of full resolution
+        };
+
+        onSelectImage(optimizedImageForEditor);
         setLoadingImageId(null);
       }, 300);
     } catch (error) {
       console.error("Failed to load high-quality image:", error);
-      // If high-quality loading fails, still proceed with selection
-      onSelectImage(image);
+      // If high-quality loading fails, still proceed with selection using preview URL
+      const fallbackImageForEditor: OccasionImage = {
+        ...image,
+        fullUrl: image.previewUrl, // Use the 400x400 preview as fallback
+      };
+
+      onSelectImage(fallbackImageForEditor);
       setLoadingImageId(null);
     }
   };
@@ -259,18 +269,18 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({
     <div className="w-full">
       <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-4">
         Choose an Image for {occasion.name}
-      </h3>
+      </h3>{" "}
       {/* Helpful text about the optimization */}
       <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
         <div className="flex items-center space-x-2 text-sm text-blue-700 dark:text-blue-300">
           <span>⚡</span>
           <span>
-            <strong>Fast Loading:</strong> Images load instantly as low-quality
-            previews, then upgrade to HD when clicked
+            <strong>Smart Loading:</strong> Images load instantly as previews,
+            then upgrade to HD when clicked. Uses optimized resolution to
+            prevent timeouts.
           </span>
         </div>
       </div>
-
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
         {images.map((image) => (
           <motion.div
