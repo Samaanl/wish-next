@@ -1,10 +1,5 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
-import {
-  OccasionImage,
-  downloadImage,
-  downloadImageForEditor,
-} from "@/utils/imageService";
-import FastImage from "./FastImage";
+import { OccasionImage, downloadImage } from "@/utils/imageService";
 import dynamic from "next/dynamic";
 
 // Dynamically import fabric to avoid SSR issues
@@ -64,7 +59,6 @@ const TextEditor: React.FC<TextEditorProps> = ({
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fabricCanvasRef = useRef<any>(null);
-  const mountedRef = useRef<boolean>(true);
   const [textColor, setTextColor] = useState("#ffffff");
   const [fontSize, setFontSize] = useState(24);
   const [textShadow, setTextShadow] = useState(true);
@@ -74,7 +68,6 @@ const TextEditor: React.FC<TextEditorProps> = ({
   const [fabric, setFabric] = useState<any>(null);
   const [canvasReady, setCanvasReady] = useState(false);
   const [setupAttempts, setSetupAttempts] = useState(0);
-  const [showCanvasLoading, setShowCanvasLoading] = useState(false);
 
   const colorOptions = [
     "#ffffff", // White
@@ -131,14 +124,15 @@ const TextEditor: React.FC<TextEditorProps> = ({
     "Lucida Sans",
     "Tahoma",
     "Verdana",
-  ]; // Load fabric.js
-  useEffect(() => {
-    console.log("[FabricLoaderEffect] Initializing fabric load.");
-    mountedRef.current = true; // Ensure mounted state is set
+  ];
 
+  // Load fabric.js
+  useEffect(() => {
+    let isMounted = true;
+    console.log("[FabricLoaderEffect] Initializing fabric load.");
     loadFabric()
       .then((fabricInstance) => {
-        if (mountedRef.current) {
+        if (isMounted) {
           console.log(
             "[FabricLoaderEffect] Fabric.js loaded successfully, setting fabric state."
           );
@@ -146,7 +140,7 @@ const TextEditor: React.FC<TextEditorProps> = ({
         }
       })
       .catch((err) => {
-        if (mountedRef.current) {
+        if (isMounted) {
           console.error("[FabricLoaderEffect] Failed to load fabric.js:", err);
           setError(
             "CRITICAL: Editor libraries failed to load. Please refresh."
@@ -154,10 +148,8 @@ const TextEditor: React.FC<TextEditorProps> = ({
           setLoading(false);
         }
       });
-
     return () => {
-      console.log("[FabricLoaderEffect] Cleanup - setting mountedRef to false");
-      mountedRef.current = false;
+      isMounted = false;
     };
   }, []);
 
@@ -167,8 +159,10 @@ const TextEditor: React.FC<TextEditorProps> = ({
       `[TextEditor LayoutEffect] After DOM mutation - loading: ${loading}, canvasRef.current populated: ${!!canvasRef.current}`
     );
   }, [loading]);
+
   // Initialize canvas with fabric.js when it's loaded AND selectedImage changes
   useEffect(() => {
+    let isCanvasSetupMounted = true;
     let imageLoadingTimeout: NodeJS.Timeout | null = null;
 
     console.log(
@@ -179,11 +173,6 @@ const TextEditor: React.FC<TextEditorProps> = ({
 
     if (!fabric) {
       console.log("[CanvasSetupEffect] Fabric not loaded yet. Returning.");
-      return;
-    }
-
-    if (!mountedRef.current) {
-      console.log("[CanvasSetupEffect] Component unmounted. Returning.");
       return;
     }
 
@@ -228,9 +217,15 @@ const TextEditor: React.FC<TextEditorProps> = ({
         `[_setupFabricCanvas] Starting for image: ${selectedImage.fullUrl}`
       );
       setError(null);
-      setShowCanvasLoading(true);
+
+      const editorContentLoadingElement = document.getElementById(
+        "editor-content-loading"
+      );
+      if (editorContentLoadingElement)
+        editorContentLoadingElement.style.display = "flex";
+
       imageLoadingTimeout = setTimeout(() => {
-        if (mountedRef.current) {
+        if (isCanvasSetupMounted) {
           console.warn(
             "[_setupFabricCanvas] Image loading seems to be taking a while..."
           );
@@ -247,28 +242,21 @@ const TextEditor: React.FC<TextEditorProps> = ({
           backgroundColor: "#f0f0f0",
           preserveObjectStacking: true,
         });
-        if (!mountedRef.current) {
+        if (!isCanvasSetupMounted) {
           newCanvas.dispose();
           return;
         }
         fabricCanvasRef.current = newCanvas;
-        console.log(
-          `[_setupFabricCanvas] Downloading image progressively: ${selectedImage.fullUrl}`
-        );
-        const imgHtmlElement = await downloadImageForEditor(
-          selectedImage,
-          (progress: number) => {
-            console.log(`[TextEditor] Image loading progress: ${progress}%`);
-          }
-        );
 
-        if (!mountedRef.current) {
+        console.log(
+          `[_setupFabricCanvas] Downloading image via imageService: ${selectedImage.fullUrl}`
+        );
+        const imgHtmlElement = await downloadImage(selectedImage.fullUrl);
+        if (!isCanvasSetupMounted) {
           newCanvas.dispose();
           return;
         }
-        console.log(
-          "[_setupFabricCanvas] Image downloaded successfully with progressive loading."
-        );
+        console.log("[_setupFabricCanvas] Image downloaded successfully.");
 
         const fabricImage = new fabric.Image(imgHtmlElement, {
           selectable: false,
@@ -329,7 +317,7 @@ const TextEditor: React.FC<TextEditorProps> = ({
           newCanvas.getActiveObject()
         );
       } catch (err: any) {
-        if (mountedRef.current) {
+        if (isCanvasSetupMounted) {
           console.error("[_setupFabricCanvas] Error during canvas setup:", err);
           const newAttempts = setupAttempts + 1;
           setSetupAttempts(newAttempts);
@@ -340,7 +328,7 @@ const TextEditor: React.FC<TextEditorProps> = ({
             );
             // Retry after a short delay
             setTimeout(() => {
-              if (mountedRef.current) {
+              if (isCanvasSetupMounted) {
                 _setupFabricCanvas();
               }
             }, 1000);
@@ -355,66 +343,39 @@ const TextEditor: React.FC<TextEditorProps> = ({
           }
         }
       } finally {
-        if (mountedRef.current) {
+        if (isCanvasSetupMounted) {
           console.log("[_setupFabricCanvas] Reached finally block.");
           if (imageLoadingTimeout) clearTimeout(imageLoadingTimeout);
-          setShowCanvasLoading(false);
+          if (editorContentLoadingElement)
+            editorContentLoadingElement.style.display = "none";
         }
       }
     };
-    _setupFabricCanvas();
 
+    _setupFabricCanvas();
     return () => {
-      console.log(
-        "[CanvasSetupEffect] Cleanup - disposing fabric canvas if it exists."
-      );
+      isCanvasSetupMounted = false;
       if (imageLoadingTimeout) clearTimeout(imageLoadingTimeout);
+      console.log(
+        "[CanvasSetupEffect] Cleanup. Disposing fabric canvas if it exists."
+      );
       if (fabricCanvasRef.current) {
         fabricCanvasRef.current.dispose();
         fabricCanvasRef.current = null;
       }
       setCanvasReady(false);
     };
-  }, [fabric, selectedImage, loading, wish, setupAttempts]); // Removed text style properties to prevent canvas recreation
-
-  // Separate effect for updating text properties without recreating canvas
-  useEffect(() => {
-    if (!canvasReady || !fabricCanvasRef.current) {
-      return;
-    }
-
-    console.log(
-      "[TextPropertiesEffect] Updating text properties without canvas recreation"
-    );
-
-    // Find and update text object
-    const objects = fabricCanvasRef.current.getObjects();
-    const textObject = objects.find((obj: any) => obj.type === "textbox");
-
-    if (textObject) {
-      // Update text properties
-      textObject.set({
-        fontSize: fontSize,
-        fontFamily: fontFamily,
-        fill: textColor,
-        shadow: textShadow
-          ? new fabric.Shadow({
-              color: "rgba(0,0,0,0.6)",
-              blur: 5,
-              offsetX: 2,
-              offsetY: 2,
-            })
-          : null,
-      });
-
-      fabricCanvasRef.current.renderAll();
-      console.log(
-        "[TextPropertiesEffect] Text properties updated successfully"
-      );
-    }
-  }, [fontSize, fontFamily, textColor, textShadow, canvasReady, fabric]);
-
-  // Fallback to enable controls if canvas setup is taking too long
+  }, [
+    fabric,
+    selectedImage,
+    loading,
+    wish,
+    fontSize,
+    fontFamily,
+    textColor,
+    textShadow,
+    setupAttempts,
+  ]); // Fallback to enable controls if canvas setup is taking too long
   useEffect(() => {
     const fallbackTimeout = setTimeout(() => {
       if (!canvasReady && !loading && !error) {
@@ -429,15 +390,7 @@ const TextEditor: React.FC<TextEditorProps> = ({
     }, 10000); // 10 second fallback
 
     return () => clearTimeout(fallbackTimeout);
-  }, []); // Empty dependency array - only run once on mount
-
-  // Component-level cleanup effect
-  useEffect(() => {
-    return () => {
-      console.log("[TextEditor] Component unmounting - final cleanup");
-      mountedRef.current = false;
-    };
-  }, []);
+  }, [canvasReady, loading, error]);
 
   // Apply changes when text properties change
   const updateTextProperties = (property: string, value: any) => {
@@ -482,148 +435,55 @@ const TextEditor: React.FC<TextEditorProps> = ({
       fabricCanvasRef.current.renderAll();
     }
   };
+
   // Handle color changes
   const handleColorChange = (color: string) => {
     setTextColor(color);
-    // Text will be updated by the useEffect for text properties
+    updateTextProperties("fill", color);
   };
 
   // Handle font size changes
   const handleFontSizeChange = (size: number) => {
     setFontSize(size);
-    // Text will be updated by the useEffect for text properties
+    updateTextProperties("fontSize", size);
   };
 
   // Handle font family changes
   const handleFontFamilyChange = (family: string) => {
     setFontFamily(family);
-    // Text will be updated by the useEffect for text properties
+    updateTextProperties("fontFamily", family);
   };
 
   // Handle shadow toggle
   const handleShadowToggle = (enabled: boolean) => {
     setTextShadow(enabled);
-    // Text will be updated by the useEffect for text properties
+    updateTextProperties("shadow", enabled);
   };
-  // Safe download function that avoids all DOM manipulation and canvas access errors
+
+  // Simple download function that avoids DOM manipulation errors completely
   const handleDownload = async () => {
+    if (!fabricCanvasRef.current) {
+      setError("Canvas not ready for download. Please try refreshing.");
+      return;
+    }
+
     try {
       setLoading(true);
-      console.log("Starting safe download process");
+      console.log("Starting simplified download process");
 
-      // Capture current fabric canvas state safely
-      let textData: any[] = [];
-      let canvasWidth = 600;
-      let canvasHeight = 600;
-
-      // Safely extract data from fabric canvas if it exists
-      if (fabricCanvasRef.current) {
-        try {
-          const fabricCanvas = fabricCanvasRef.current;
-          canvasWidth = fabricCanvas.getWidth();
-          canvasHeight = fabricCanvas.getHeight();
-
-          // Extract text objects data safely
-          const objects = fabricCanvas.getObjects();
-          textData = objects
-            .filter((obj: any) => obj.type === "textbox" || obj.type === "text")
-            .map((obj: any) => ({
-              text: obj.text || wish,
-              left: obj.left || canvasWidth / 2,
-              top: obj.top || canvasHeight / 2,
-              fontSize: obj.fontSize || fontSize,
-              fontFamily: obj.fontFamily || fontFamily,
-              fill: obj.fill || textColor,
-              textAlign: obj.textAlign || "center",
-              shadow: obj.shadow
-                ? {
-                    color: obj.shadow.color || "rgba(0,0,0,0.6)",
-                    blur: obj.shadow.blur || 5,
-                    offsetX: obj.shadow.offsetX || 2,
-                    offsetY: obj.shadow.offsetY || 2,
-                  }
-                : null,
-            }));
-        } catch (canvasError) {
-          console.warn(
-            "Could not extract from fabric canvas, using fallback text data:",
-            canvasError
-          );
-          // Fallback to current state values
-          textData = [
-            {
-              text: wish,
-              left: canvasWidth / 2,
-              top: canvasHeight / 2,
-              fontSize: fontSize,
-              fontFamily: fontFamily,
-              fill: textColor,
-              textAlign: "center",
-              shadow: textShadow
-                ? {
-                    color: "rgba(0,0,0,0.6)",
-                    blur: 5,
-                    offsetX: 2,
-                    offsetY: 2,
-                  }
-                : null,
-            },
-          ];
-        }
-      } else {
-        console.warn("No fabric canvas available, using current state values");
-        // Use current component state as fallback
-        textData = [
-          {
-            text: wish,
-            left: canvasWidth / 2,
-            top: canvasHeight / 2,
-            fontSize: fontSize,
-            fontFamily: fontFamily,
-            fill: textColor,
-            textAlign: "center",
-            shadow: textShadow
-              ? {
-                  color: "rgba(0,0,0,0.6)",
-                  blur: 5,
-                  offsetX: 2,
-                  offsetY: 2,
-                }
-              : null,
-          },
-        ];
-      }
-
-      // Load original high-res image with timeout protection
+      // Load original high-res image
       const img = new Image();
       img.crossOrigin = "anonymous";
 
       await new Promise<void>((resolve, reject) => {
-        let resolved = false;
-
-        img.onload = () => {
-          if (!resolved) {
-            resolved = true;
-            resolve();
-          }
-        };
-
-        img.onerror = () => {
-          if (!resolved) {
-            resolved = true;
-            reject(new Error("Failed to load original image for export"));
-          }
-        };
-
-        // Set source after event handlers
+        img.onload = () => resolve();
+        img.onerror = () =>
+          reject(new Error("Failed to load original image for export"));
         img.src = selectedImage.fullUrl;
 
-        // Timeout protection
+        // Backup timeout
         setTimeout(() => {
-          if (!resolved) {
-            resolved = true;
-            reject(new Error("Image load timed out"));
-          }
+          if (!img.complete) reject(new Error("Image load timed out"));
         }, 8000);
       });
 
@@ -640,35 +500,60 @@ const TextEditor: React.FC<TextEditorProps> = ({
       // Draw the background image
       ctx.drawImage(img, 0, 0);
 
-      // Calculate scaling between display canvas and export canvas
-      const scaleFactorX = img.naturalWidth / canvasWidth;
-      const scaleFactorY = img.naturalHeight / canvasHeight;
+      // Get text from fabric canvas
+      const fabricCanvas = fabricCanvasRef.current;
+      const textObjects = fabricCanvas
+        .getObjects()
+        .filter((obj: any) => obj.type === "textbox" || obj.type === "text");
 
-      // Draw each text object
-      textData.forEach((textObj) => {
+      // Calculate scaling between display canvas and export canvas
+      const scaleFactorX = img.naturalWidth / fabricCanvas.getWidth();
+      const scaleFactorY = img.naturalHeight / fabricCanvas.getHeight();
+      // Draw each text object with proper positioning
+      textObjects.forEach((obj: any) => {
         // Scale position and size
-        const scaledFontSize = textObj.fontSize * scaleFactorY;
+        const fontSize = obj.fontSize * Math.min(scaleFactorX, scaleFactorY);
+        const fontFamily = obj.fontFamily || "Arial";
+        const fill = obj.fill || "#ffffff";
 
         // Set up text rendering
-        ctx.font = `${scaledFontSize}px ${textObj.fontFamily}`;
-        ctx.fillStyle = textObj.fill;
-        ctx.textAlign = textObj.textAlign === "center" ? "center" : "left";
-        ctx.textBaseline = "middle";
+        ctx.font = `${fontSize}px ${fontFamily}`;
+        ctx.fillStyle = fill;
+        ctx.textAlign = obj.textAlign || "center";
+        ctx.textBaseline = "middle"; // Important: fabric.js uses middle baseline by default
 
         // Handle shadow
-        if (textObj.shadow) {
-          ctx.shadowColor = textObj.shadow.color;
-          ctx.shadowBlur = textObj.shadow.blur * scaleFactorX;
-          ctx.shadowOffsetX = textObj.shadow.offsetX * scaleFactorX;
-          ctx.shadowOffsetY = textObj.shadow.offsetY * scaleFactorY;
+        if (obj.shadow) {
+          ctx.shadowColor = obj.shadow.color || "rgba(0,0,0,0.6)";
+          ctx.shadowBlur =
+            (obj.shadow.blur || 5) * Math.min(scaleFactorX, scaleFactorY);
+          ctx.shadowOffsetX = (obj.shadow.offsetX || 2) * scaleFactorX;
+          ctx.shadowOffsetY = (obj.shadow.offsetY || 2) * scaleFactorY;
         }
 
-        // Position text - scale to export resolution
-        const x = textObj.left * scaleFactorX;
-        const y = textObj.top * scaleFactorY;
+        // Position text - fabric.js text objects use center origin by default
+        // We need to respect the originX and originY properties
+        let x = obj.left * scaleFactorX;
+        let y = obj.top * scaleFactorY;
+
+        // Adjust for fabric.js origin handling
+        if (obj.originX === "center") {
+          ctx.textAlign = "center";
+        } else if (obj.originX === "left") {
+          ctx.textAlign = "left";
+        } else if (obj.originX === "right") {
+          ctx.textAlign = "right";
+        }
+
+        // fabric.js handles originY with baseline, we're using middle baseline
+        // so center origin is already handled correctly
+
+        console.log(
+          `Drawing text: "${obj.text}" at (${x}, ${y}), fontSize: ${fontSize}px`
+        );
 
         // Draw text
-        ctx.fillText(textObj.text, x, y);
+        ctx.fillText(obj.text || wish, x, y);
 
         // Reset shadow
         ctx.shadowColor = "transparent";
@@ -677,81 +562,26 @@ const TextEditor: React.FC<TextEditorProps> = ({
         ctx.shadowOffsetY = 0;
       });
 
-      // Convert canvas to blob for better browser compatibility
-      const blob = await new Promise<Blob>((resolve, reject) => {
-        exportCanvas.toBlob(
-          (blob) => {
-            if (blob) {
-              resolve(blob);
-            } else {
-              reject(new Error("Failed to create image blob"));
-            }
-          },
-          "image/png",
-          1.0
-        );
-      }); // Create download using blob URL (safer than data URL)
-      const blobUrl = URL.createObjectURL(blob);
+      // Convert canvas to data URL and trigger download
+      const dataURL = exportCanvas.toDataURL("image/png", 1.0);
       const filename = `wish-maker-${
         selectedImage?.occasion || "image"
       }-${Date.now()}.png`;
 
-      // Use a safer download approach without DOM manipulation
-      try {
-        // Try using the modern File System Access API if available
-        if ("showSaveFilePicker" in window) {
-          const fileHandle = await (window as any).showSaveFilePicker({
-            suggestedName: filename,
-            types: [
-              {
-                description: "PNG images",
-                accept: { "image/png": [".png"] },
-              },
-            ],
-          });
-          const writable = await fileHandle.createWritable();
-          await writable.write(blob);
-          await writable.close();
-        } else {
-          // Fallback: use a React-friendly approach
-          const downloadUrl = blobUrl;
+      // Create link element
+      const link = document.createElement("a");
+      link.download = filename;
+      link.href = dataURL;
 
-          // Use window.open instead of DOM manipulation
-          const downloadWindow = window.open(downloadUrl, "_blank");
-          if (downloadWindow) {
-            downloadWindow.onload = () => {
-              downloadWindow.close();
-            };
-          } else {
-            // Final fallback: direct blob download
-            const link = document.createElement("a");
-            link.href = blobUrl;
-            link.download = filename;
+      // Use modern event dispatch approach instead of DOM manipulation
+      const clickEvent = new MouseEvent("click", {
+        view: window,
+        bubbles: false,
+        cancelable: true,
+      });
 
-            // Use click() in a React-safe way
-            const clickEvent = new MouseEvent("click", {
-              view: window,
-              bubbles: true,
-              cancelable: true,
-            });
-            link.dispatchEvent(clickEvent);
-          }
-        }
-      } catch (downloadError) {
-        console.warn(
-          "Advanced download failed, using basic method:",
-          downloadError
-        );
-
-        // Most basic fallback
-        const link = document.createElement("a");
-        link.href = blobUrl;
-        link.download = filename;
-        link.click();
-      }
-
-      // Clean up blob URL
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+      // Dispatch the click event - no DOM insertion needed
+      link.dispatchEvent(clickEvent);
 
       console.log("Download completed successfully");
     } catch (err) {
@@ -822,15 +652,16 @@ const TextEditor: React.FC<TextEditorProps> = ({
                   </div>
                 ) : (
                   <div className="relative w-full flex justify-center">
-                    {" "}
-                    {showCanvasLoading && (
-                      <div className="absolute inset-0 flex flex-col justify-center items-center bg-white/80 dark:bg-gray-800/80 z-10">
-                        <div className="animate-spin rounded-full h-10 w-10 border-4 border-indigo-200 border-t-indigo-600"></div>
-                        <span className="text-gray-600 dark:text-gray-300 font-medium mt-3">
-                          Loading image...
-                        </span>
-                      </div>
-                    )}
+                    <div
+                      id="editor-content-loading"
+                      className="absolute inset-0 flex flex-col justify-center items-center bg-white/80 dark:bg-gray-800/80 z-10"
+                      style={{ display: "none" }}
+                    >
+                      <div className="animate-spin rounded-full h-10 w-10 border-4 border-indigo-200 border-t-indigo-600"></div>
+                      <span className="text-gray-600 dark:text-gray-300 font-medium mt-3">
+                        Loading image...
+                      </span>
+                    </div>
                     <canvas
                       ref={canvasRef}
                       className="max-w-full h-auto rounded-lg shadow-sm border border-gray-200 dark:border-gray-600"
