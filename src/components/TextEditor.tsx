@@ -459,8 +459,7 @@ const TextEditor: React.FC<TextEditorProps> = ({
     setTextShadow(enabled);
     updateTextProperties("shadow", enabled);
   };
-
-  // Simple download function that avoids DOM manipulation errors completely
+  // Enhanced download function with better visual feedback and reliability
   const handleDownload = async () => {
     if (!fabricCanvasRef.current) {
       setError("Canvas not ready for download. Please try refreshing.");
@@ -469,23 +468,47 @@ const TextEditor: React.FC<TextEditorProps> = ({
 
     try {
       setLoading(true);
-      console.log("Starting simplified download process");
+      setError(""); // Clear any previous errors
+      console.log("Starting enhanced download process");
 
-      // Load original high-res image
+      // Show immediate feedback
+      console.log("Preparing download...");
+
+      // Load original high-res image with timeout protection
       const img = new Image();
       img.crossOrigin = "anonymous";
 
       await new Promise<void>((resolve, reject) => {
-        img.onload = () => resolve();
-        img.onerror = () =>
-          reject(new Error("Failed to load original image for export"));
+        let resolved = false;
+
+        img.onload = () => {
+          if (!resolved) {
+            resolved = true;
+            console.log("Image loaded successfully for export");
+            resolve();
+          }
+        };
+
+        img.onerror = () => {
+          if (!resolved) {
+            resolved = true;
+            reject(new Error("Failed to load original image for export"));
+          }
+        };
+
+        // Set source after event handlers
         img.src = selectedImage.fullUrl;
 
-        // Backup timeout
+        // Timeout protection
         setTimeout(() => {
-          if (!img.complete) reject(new Error("Image load timed out"));
-        }, 8000);
+          if (!resolved) {
+            resolved = true;
+            reject(new Error("Image load timed out"));
+          }
+        }, 10000); // Increased timeout to 10 seconds
       });
+
+      console.log("Creating export canvas...");
 
       // Create export canvas at original high resolution
       const exportCanvas = document.createElement("canvas");
@@ -497,6 +520,10 @@ const TextEditor: React.FC<TextEditorProps> = ({
         throw new Error("Failed to get export canvas context");
       }
 
+      console.log(
+        `Export canvas size: ${img.naturalWidth}x${img.naturalHeight}`
+      );
+
       // Draw the background image
       ctx.drawImage(img, 0, 0);
 
@@ -506,9 +533,13 @@ const TextEditor: React.FC<TextEditorProps> = ({
         .getObjects()
         .filter((obj: any) => obj.type === "textbox" || obj.type === "text");
 
+      console.log(`Found ${textObjects.length} text objects to export`);
+
       // Calculate scaling between display canvas and export canvas
       const scaleFactorX = img.naturalWidth / fabricCanvas.getWidth();
       const scaleFactorY = img.naturalHeight / fabricCanvas.getHeight();
+
+      console.log(`Scale factors: X=${scaleFactorX}, Y=${scaleFactorY}`);
       // Draw each text object with proper positioning
       textObjects.forEach((obj: any) => {
         // Scale position and size
@@ -560,30 +591,71 @@ const TextEditor: React.FC<TextEditorProps> = ({
         ctx.shadowBlur = 0;
         ctx.shadowOffsetX = 0;
         ctx.shadowOffsetY = 0;
+      }); // Convert canvas to blob for better browser compatibility
+      console.log("Converting canvas to downloadable format...");
+
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        exportCanvas.toBlob(
+          (blob) => {
+            if (blob) {
+              resolve(blob);
+            } else {
+              reject(new Error("Failed to create image blob"));
+            }
+          },
+          "image/png",
+          1.0
+        );
       });
 
-      // Convert canvas to data URL and trigger download
-      const dataURL = exportCanvas.toDataURL("image/png", 1.0);
+      // Create download using multiple fallback methods
       const filename = `wish-maker-${
         selectedImage?.occasion || "image"
       }-${Date.now()}.png`;
 
-      // Create link element
-      const link = document.createElement("a");
-      link.download = filename;
-      link.href = dataURL;
+      console.log(`Triggering download: ${filename}`);
 
-      // Use modern event dispatch approach instead of DOM manipulation
-      const clickEvent = new MouseEvent("click", {
-        view: window,
-        bubbles: false,
-        cancelable: true,
-      });
+      // Method 1: Try using URL.createObjectURL with programmatic click
+      try {
+        const blobUrl = URL.createObjectURL(blob);
 
-      // Dispatch the click event - no DOM insertion needed
-      link.dispatchEvent(clickEvent);
+        // Create a temporary link element
+        const link = document.createElement("a");
+        link.href = blobUrl;
+        link.download = filename;
+        link.style.display = "none";
 
-      console.log("Download completed successfully");
+        // Add to DOM, click, and remove
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        // Clean up blob URL after a delay
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+
+        console.log("Download triggered successfully using blob URL method");
+      } catch (blobError) {
+        console.warn(
+          "Blob URL method failed, trying data URL fallback:",
+          blobError
+        );
+
+        // Method 2: Fallback to data URL
+        const dataURL = exportCanvas.toDataURL("image/png", 1.0);
+
+        const link = document.createElement("a");
+        link.href = dataURL;
+        link.download = filename;
+        link.style.display = "none";
+
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        console.log("Download triggered using data URL fallback method");
+      }
+
+      console.log("Download process completed successfully");
     } catch (err) {
       console.error("Download error:", err);
       setError(
@@ -678,18 +750,40 @@ const TextEditor: React.FC<TextEditorProps> = ({
                 className="px-6 py-3 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors font-medium"
               >
                 ← Back{" "}
-              </button>
+              </button>{" "}
               {!loading && !error && canvasReady && (
                 <button
                   onClick={handleDownload}
                   disabled={loading}
-                  className={`px-6 py-3 rounded-lg font-medium transition-colors ${
+                  className={`px-6 py-3 rounded-lg font-medium transition-all duration-200 ${
                     loading
-                      ? "bg-green-400 cursor-not-allowed text-white"
-                      : "bg-green-600 hover:bg-green-700 text-white"
+                      ? "bg-green-400 cursor-not-allowed text-white animate-pulse"
+                      : "bg-green-600 hover:bg-green-700 text-white hover:scale-105 active:scale-95"
                   }`}
                 >
-                  {loading ? "Processing..." : "⬇️ Download"}
+                  {loading ? (
+                    <span className="flex items-center gap-2">
+                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                          fill="none"
+                        />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="m4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        />
+                      </svg>
+                      Downloading...
+                    </span>
+                  ) : (
+                    "⬇️ Download"
+                  )}
                 </button>
               )}
             </div>
@@ -863,13 +957,35 @@ const TextEditor: React.FC<TextEditorProps> = ({
             <button
               onClick={handleDownload}
               disabled={loading}
-              className={`flex-1 px-4 py-3 rounded-lg font-medium transition-colors ${
+              className={`flex-1 px-4 py-3 rounded-lg font-medium transition-all duration-200 ${
                 loading
-                  ? "bg-green-400 cursor-not-allowed text-white"
-                  : "bg-green-600 hover:bg-green-700 text-white"
+                  ? "bg-green-400 cursor-not-allowed text-white animate-pulse"
+                  : "bg-green-600 hover:bg-green-700 text-white hover:scale-105 active:scale-95"
               }`}
             >
-              {loading ? "⬇️..." : "⬇️ Download"}
+              {loading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                      fill="none"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="m4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    />
+                  </svg>
+                  Downloading...
+                </span>
+              ) : (
+                "⬇️ Download"
+              )}
             </button>
           )}
         </div>
