@@ -458,11 +458,23 @@ const TextEditor: React.FC<TextEditorProps> = ({
   const handleShadowToggle = (enabled: boolean) => {
     setTextShadow(enabled);
     updateTextProperties("shadow", enabled);
-  };
-  // Enhanced download function with better visual feedback and reliability
+  }; // Enhanced download function with better visual feedback and reliability
   const handleDownload = async () => {
+    // Multiple safety checks for canvas readiness
     if (!fabricCanvasRef.current) {
       setError("Canvas not ready for download. Please try refreshing.");
+      return;
+    }
+
+    if (!canvasReady) {
+      setError(
+        "Canvas is still initializing. Please wait a moment and try again."
+      );
+      return;
+    }
+
+    if (!selectedImage) {
+      setError("No image selected for download.");
       return;
     }
 
@@ -470,6 +482,13 @@ const TextEditor: React.FC<TextEditorProps> = ({
       setLoading(true);
       setError(""); // Clear any previous errors
       console.log("Starting enhanced download process");
+
+      // Verify canvas is still valid before proceeding
+      if (!fabricCanvasRef.current) {
+        throw new Error(
+          "Canvas became unavailable during download preparation"
+        );
+      }
 
       // Show immediate feedback
       console.log("Preparing download...");
@@ -522,13 +541,22 @@ const TextEditor: React.FC<TextEditorProps> = ({
 
       console.log(
         `Export canvas size: ${img.naturalWidth}x${img.naturalHeight}`
-      );
-
-      // Draw the background image
+      ); // Draw the background image
       ctx.drawImage(img, 0, 0);
 
-      // Get text from fabric canvas
+      // Final safety check before accessing fabric canvas
+      if (!fabricCanvasRef.current) {
+        throw new Error("Canvas became unavailable after image loading");
+      }
+
+      // Get text from fabric canvas with proper null checking
       const fabricCanvas = fabricCanvasRef.current;
+      if (!fabricCanvas) {
+        throw new Error(
+          "Fabric canvas became unavailable during download process"
+        );
+      }
+
       const textObjects = fabricCanvas
         .getObjects()
         .filter((obj: any) => obj.type === "textbox" || obj.type === "text");
