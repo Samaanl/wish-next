@@ -426,8 +426,10 @@ const TextEditor: React.FC<TextEditorProps> = ({
           "Canvas setup had issues, but controls are enabled. You may need to refresh if text editing doesn't work properly."
         );
       }
-    }, 10000); // 10 second fallback    return () => clearTimeout(fallbackTimeout);
-  }, [canvasReady, loading, error]);
+    }, 10000); // 10 second fallback
+
+    return () => clearTimeout(fallbackTimeout);
+  }, []); // Empty dependency array - only run once on mount
 
   // Component-level cleanup effect
   useEffect(() => {
