@@ -58,7 +58,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 }) => {
   const [currentUser, setCurrentUser] = useState<UserData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasInitialized, setHasInitialized] = useState(false);
   useEffect(() => {
+    // Only run once when component mounts
+    if (hasInitialized) return;
     const checkUser = async () => {
       // Only run in browser
       if (typeof window === "undefined") {
@@ -66,8 +69,51 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         return;
       }
 
+      // If we're on the magic link page, don't run auth checks
+      if (
+        typeof window !== "undefined" &&
+        window.location.pathname === "/auth/magic-link"
+      ) {
+        console.log("Skipping auth check - on magic link verification page");
+        setIsLoading(false);
+        setHasInitialized(true);
+        return;
+      }
+
       setIsLoading(true);
       try {
+        // Add rate limiting - check if we've made a request recently
+        const lastAuthCheck = localStorage.getItem("last_auth_check");
+        const now = Date.now();
+
+        // If we made an auth check in the last 10 seconds, skip this check
+        if (lastAuthCheck && now - parseInt(lastAuthCheck) < 10000) {
+          console.log("Skipping auth check - rate limited");
+          const guestUser = getGuestUser();
+          setCurrentUser(guestUser);
+          setIsLoading(false);
+          setHasInitialized(true);
+          return;
+        } // Also check if we're in the middle of a magic link verification
+        const magicLinkProcess = localStorage.getItem(
+          "last_magic_link_process"
+        );
+        const magicLinkVerifying = localStorage.getItem("magic_link_verifying");
+
+        if (
+          (magicLinkProcess && now - parseInt(magicLinkProcess) < 15000) ||
+          magicLinkVerifying
+        ) {
+          console.log(
+            "Skipping auth check - magic link verification in progress"
+          );
+          setIsLoading(false);
+          setHasInitialized(true);
+          return;
+        }
+
+        localStorage.setItem("last_auth_check", now.toString());
+
         // First try to get the stored user from localStorage
         const storedUserJson = localStorage.getItem("currentUser");
         let storedUser = null;
@@ -94,6 +140,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
               );
               setCurrentUser(appwriteUser);
               setIsLoading(false);
+              setHasInitialized(true);
               return;
             }
           } catch (error) {
@@ -105,6 +152,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           const newGuestUser = getGuestUser();
           setCurrentUser(newGuestUser);
           setIsLoading(false);
+          setHasInitialized(true);
           return;
         }
 
@@ -137,11 +185,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         setCurrentUser(guestUser);
       } finally {
         setIsLoading(false);
+        setHasInitialized(true);
       }
     };
 
     checkUser();
-  }, []);
+  }, []); // Remove dependencies to prevent re-runs
   const logOut = async () => {
     setIsLoading(true);
     try {
@@ -180,18 +229,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       setIsLoading(false);
     }
   };
-
   const verifyMagicLinkSession = async (userId: string, secret: string) => {
+    // Set a flag to prevent AuthContext from interfering
+    localStorage.setItem("magic_link_verifying", "true");
+
     setIsLoading(true);
     try {
       const user = await verifyMagicLink(userId, secret);
       if (user) {
         setCurrentUser(user);
+        // Clear the flag after successful verification
+        localStorage.removeItem("magic_link_verifying");
         return user;
       }
       throw new Error("Failed to verify magic link");
     } catch (error) {
       console.error("Error verifying magic link:", error);
+      // Clear the flag on error too
+      localStorage.removeItem("magic_link_verifying");
       throw error;
     } finally {
       setIsLoading(false);

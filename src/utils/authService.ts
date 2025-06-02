@@ -421,7 +421,16 @@ export const signInWithMagicLink = async (email: string) => {
 
 export const verifyMagicLink = async (userId: string, secret: string) => {
   try {
-    console.log("Verifying magic link session");
+    console.log("Verifying magic link session"); // Add rate limiting check - increased to 10 seconds to prevent rapid retries
+    const lastVerifyAttempt = localStorage.getItem("last_magic_link_verify");
+    const now = Date.now();
+
+    if (lastVerifyAttempt && now - parseInt(lastVerifyAttempt) < 10000) {
+      console.log("Rate limiting magic link verification attempt");
+      throw new Error("Please wait before trying again");
+    }
+
+    localStorage.setItem("last_magic_link_verify", now.toString());
 
     // Update the magic link session
     await account.updateMagicURLSession(userId, secret);
@@ -438,6 +447,12 @@ export const verifyMagicLink = async (userId: string, secret: string) => {
     throw new Error("Failed to get user after magic link verification");
   } catch (error: Error | unknown) {
     console.error("Magic link verification error:", error);
+
+    // If it's a rate limit error, provide a specific message
+    if (error instanceof Error && error.message.includes("Rate limit")) {
+      throw new Error("Too many attempts. Please wait a moment and try again.");
+    }
+
     throw error instanceof Error
       ? error
       : new Error("Failed to verify magic link");

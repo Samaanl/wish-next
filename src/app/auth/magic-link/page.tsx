@@ -8,25 +8,61 @@ import { useAuth } from "@/contexts/AuthContext";
 function MagicLinkContent() {
   const [status, setStatus] = useState("Processing...");
   const [isLoading, setIsLoading] = useState(true);
+  const [hasVerified, setHasVerified] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { verifyMagicLinkSession, updateCurrentUser } = useAuth();
+  const { verifyMagicLinkSession, updateCurrentUser, currentUser } = useAuth();
 
   useEffect(() => {
+    // Prevent multiple verification attempts with multiple checks
+    if (hasVerified || isProcessing) return;
+
+    // Check if we've already processed this verification recently
+    const lastVerification = localStorage.getItem("last_magic_link_process");
+    const now = Date.now();
+
+    if (lastVerification && now - parseInt(lastVerification) < 10000) {
+      console.log("Skipping magic link verification - processed recently");
+      setStatus("Already processed. Redirecting...");
+      setTimeout(() => router.push("/"), 2000);
+      setIsLoading(false);
+      return;
+    }
+
     const handleMagicLink = async () => {
+      if (isProcessing) return; // Double-check to prevent race conditions
+      setIsProcessing(true);
+
+      // Mark this verification attempt immediately
+      localStorage.setItem("last_magic_link_process", now.toString());
       try {
         const userId = searchParams.get("userId");
         const secret = searchParams.get("secret");
 
+        // Check if user is already authenticated
+        if (currentUser && !currentUser.isGuest) {
+          setStatus("You are already signed in! Redirecting...");
+          setTimeout(() => {
+            router.push("/");
+          }, 1500);
+          setIsLoading(false);
+          return;
+        }
+
         if (userId && secret) {
+          setHasVerified(true);
           setStatus("Verifying magic link...");
 
           // Verify the magic link
           const user = await verifyMagicLinkSession(userId, secret);
-
           if (user) {
             updateCurrentUser(user);
             setStatus("Authentication successful! Redirecting...");
+
+            // Clear all magic link flags
+            localStorage.removeItem("magic_link_verifying");
+            localStorage.removeItem("last_magic_link_process");
 
             // Try to go back to the original page or default to home
             const savedRedirect = localStorage.getItem("auth_redirect");
@@ -40,6 +76,8 @@ function MagicLinkContent() {
             }, 1500);
           } else {
             setStatus("Authentication failed. Please try again.");
+            // Clear flags on failure too
+            localStorage.removeItem("magic_link_verifying");
             setTimeout(() => {
               router.push("/");
             }, 3000);
@@ -52,17 +90,35 @@ function MagicLinkContent() {
         }
       } catch (error) {
         console.error("Magic link verification error:", error);
-        setStatus("Authentication failed. Please try again.");
+
+        // Handle specific error types
+        if (error instanceof Error) {
+          if (
+            error.message.includes("Rate limit") ||
+            error.message.includes("Too many attempts")
+          ) {
+            setStatus("Too many attempts. Please wait a moment and try again.");
+          } else if (error.message.includes("wait before trying")) {
+            setStatus("Please wait before trying again.");
+          } else {
+            setStatus("Authentication failed. Please try again.");
+          }
+        } else {
+          setStatus("Authentication failed. Please try again.");
+        }
         setTimeout(() => {
           router.push("/");
-        }, 3000);
+        }, 5000); // Give more time for rate limit errors
       } finally {
         setIsLoading(false);
+        setIsProcessing(false);
+        // Always clear flags when done
+        localStorage.removeItem("magic_link_verifying");
       }
     };
 
     handleMagicLink();
-  }, [router, searchParams, verifyMagicLinkSession, updateCurrentUser]);
+  }, []); // Remove all dependencies to run only once
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
