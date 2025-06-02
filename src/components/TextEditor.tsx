@@ -73,6 +73,7 @@ const TextEditor: React.FC<TextEditorProps> = ({
   const [fabric, setFabric] = useState<any>(null);
   const [canvasReady, setCanvasReady] = useState(false);
   const [setupAttempts, setSetupAttempts] = useState(0);
+  const [showCanvasLoading, setShowCanvasLoading] = useState(false);
 
   const colorOptions = [
     "#ffffff", // White
@@ -222,12 +223,7 @@ const TextEditor: React.FC<TextEditorProps> = ({
         `[_setupFabricCanvas] Starting for image: ${selectedImage.fullUrl}`
       );
       setError(null);
-
-      const editorContentLoadingElement = document.getElementById(
-        "editor-content-loading"
-      );
-      if (editorContentLoadingElement)
-        editorContentLoadingElement.style.display = "flex";
+      setShowCanvasLoading(true);
 
       imageLoadingTimeout = setTimeout(() => {
         if (isCanvasSetupMounted) {
@@ -358,8 +354,7 @@ const TextEditor: React.FC<TextEditorProps> = ({
         if (isCanvasSetupMounted) {
           console.log("[_setupFabricCanvas] Reached finally block.");
           if (imageLoadingTimeout) clearTimeout(imageLoadingTimeout);
-          if (editorContentLoadingElement)
-            editorContentLoadingElement.style.display = "none";
+          setShowCanvasLoading(false);
         }
       }
     };
@@ -656,24 +651,65 @@ const TextEditor: React.FC<TextEditorProps> = ({
           "image/png",
           1.0
         );
-      });
-
-      // Create download using blob URL (safer than data URL)
+      }); // Create download using blob URL (safer than data URL)
       const blobUrl = URL.createObjectURL(blob);
       const filename = `wish-maker-${
         selectedImage?.occasion || "image"
       }-${Date.now()}.png`;
 
-      // Create temporary download link
-      const link = document.createElement("a");
-      link.href = blobUrl;
-      link.download = filename;
+      // Use a safer download approach without DOM manipulation
+      try {
+        // Try using the modern File System Access API if available
+        if ("showSaveFilePicker" in window) {
+          const fileHandle = await (window as any).showSaveFilePicker({
+            suggestedName: filename,
+            types: [
+              {
+                description: "PNG images",
+                accept: { "image/png": [".png"] },
+              },
+            ],
+          });
+          const writable = await fileHandle.createWritable();
+          await writable.write(blob);
+          await writable.close();
+        } else {
+          // Fallback: use a React-friendly approach
+          const downloadUrl = blobUrl;
 
-      // Trigger download without DOM manipulation
-      link.style.display = "none";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+          // Use window.open instead of DOM manipulation
+          const downloadWindow = window.open(downloadUrl, "_blank");
+          if (downloadWindow) {
+            downloadWindow.onload = () => {
+              downloadWindow.close();
+            };
+          } else {
+            // Final fallback: direct blob download
+            const link = document.createElement("a");
+            link.href = blobUrl;
+            link.download = filename;
+
+            // Use click() in a React-safe way
+            const clickEvent = new MouseEvent("click", {
+              view: window,
+              bubbles: true,
+              cancelable: true,
+            });
+            link.dispatchEvent(clickEvent);
+          }
+        }
+      } catch (downloadError) {
+        console.warn(
+          "Advanced download failed, using basic method:",
+          downloadError
+        );
+
+        // Most basic fallback
+        const link = document.createElement("a");
+        link.href = blobUrl;
+        link.download = filename;
+        link.click();
+      }
 
       // Clean up blob URL
       setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
@@ -747,16 +783,15 @@ const TextEditor: React.FC<TextEditorProps> = ({
                   </div>
                 ) : (
                   <div className="relative w-full flex justify-center">
-                    <div
-                      id="editor-content-loading"
-                      className="absolute inset-0 flex flex-col justify-center items-center bg-white/80 dark:bg-gray-800/80 z-10"
-                      style={{ display: "none" }}
-                    >
-                      <div className="animate-spin rounded-full h-10 w-10 border-4 border-indigo-200 border-t-indigo-600"></div>
-                      <span className="text-gray-600 dark:text-gray-300 font-medium mt-3">
-                        Loading image...
-                      </span>
-                    </div>
+                    {" "}
+                    {showCanvasLoading && (
+                      <div className="absolute inset-0 flex flex-col justify-center items-center bg-white/80 dark:bg-gray-800/80 z-10">
+                        <div className="animate-spin rounded-full h-10 w-10 border-4 border-indigo-200 border-t-indigo-600"></div>
+                        <span className="text-gray-600 dark:text-gray-300 font-medium mt-3">
+                          Loading image...
+                        </span>
+                      </div>
+                    )}
                     <canvas
                       ref={canvasRef}
                       className="max-w-full h-auto rounded-lg shadow-sm border border-gray-200 dark:border-gray-600"

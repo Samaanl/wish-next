@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { motion } from "framer-motion";
 import {
   Occasion,
   OccasionImage,
@@ -232,13 +231,10 @@ const OptimizedImageGallery: React.FC<OptimizedImageGalleryProps> = ({
           const isLoaded = imageState?.loaded || false;
           const hasError = imageState?.error || false;
           const isLoading = imageState?.isLoading || false;
-
           return (
-            <motion.div
+            <div
               key={image.id}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="aspect-square rounded-lg overflow-hidden cursor-pointer hover:shadow-lg transition-shadow duration-200 relative"
+              className="aspect-square rounded-lg overflow-hidden cursor-pointer hover:shadow-lg transition-all duration-200 relative hover:scale-105 active:scale-95"
               onClick={() => handleImageClick(image)}
             >
               {/* Base image - always clickable */}
@@ -276,7 +272,7 @@ const OptimizedImageGallery: React.FC<OptimizedImageGalleryProps> = ({
                   ✓
                 </div>
               )}
-            </motion.div>
+            </div>
           );
         })}
       </div>

@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect } from "react";
-import { motion } from "framer-motion";
 
 interface FastImageProps {
   thumbnailUrl: string;
@@ -205,16 +204,14 @@ const FastImage: React.FC<FastImageProps> = ({
       className={`relative overflow-hidden ${className}`}
       onClick={handleClick}
     >
-      <motion.img
+      {" "}
+      <img
         src={currentSrc}
         alt={alt}
-        className="w-full h-full object-cover"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.3 }}
+        className="w-full h-full object-cover transition-opacity duration-300"
         loading="lazy"
+        style={{ opacity: loadedSrc === currentSrc ? 1 : 0.8 }}
       />
-
       {/* Upgrading indicator */}
       {isUpgrading && (
         <div className="absolute top-2 right-2 bg-black bg-opacity-60 text-white text-xs px-2 py-1 rounded flex items-center">
@@ -222,7 +219,6 @@ const FastImage: React.FC<FastImageProps> = ({
           Upgrading
         </div>
       )}
-
       {/* Quality indicator */}
       {loadedSrc && !isUpgrading && loadHighQuality && (
         <div className="absolute bottom-2 right-2 bg-black bg-opacity-60 text-white text-xs px-2 py-1 rounded">
