@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import { imageLoadingManager } from "../utils/imageService";
 
 interface ProgressiveImageProps {
@@ -293,24 +292,28 @@ const ProgressiveImage: React.FC<ProgressiveImageProps> = ({
       </div>
     );
   }
-
   return (
     <div
       className={`relative overflow-hidden ${className}`}
       onClick={handleClick}
     >
-      <AnimatePresence mode="wait">
-        <motion.img
-          key={currentSrc}
-          src={currentSrc}
-          alt={alt}
-          className="w-full h-full object-cover"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.3 }}
-        />
-      </AnimatePresence>
+      {/* Single img element with smooth transitions via CSS */}
+      <img
+        src={currentSrc}
+        alt={alt}
+        className="w-full h-full object-cover transition-opacity duration-300"
+        style={{
+          opacity: isLoading ? 0.7 : 1,
+          background: isLoading ? "#f3f4f6" : "transparent",
+        }}
+      />
+
+      {/* Loading spinner overlay - only show initially */}
+      {isLoading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-100 bg-opacity-75">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+        </div>
+      )}
 
       {/* Priority indicator */}
       {imageId && imageLoadingManager.hasPriority(imageId) && (
