@@ -7,6 +7,7 @@ import {
   getDummyImagesForOccasion,
 } from "@/utils/imageService";
 import LoadingAnimation from "./LoadingAnimation";
+import ProgressiveImage from "./ProgressiveImage";
 
 interface ImageGalleryProps {
   occasion: Occasion;
@@ -37,7 +38,7 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({
         // Check if we got dummy images
         if (
           occasionImages.length > 0 &&
-          occasionImages[0].previewUrl.includes("placehold.co")
+          occasionImages[0].thumbnailUrl.includes("placehold.co")
         ) {
           setUseDummyImages(true);
           setError(
@@ -78,6 +79,7 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({
         <p className="text-red-500 mb-4">{error}</p>
         {useDummyImages && images.length > 0 ? (
           <>
+            {" "}
             <p className="text-gray-500 dark:text-gray-400 mb-4">
               Showing placeholder images:
             </p>
@@ -88,12 +90,16 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   className="aspect-square rounded-lg overflow-hidden cursor-pointer hover:shadow-lg transition-shadow duration-200"
-                  onClick={() => onSelectImage(image)}
                 >
-                  <img
-                    src={image.previewUrl}
+                  <ProgressiveImage
+                    thumbnailUrl={image.thumbnailUrl}
+                    previewUrl={image.previewUrl}
+                    mediumUrl={image.mediumUrl}
+                    fullUrl={image.fullUrl}
                     alt={`${occasion.name} template`}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full"
+                    onClick={() => onSelectImage(image)}
+                    imageId={image.id}
                   />
                 </motion.div>
               ))}
@@ -123,10 +129,10 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({
 
   return (
     <div className="w-full">
+      {" "}
       <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-4">
         Choose an Image for {occasion.name}
       </h3>
-
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
         {images.map((image) => (
           <motion.div
@@ -134,12 +140,16 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             className="aspect-square rounded-lg overflow-hidden cursor-pointer hover:shadow-lg transition-shadow duration-200"
-            onClick={() => onSelectImage(image)}
           >
-            <img
-              src={image.previewUrl}
+            <ProgressiveImage
+              thumbnailUrl={image.thumbnailUrl}
+              previewUrl={image.previewUrl}
+              mediumUrl={image.mediumUrl}
+              fullUrl={image.fullUrl}
               alt={`${occasion.name} template`}
-              className="w-full h-full object-cover"
+              className="w-full h-full"
+              onClick={() => onSelectImage(image)}
+              imageId={image.id}
             />
           </motion.div>
         ))}

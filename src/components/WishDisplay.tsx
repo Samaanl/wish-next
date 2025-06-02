@@ -7,7 +7,8 @@ import {
   CloudArrowUpIcon,
 } from "@heroicons/react/24/outline";
 import OccasionSelector from "./OccasionSelector";
-import ImageGallery from "./ImageGallery";
+import OptimizedImageGallery from "./OptimizedImageGallery";
+import ImageErrorBoundary from "./ImageErrorBoundary";
 import TextEditor from "./TextEditor";
 import { Occasion, OccasionImage, uploadWishImage } from "@/utils/imageService";
 
@@ -219,22 +220,25 @@ export default function WishDisplay({
     if (selectedImage && selectedOccasion) {
       return (
         <div className="w-full max-w-4xl mx-auto">
-          <TextEditor
-            wish={wishText}
-            selectedImage={selectedImage}
-            onBack={handleBackToOccasion}
-          />
+          <ImageErrorBoundary>
+            <TextEditor
+              wish={wishText}
+              selectedImage={selectedImage}
+              onBack={handleBackToOccasion}
+            />
+          </ImageErrorBoundary>
         </div>
       );
     }
-
     if (selectedOccasion) {
       return (
         <div className="w-full max-w-4xl mx-auto">
-          <ImageGallery
-            occasion={selectedOccasion}
-            onSelectImage={handleSelectImage}
-          />
+          <ImageErrorBoundary>
+            <OptimizedImageGallery
+              occasion={selectedOccasion}
+              onSelectImage={handleSelectImage}
+            />
+          </ImageErrorBoundary>
           <div className="flex justify-center mt-6">
             <button
               onClick={() => setSelectedOccasion(null)}

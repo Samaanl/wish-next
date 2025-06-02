@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { OccasionImage, getImageById } from "@/utils/imageService";
 import { motion } from "framer-motion";
+import ProgressiveImage from "./ProgressiveImage";
 
 interface SavedWishImageProps {
   imageId: string;
@@ -49,7 +50,6 @@ const SavedWishImage: React.FC<SavedWishImageProps> = ({
       </div>
     );
   }
-
   return (
     <motion.div
       whileHover={{ scale: 1.05 }}
@@ -57,10 +57,16 @@ const SavedWishImage: React.FC<SavedWishImageProps> = ({
       className="aspect-square rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-shadow duration-200"
       onClick={() => onSelect && onSelect(image)}
     >
-      <img
-        src={image.previewUrl}
+      {" "}
+      <ProgressiveImage
+        thumbnailUrl={image.thumbnailUrl}
+        previewUrl={image.previewUrl}
+        mediumUrl={image.mediumUrl}
+        fullUrl={image.fullUrl}
         alt={`Saved wish for ${image.occasion}`}
-        className="w-full h-full object-cover"
+        className="w-full h-full"
+        onClick={() => onSelect && onSelect(image)}
+        imageId={image.id}
       />
     </motion.div>
   );
