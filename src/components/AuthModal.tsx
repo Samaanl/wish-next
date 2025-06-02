@@ -32,7 +32,7 @@ const AuthModal: React.FC<AuthModalProps> = ({
     }
   }, [isOpen]);
 
-  // Don't render anything if not open
+  // Don't render anything if not open test
   if (!isOpen) return null;
   console.log("Rendering AuthModal component");
   const handleGoogleSignIn = async () => {
