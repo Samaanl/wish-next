@@ -131,10 +131,11 @@ const TextEditor: React.FC<TextEditorProps> = ({
     "Lucida Sans",
     "Tahoma",
     "Verdana",
-  ];
-  // Load fabric.js
+  ]; // Load fabric.js
   useEffect(() => {
     console.log("[FabricLoaderEffect] Initializing fabric load.");
+    mountedRef.current = true; // Ensure mounted state is set
+
     loadFabric()
       .then((fabricInstance) => {
         if (mountedRef.current) {
@@ -153,7 +154,9 @@ const TextEditor: React.FC<TextEditorProps> = ({
           setLoading(false);
         }
       });
+
     return () => {
+      console.log("[FabricLoaderEffect] Cleanup - setting mountedRef to false");
       mountedRef.current = false;
     };
   }, []);
@@ -360,29 +363,58 @@ const TextEditor: React.FC<TextEditorProps> = ({
       }
     };
     _setupFabricCanvas();
+
     return () => {
-      mountedRef.current = false;
-      if (imageLoadingTimeout) clearTimeout(imageLoadingTimeout);
       console.log(
-        "[CanvasSetupEffect] Cleanup. Disposing fabric canvas if it exists."
+        "[CanvasSetupEffect] Cleanup - disposing fabric canvas if it exists."
       );
+      if (imageLoadingTimeout) clearTimeout(imageLoadingTimeout);
       if (fabricCanvasRef.current) {
         fabricCanvasRef.current.dispose();
         fabricCanvasRef.current = null;
       }
       setCanvasReady(false);
     };
-  }, [
-    fabric,
-    selectedImage,
-    loading,
-    wish,
-    fontSize,
-    fontFamily,
-    textColor,
-    textShadow,
-    setupAttempts,
-  ]); // Fallback to enable controls if canvas setup is taking too long
+  }, [fabric, selectedImage, loading, wish, setupAttempts]); // Removed text style properties to prevent canvas recreation
+
+  // Separate effect for updating text properties without recreating canvas
+  useEffect(() => {
+    if (!canvasReady || !fabricCanvasRef.current) {
+      return;
+    }
+
+    console.log(
+      "[TextPropertiesEffect] Updating text properties without canvas recreation"
+    );
+
+    // Find and update text object
+    const objects = fabricCanvasRef.current.getObjects();
+    const textObject = objects.find((obj: any) => obj.type === "textbox");
+
+    if (textObject) {
+      // Update text properties
+      textObject.set({
+        fontSize: fontSize,
+        fontFamily: fontFamily,
+        fill: textColor,
+        shadow: textShadow
+          ? new fabric.Shadow({
+              color: "rgba(0,0,0,0.6)",
+              blur: 5,
+              offsetX: 2,
+              offsetY: 2,
+            })
+          : null,
+      });
+
+      fabricCanvasRef.current.renderAll();
+      console.log(
+        "[TextPropertiesEffect] Text properties updated successfully"
+      );
+    }
+  }, [fontSize, fontFamily, textColor, textShadow, canvasReady, fabric]);
+
+  // Fallback to enable controls if canvas setup is taking too long
   useEffect(() => {
     const fallbackTimeout = setTimeout(() => {
       if (!canvasReady && !loading && !error) {
@@ -394,10 +426,16 @@ const TextEditor: React.FC<TextEditorProps> = ({
           "Canvas setup had issues, but controls are enabled. You may need to refresh if text editing doesn't work properly."
         );
       }
-    }, 10000); // 10 second fallback
-
-    return () => clearTimeout(fallbackTimeout);
+    }, 10000); // 10 second fallback    return () => clearTimeout(fallbackTimeout);
   }, [canvasReady, loading, error]);
+
+  // Component-level cleanup effect
+  useEffect(() => {
+    return () => {
+      console.log("[TextEditor] Component unmounting - final cleanup");
+      mountedRef.current = false;
+    };
+  }, []);
 
   // Apply changes when text properties change
   const updateTextProperties = (property: string, value: any) => {
@@ -442,29 +480,28 @@ const TextEditor: React.FC<TextEditorProps> = ({
       fabricCanvasRef.current.renderAll();
     }
   };
-
   // Handle color changes
   const handleColorChange = (color: string) => {
     setTextColor(color);
-    updateTextProperties("fill", color);
+    // Text will be updated by the useEffect for text properties
   };
 
   // Handle font size changes
   const handleFontSizeChange = (size: number) => {
     setFontSize(size);
-    updateTextProperties("fontSize", size);
+    // Text will be updated by the useEffect for text properties
   };
 
   // Handle font family changes
   const handleFontFamilyChange = (family: string) => {
     setFontFamily(family);
-    updateTextProperties("fontFamily", family);
+    // Text will be updated by the useEffect for text properties
   };
 
   // Handle shadow toggle
   const handleShadowToggle = (enabled: boolean) => {
     setTextShadow(enabled);
-    updateTextProperties("shadow", enabled);
+    // Text will be updated by the useEffect for text properties
   };
   // Safe download function that avoids all DOM manipulation and canvas access errors
   const handleDownload = async () => {
