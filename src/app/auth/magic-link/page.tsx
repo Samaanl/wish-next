@@ -1,15 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 
-export default function MagicLinkPage() {
+// Component that uses useSearchParams - needs to be wrapped in Suspense
+function MagicLinkContent() {
   const [status, setStatus] = useState("Processing...");
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
   const searchParams = useSearchParams();
   const { verifyMagicLinkSession, updateCurrentUser } = useAuth();
+
   useEffect(() => {
     const handleMagicLink = async () => {
       try {
@@ -88,5 +90,33 @@ export default function MagicLinkPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+// Loading fallback component
+function MagicLinkLoading() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-100">
+      <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full">
+        <div className="text-center">
+          <h2 className="text-2xl font-semibold mb-4">
+            Magic Link Authentication
+          </h2>
+          <div className="animate-pulse mb-4">
+            <div className="w-16 h-16 bg-blue-200 rounded-full mx-auto mb-4"></div>
+          </div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Main page component with Suspense wrapper
+export default function MagicLinkPage() {
+  return (
+    <Suspense fallback={<MagicLinkLoading />}>
+      <MagicLinkContent />
+    </Suspense>
   );
 }
