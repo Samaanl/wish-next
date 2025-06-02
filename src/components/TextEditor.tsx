@@ -2,7 +2,7 @@ import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   OccasionImage,
   downloadImage,
-  downloadImageProgressively,
+  downloadImageForEditor,
 } from "@/utils/imageService";
 import FastImage from "./FastImage";
 import dynamic from "next/dynamic";
@@ -255,10 +255,9 @@ const TextEditor: React.FC<TextEditorProps> = ({
         console.log(
           `[_setupFabricCanvas] Downloading image progressively: ${selectedImage.fullUrl}`
         );
-
-        const imgHtmlElement = await downloadImageProgressively(
+        const imgHtmlElement = await downloadImageForEditor(
           selectedImage,
-          (progress) => {
+          (progress: number) => {
             console.log(`[TextEditor] Image loading progress: ${progress}%`);
           }
         );

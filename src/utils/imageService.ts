@@ -362,6 +362,64 @@ export const uploadWishImage = async (
   }
 };
 
+// Simple image download function for TextEditor - no progressive loading
+export const downloadImageForEditor = async (
+  image: OccasionImage,
+  onProgress?: (progress: number) => void
+): Promise<HTMLImageElement> => {
+  console.log(`Simple download for TextEditor: ${image.id}`);
+
+  onProgress?.(10);
+
+  try {
+    // For TextEditor, we only need medium quality (600x600) which should be fast enough
+    // and provides good quality for editing
+    const targetUrl = image.mediumUrl;
+    console.log(`Loading image for editor: ${targetUrl}`);
+
+    onProgress?.(50);
+
+    // Use the cached download function with reduced timeout
+    const img = await downloadImage(targetUrl);
+
+    onProgress?.(100);
+    console.log("Image loaded successfully for editor");
+
+    return img;
+  } catch (error) {
+    console.warn("Medium quality failed, falling back to preview quality");
+    onProgress?.(70);
+
+    try {
+      // Fallback to preview quality (300x300)
+      const img = await downloadImage(image.previewUrl);
+      onProgress?.(100);
+      console.log("Preview quality loaded as fallback for editor");
+      return img;
+    } catch (fallbackError) {
+      console.error(
+        "Both medium and preview failed for editor:",
+        fallbackError
+      );
+
+      // Last resort: thumbnail
+      try {
+        onProgress?.(90);
+        const img = await downloadImage(image.thumbnailUrl);
+        onProgress?.(100);
+        console.log("Using thumbnail as last resort for editor");
+        return img;
+      } catch (thumbnailError) {
+        console.error(
+          "Complete failure to load any image quality:",
+          thumbnailError
+        );
+        throw new Error("Failed to load image for editor");
+      }
+    }
+  }
+};
+
 // Progressive image download function for TextEditor
 export const downloadImageProgressively = async (
   image: OccasionImage,
