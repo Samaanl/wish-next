@@ -560,59 +560,78 @@ const TextEditor: React.FC<TextEditorProps> = ({
       const textObjects = fabricCanvas
         .getObjects()
         .filter((obj: any) => obj.type === "textbox" || obj.type === "text");
-
       console.log(`Found ${textObjects.length} text objects to export`);
+
+      // Log detailed information about text objects
+      textObjects.forEach((obj: any, index: number) => {
+        console.log(`Text object ${index}:`, {
+          text: obj.text,
+          left: obj.left,
+          top: obj.top,
+          fontSize: obj.fontSize,
+          originX: obj.originX,
+          originY: obj.originY,
+          width: obj.width,
+          height: obj.height,
+        });
+      });
 
       // Calculate scaling between display canvas and export canvas
       const scaleFactorX = img.naturalWidth / fabricCanvas.getWidth();
       const scaleFactorY = img.naturalHeight / fabricCanvas.getHeight();
 
-      console.log(`Scale factors: X=${scaleFactorX}, Y=${scaleFactorY}`);
-      // Draw each text object with proper positioning
+      console.log(
+        `Canvas dimensions - Display: ${fabricCanvas.getWidth()}x${fabricCanvas.getHeight()}, Export: ${
+          img.naturalWidth
+        }x${img.naturalHeight}`
+      );
+      console.log(`Scale factors: X=${scaleFactorX}, Y=${scaleFactorY}`); // Draw each text object with proper positioning
       textObjects.forEach((obj: any) => {
-        // Scale position and size
-        const fontSize = obj.fontSize * Math.min(scaleFactorX, scaleFactorY);
+        // Scale position and size uniformly to maintain proportions
+        const scaleFactor = Math.min(scaleFactorX, scaleFactorY);
+        const fontSize = obj.fontSize * scaleFactor;
         const fontFamily = obj.fontFamily || "Arial";
         const fill = obj.fill || "#ffffff";
 
-        // Set up text rendering
+        // Set up text rendering - match fabric.js exactly
         ctx.font = `${fontSize}px ${fontFamily}`;
         ctx.fillStyle = fill;
-        ctx.textAlign = obj.textAlign || "center";
-        ctx.textBaseline = "middle"; // Important: fabric.js uses middle baseline by default
 
-        // Handle shadow
+        // fabric.js textAlign property affects internal text alignment, not canvas context
+        // Always use center alignment for canvas context since fabric uses center origin
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+
+        // Handle shadow - scale shadow properties
         if (obj.shadow) {
           ctx.shadowColor = obj.shadow.color || "rgba(0,0,0,0.6)";
-          ctx.shadowBlur =
-            (obj.shadow.blur || 5) * Math.min(scaleFactorX, scaleFactorY);
-          ctx.shadowOffsetX = (obj.shadow.offsetX || 2) * scaleFactorX;
-          ctx.shadowOffsetY = (obj.shadow.offsetY || 2) * scaleFactorY;
+          ctx.shadowBlur = (obj.shadow.blur || 5) * scaleFactor;
+          ctx.shadowOffsetX = (obj.shadow.offsetX || 2) * scaleFactor;
+          ctx.shadowOffsetY = (obj.shadow.offsetY || 2) * scaleFactor;
         }
 
-        // Position text - fabric.js text objects use center origin by default
-        // We need to respect the originX and originY properties
+        // Get fabric object's actual rendered position and scale it
+        // fabric.js left/top represent the center point when originX/Y are "center"
         let x = obj.left * scaleFactorX;
         let y = obj.top * scaleFactorY;
 
-        // Adjust for fabric.js origin handling
-        if (obj.originX === "center") {
-          ctx.textAlign = "center";
-        } else if (obj.originX === "left") {
-          ctx.textAlign = "left";
-        } else if (obj.originX === "right") {
-          ctx.textAlign = "right";
-        }
+        // Handle text that may span multiple lines (Textbox can wrap)
+        const textLines = obj.text ? obj.text.split("\n") : [wish];
+        const lineHeight = fontSize * 1.2; // Standard line height multiplier
 
-        // fabric.js handles originY with baseline, we're using middle baseline
-        // so center origin is already handled correctly
+        // Calculate starting Y position for multi-line text
+        const totalTextHeight = textLines.length * lineHeight;
+        let startY = y - (totalTextHeight - lineHeight) / 2;
 
         console.log(
-          `Drawing text: "${obj.text}" at (${x}, ${y}), fontSize: ${fontSize}px`
+          `Drawing ${textLines.length} lines at scaled position (${x}, ${y}), fontSize: ${fontSize}px`
         );
 
-        // Draw text
-        ctx.fillText(obj.text || wish, x, y);
+        // Draw each line of text
+        textLines.forEach((line: string, index: number) => {
+          const currentY = startY + index * lineHeight;
+          ctx.fillText(line.trim(), x, currentY);
+        });
 
         // Reset shadow
         ctx.shadowColor = "transparent";
