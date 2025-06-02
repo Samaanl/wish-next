@@ -310,6 +310,47 @@ const TextEditor: React.FC<TextEditorProps> = ({
         const text = new fabric.Textbox(wish, textOptions);
         newCanvas.add(text);
         newCanvas.setActiveObject(text);
+
+        // Add event listeners to sync fabric object changes with React state
+        newCanvas.on("object:scaling", (e: any) => {
+          const obj = e.target;
+          if (obj && obj.type === "textbox") {
+            // When scaling, fabric.js changes scaleX and scaleY, we need to update the fontSize accordingly
+            const newFontSize = Math.round(obj.fontSize * obj.scaleY);
+            console.log(
+              `Text scaled: original fontSize ${obj.fontSize}, scale ${obj.scaleY}, new effective fontSize ${newFontSize}`
+            );
+            setFontSize(newFontSize);
+          }
+        });
+
+        newCanvas.on("object:modified", (e: any) => {
+          const obj = e.target;
+          if (obj && obj.type === "textbox") {
+            // After modification (scaling, rotating, etc.), sync all properties
+            console.log("Text object modified:", {
+              fontSize: obj.fontSize,
+              scaleX: obj.scaleX,
+              scaleY: obj.scaleY,
+              effectiveFontSize: Math.round(obj.fontSize * obj.scaleY),
+            });
+
+            // Update state to reflect the current object properties
+            const effectiveFontSize = Math.round(obj.fontSize * obj.scaleY);
+            setFontSize(effectiveFontSize);
+            setTextColor(obj.fill);
+            setFontFamily(obj.fontFamily);
+            setTextShadow(!!obj.shadow);
+          }
+        });
+
+        newCanvas.on("text:changed", (e: any) => {
+          const obj = e.target;
+          if (obj && obj.type === "textbox") {
+            console.log("Text content changed:", obj.text);
+          }
+        });
+
         newCanvas.renderAll();
         setCanvasReady(true);
         setSetupAttempts(0); // Reset attempts on success
@@ -430,7 +471,19 @@ const TextEditor: React.FC<TextEditorProps> = ({
         }
       } else {
         // For other properties like color, fontSize, fontFamily
-        activeObject.set({ [property]: value });
+        if (property === "fontSize") {
+          // When setting fontSize programmatically, reset any scaling
+          activeObject.set({
+            [property]: value,
+            scaleX: 1,
+            scaleY: 1,
+          });
+          console.log(
+            `Font size changed programmatically to ${value}px, resetting scale to 1`
+          );
+        } else {
+          activeObject.set({ [property]: value });
+        }
       }
 
       fabricCanvasRef.current.renderAll();
@@ -592,30 +645,36 @@ const TextEditor: React.FC<TextEditorProps> = ({
           img.naturalWidth
         }x${img.naturalHeight}`
       );
-      console.log(`Scale factors: X=${scaleFactorX}, Y=${scaleFactorY}`);
-
-      // Draw each text object with proper positioning and text wrapping
+      console.log(`Scale factors: X=${scaleFactorX}, Y=${scaleFactorY}`); // Draw each text object with proper positioning and text wrapping
       textObjects.forEach((obj: any, index: number) => {
-        // Use separate scale factors for position and font size to maintain exact positioning
-        const fontSize = obj.fontSize * scaleFactorY; // Use Y scale for font size
+        // Calculate effective font size considering both fontSize and scale transforms
+        // When users resize text by dragging corners, fabric.js applies scaleY transform
+        const effectiveFontSize = obj.fontSize * (obj.scaleY || 1);
+        const fontSize = effectiveFontSize * scaleFactorY; // Then scale for export canvas
         const fontFamily = obj.fontFamily || "Arial";
         const fill = obj.fill || "#ffffff";
+
+        console.log(`Text object ${index} scaling info:`, {
+          originalFontSize: obj.fontSize,
+          scaleY: obj.scaleY || 1,
+          effectiveFontSize: effectiveFontSize,
+          exportFontSize: fontSize,
+        });
 
         // Set up text rendering
         ctx.font = `${fontSize}px ${fontFamily}`;
         ctx.fillStyle = fill;
         ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-
-        // Handle shadow - scale shadow properties using Y scale factor
+        ctx.textBaseline = "middle"; // Handle shadow - scale shadow properties using effective scale factor
         if (obj.shadow) {
           ctx.shadowColor = obj.shadow.color || "rgba(0,0,0,0.6)";
-          ctx.shadowBlur = (obj.shadow.blur || 5) * scaleFactorY;
+          // Scale shadow properties considering both object scale and export scale
+          const shadowScale = (obj.scaleY || 1) * scaleFactorY;
+          ctx.shadowBlur = (obj.shadow.blur || 5) * shadowScale;
           ctx.shadowOffsetX = (obj.shadow.offsetX || 2) * scaleFactorX;
-          ctx.shadowOffsetY = (obj.shadow.offsetY || 2) * scaleFactorY;
-        }
-
-        // Scale position using separate X and Y factors to maintain exact positioning
+          ctx.shadowOffsetY = (obj.shadow.offsetY || 2) * shadowScale;
+        } // Scale position using separate X and Y factors to maintain exact positioning
+        // Account for object scaling when calculating position
         let x = obj.left * scaleFactorX;
         let y = obj.top * scaleFactorY; // Get text content, with fallback to the original wish text
         const textContent = obj.text || wish || "";
@@ -626,13 +685,17 @@ const TextEditor: React.FC<TextEditorProps> = ({
           return;
         } // Calculate the scaled width for text wrapping (matching fabric's textbox width)
         // If obj.width is not set, use 80% of canvas width as fallback
-        const maxWidth =
-          obj.width && obj.width > 0
-            ? obj.width * scaleFactorX
-            : img.naturalWidth * 0.8;
-
+        // Account for object scaling when calculating text width
+        const effectiveWidth =
+          (obj.width || (img.naturalWidth * 0.8) / scaleFactorX) *
+          (obj.scaleX || 1);
+        const maxWidth = effectiveWidth * scaleFactorX;
         console.log(
-          `Text object ${index} - Content: "${textContent}", Max width: ${maxWidth}px`
+          `Text object ${index} - Content: "${textContent}", Original width: ${
+            obj.width
+          }, Scale X: ${
+            obj.scaleX || 1
+          }, Effective width: ${effectiveWidth}, Max width: ${maxWidth}px`
         );
 
         // Advanced text wrapping that matches Fabric.js Textbox behavior
