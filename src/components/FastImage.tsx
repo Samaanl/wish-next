@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+import { motion } from "framer-motion";
 
 interface FastImageProps {
   thumbnailUrl: string;
@@ -183,10 +184,11 @@ const FastImage: React.FC<FastImageProps> = ({
       onClick();
     }
   };
-
   if (hasError) {
     return (
-      <div
+      <motion.div
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
         className={`bg-gray-200 dark:bg-gray-700 flex items-center justify-center ${className}`}
         onClick={handleClick}
       >
@@ -195,16 +197,16 @@ const FastImage: React.FC<FastImageProps> = ({
           <div className="text-sm">Failed to load</div>
           <div className="text-xs text-gray-400 mt-1">Click to continue</div>
         </div>
-      </div>
+      </motion.div>
     );
   }
-
   return (
-    <div
+    <motion.div
+      whileHover={{ scale: 1.05 }}
+      whileTap={{ scale: 0.95 }}
       className={`relative overflow-hidden ${className}`}
       onClick={handleClick}
     >
-      {" "}
       <img
         src={currentSrc}
         alt={alt}
@@ -231,7 +233,7 @@ const FastImage: React.FC<FastImageProps> = ({
             : "LQ"}
         </div>
       )}
-    </div>
+    </motion.div>
   );
 };
 

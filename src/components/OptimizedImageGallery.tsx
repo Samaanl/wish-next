@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 import {
   Occasion,
   OccasionImage,
@@ -216,15 +217,13 @@ const OptimizedImageGallery: React.FC<OptimizedImageGalleryProps> = ({
       <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-4">
         Choose an Image for {occasion.name}
       </h3>
-
       {error && useDummyImages && (
         <div className="mb-4 p-3 bg-yellow-100 dark:bg-yellow-900/20 rounded-lg text-sm border border-yellow-200 dark:border-yellow-800">
           <p className="text-yellow-800 dark:text-yellow-200">
             {error} Gallery remains functional with placeholder images.
           </p>
         </div>
-      )}
-
+      )}{" "}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
         {images.map((image) => {
           const imageState = imageStates.get(image.id);
@@ -232,9 +231,11 @@ const OptimizedImageGallery: React.FC<OptimizedImageGalleryProps> = ({
           const hasError = imageState?.error || false;
           const isLoading = imageState?.isLoading || false;
           return (
-            <div
+            <motion.div
               key={image.id}
-              className="aspect-square rounded-lg overflow-hidden cursor-pointer hover:shadow-lg transition-all duration-200 relative hover:scale-105 active:scale-95"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="aspect-square rounded-lg overflow-hidden cursor-pointer hover:shadow-lg transition-all duration-200 relative"
               onClick={() => handleImageClick(image)}
             >
               {/* Base image - always clickable */}
@@ -272,11 +273,10 @@ const OptimizedImageGallery: React.FC<OptimizedImageGalleryProps> = ({
                   ✓
                 </div>
               )}
-            </div>
+            </motion.div>
           );
         })}
       </div>
-
       {images.length === 0 && (
         <div className="text-center py-12">
           <p className="text-gray-500 dark:text-gray-400">
