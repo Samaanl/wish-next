@@ -8,6 +8,8 @@ import {
   createGuestUser,
   getGuestUser,
   GUEST_USER_KEY,
+  signInWithMagicLink,
+  verifyMagicLink,
 } from "@/utils/authService";
 import { shouldUseAppwrite } from "@/utils/appwrite";
 
@@ -16,6 +18,8 @@ interface AuthContextType {
   isLoading: boolean;
   logOut: () => Promise<boolean>;
   signInAnon: () => Promise<UserData | null>;
+  signInMagicLink: (email: string) => Promise<boolean>;
+  verifyMagicLinkSession: (userId: string, secret: string) => Promise<UserData>;
   updateCurrentUser: (user: UserData) => void;
   refreshUserCredits: () => Promise<void>;
   refreshUserSession: () => Promise<UserData | null>;
@@ -28,6 +32,14 @@ const AuthContext = createContext<AuthContextType>({
   signInAnon: async () => {
     throw new Error("Not implemented");
     return null;
+  },
+  signInMagicLink: async () => {
+    throw new Error("Not implemented");
+    return false;
+  },
+  verifyMagicLinkSession: async () => {
+    throw new Error("Not implemented");
+    return null as any;
   },
   updateCurrentUser: () => {},
   refreshUserCredits: async () => {
@@ -145,13 +157,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       setIsLoading(false);
     }
   };
-
   const signInAnon = async () => {
     setIsLoading(true);
     try {
       const user = await signInAnonymously();
       setCurrentUser(user);
       return user;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const signInMagicLink = async (email: string) => {
+    setIsLoading(true);
+    try {
+      const result = await signInWithMagicLink(email);
+      return result;
+    } catch (error) {
+      console.error("Error sending magic link:", error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const verifyMagicLinkSession = async (userId: string, secret: string) => {
+    setIsLoading(true);
+    try {
+      const user = await verifyMagicLink(userId, secret);
+      if (user) {
+        setCurrentUser(user);
+        return user;
+      }
+      throw new Error("Failed to verify magic link");
+    } catch (error) {
+      console.error("Error verifying magic link:", error);
+      throw error;
     } finally {
       setIsLoading(false);
     }
@@ -268,6 +309,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     isLoading,
     logOut,
     signInAnon,
+    signInMagicLink,
+    verifyMagicLinkSession,
     updateCurrentUser,
     refreshUserCredits,
     refreshUserSession,

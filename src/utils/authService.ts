@@ -1,6 +1,7 @@
 import {
   account,
   databases,
+  functions,
   ID,
   DATABASE_ID,
   USERS_COLLECTION_ID,
@@ -375,5 +376,70 @@ export const checkAppwriteConnection = async (): Promise<boolean> => {
 
     console.error("Appwrite connection test failed:", error);
     return false;
+  }
+};
+
+// Magic Link Authentication Functions
+export const signInWithMagicLink = async (email: string) => {
+  try {
+    console.log("Creating magic link session for:", email);
+
+    // Clear any existing session before starting magic link flow
+    try {
+      await account.deleteSession("current");
+      console.log("Cleared existing session before magic link");
+    } catch (sessionError) {
+      // No existing session or failed to clear - that's fine, continue
+      console.log(
+        "No existing session to clear or failed to clear:",
+        sessionError
+      );
+    }
+
+    // Remove any previous guest user when starting magic link flow
+    localStorage.removeItem(GUEST_USER_KEY);
+
+    // Save the current page URL to redirect back after auth
+    const currentPath = window.location.pathname;
+    if (currentPath !== "/auth/magic-link") {
+      localStorage.setItem("auth_redirect", currentPath);
+    }
+
+    const callbackUrl = `${window.location.origin}/auth/magic-link`;
+    console.log("Magic link callback URL:", callbackUrl); // Create magic link session using Appwrite's built-in method
+    await account.createMagicURLToken(ID.unique(), email, callbackUrl);
+
+    console.log("Magic link created successfully");
+    return true;
+  } catch (error: Error | unknown) {
+    console.error("Magic link creation error:", error);
+    throw error instanceof Error
+      ? error
+      : new Error("Failed to create magic link");
+  }
+};
+
+export const verifyMagicLink = async (userId: string, secret: string) => {
+  try {
+    console.log("Verifying magic link session");
+
+    // Update the magic link session
+    await account.updateMagicURLSession(userId, secret);
+
+    // Get the current user after verification
+    const user = await getCurrentUser();
+
+    if (user && !user.isGuest) {
+      // Store in localStorage for persistence
+      storeUserInLocalStorage(user);
+      return user;
+    }
+
+    throw new Error("Failed to get user after magic link verification");
+  } catch (error: Error | unknown) {
+    console.error("Magic link verification error:", error);
+    throw error instanceof Error
+      ? error
+      : new Error("Failed to verify magic link");
   }
 };
