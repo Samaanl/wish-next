@@ -560,20 +560,27 @@ const TextEditor: React.FC<TextEditorProps> = ({
       const textObjects = fabricCanvas
         .getObjects()
         .filter((obj: any) => obj.type === "textbox" || obj.type === "text");
-      console.log(`Found ${textObjects.length} text objects to export`);
-
-      // Log detailed information about text objects
+      console.log(`Found ${textObjects.length} text objects to export`); // Log detailed information about text objects with scaling info
       textObjects.forEach((obj: any, index: number) => {
         console.log(`Text object ${index}:`, {
           text: obj.text,
           left: obj.left,
           top: obj.top,
           fontSize: obj.fontSize,
+          fontFamily: obj.fontFamily,
+          fill: obj.fill,
           originX: obj.originX,
           originY: obj.originY,
           width: obj.width,
           height: obj.height,
+          textAlign: obj.textAlign,
+          shadow: obj.shadow,
         });
+        console.log(
+          `Scaling: display canvas ${fabricCanvas.getWidth()}x${fabricCanvas.getHeight()} -> export ${
+            img.naturalWidth
+          }x${img.naturalHeight}`
+        );
       });
 
       // Calculate scaling between display canvas and export canvas
@@ -585,52 +592,113 @@ const TextEditor: React.FC<TextEditorProps> = ({
           img.naturalWidth
         }x${img.naturalHeight}`
       );
-      console.log(`Scale factors: X=${scaleFactorX}, Y=${scaleFactorY}`); // Draw each text object with proper positioning
-      textObjects.forEach((obj: any) => {
-        // Scale position and size uniformly to maintain proportions
-        const scaleFactor = Math.min(scaleFactorX, scaleFactorY);
-        const fontSize = obj.fontSize * scaleFactor;
+      console.log(`Scale factors: X=${scaleFactorX}, Y=${scaleFactorY}`);
+
+      // Draw each text object with proper positioning and text wrapping
+      textObjects.forEach((obj: any, index: number) => {
+        // Use separate scale factors for position and font size to maintain exact positioning
+        const fontSize = obj.fontSize * scaleFactorY; // Use Y scale for font size
         const fontFamily = obj.fontFamily || "Arial";
         const fill = obj.fill || "#ffffff";
 
-        // Set up text rendering - match fabric.js exactly
+        // Set up text rendering
         ctx.font = `${fontSize}px ${fontFamily}`;
         ctx.fillStyle = fill;
-
-        // fabric.js textAlign property affects internal text alignment, not canvas context
-        // Always use center alignment for canvas context since fabric uses center origin
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
 
-        // Handle shadow - scale shadow properties
+        // Handle shadow - scale shadow properties using Y scale factor
         if (obj.shadow) {
           ctx.shadowColor = obj.shadow.color || "rgba(0,0,0,0.6)";
-          ctx.shadowBlur = (obj.shadow.blur || 5) * scaleFactor;
-          ctx.shadowOffsetX = (obj.shadow.offsetX || 2) * scaleFactor;
-          ctx.shadowOffsetY = (obj.shadow.offsetY || 2) * scaleFactor;
+          ctx.shadowBlur = (obj.shadow.blur || 5) * scaleFactorY;
+          ctx.shadowOffsetX = (obj.shadow.offsetX || 2) * scaleFactorX;
+          ctx.shadowOffsetY = (obj.shadow.offsetY || 2) * scaleFactorY;
         }
 
-        // Get fabric object's actual rendered position and scale it
-        // fabric.js left/top represent the center point when originX/Y are "center"
+        // Scale position using separate X and Y factors to maintain exact positioning
         let x = obj.left * scaleFactorX;
-        let y = obj.top * scaleFactorY;
+        let y = obj.top * scaleFactorY; // Get text content, with fallback to the original wish text
+        const textContent = obj.text || wish || "";
 
-        // Handle text that may span multiple lines (Textbox can wrap)
-        const textLines = obj.text ? obj.text.split("\n") : [wish];
-        const lineHeight = fontSize * 1.2; // Standard line height multiplier
+        // Skip empty text
+        if (!textContent.trim()) {
+          console.log(`Skipping empty text object ${index}`);
+          return;
+        } // Calculate the scaled width for text wrapping (matching fabric's textbox width)
+        // If obj.width is not set, use 80% of canvas width as fallback
+        const maxWidth =
+          obj.width && obj.width > 0
+            ? obj.width * scaleFactorX
+            : img.naturalWidth * 0.8;
 
-        // Calculate starting Y position for multi-line text
-        const totalTextHeight = textLines.length * lineHeight;
+        console.log(
+          `Text object ${index} - Content: "${textContent}", Max width: ${maxWidth}px`
+        );
+
+        // Advanced text wrapping that matches Fabric.js Textbox behavior
+        const words = textContent.split(/\s+/); // Split on any whitespace
+        const lines: string[] = [];
+        let currentLine = "";
+
+        // Measure text to determine wrapping, handling edge cases
+        for (let i = 0; i < words.length; i++) {
+          const word = words[i];
+          const testLine = currentLine + (currentLine ? " " : "") + word;
+          const metrics = ctx.measureText(testLine);
+
+          // If this word alone is too wide, add it anyway to prevent infinite loops
+          if (metrics.width > maxWidth && currentLine !== "") {
+            lines.push(currentLine);
+            currentLine = word;
+          } else {
+            currentLine = testLine;
+          }
+        }
+
+        if (currentLine) {
+          lines.push(currentLine);
+        }
+
+        // Handle explicit line breaks if they exist in the text
+        if (textContent.includes("\n")) {
+          const manualLines: string[] = [];
+          lines.forEach((line) => {
+            if (line.includes("\n")) {
+              manualLines.push(...line.split("\n"));
+            } else {
+              manualLines.push(line);
+            }
+          });
+          lines.splice(0, lines.length, ...manualLines);
+        }
+
+        // Ensure we have at least one line
+        if (lines.length === 0) {
+          lines.push(textContent);
+        }
+
+        // Calculate line height (fabric.js uses 1.16 as default line height multiplier)
+        const lineHeight = fontSize * 1.16;
+
+        // Calculate total text height
+        const totalTextHeight = lines.length * lineHeight;
+
+        // Calculate starting Y position (center the text block vertically)
         let startY = y - (totalTextHeight - lineHeight) / 2;
 
         console.log(
-          `Drawing ${textLines.length} lines at scaled position (${x}, ${y}), fontSize: ${fontSize}px`
+          `Drawing ${lines.length} lines at scaled position (${x}, ${y}), fontSize: ${fontSize}px, maxWidth: ${maxWidth}px`
         );
+        console.log("Text lines:", lines);
 
         // Draw each line of text
-        textLines.forEach((line: string, index: number) => {
+        lines.forEach((line: string, index: number) => {
           const currentY = startY + index * lineHeight;
-          ctx.fillText(line.trim(), x, currentY);
+
+          // Ensure text stays within canvas bounds
+          if (currentY >= 0 && currentY <= img.naturalHeight) {
+            ctx.fillText(line.trim(), x, currentY);
+          }
         });
 
         // Reset shadow
