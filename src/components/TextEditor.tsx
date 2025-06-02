@@ -63,6 +63,7 @@ const TextEditor: React.FC<TextEditorProps> = ({
   const [fontSize, setFontSize] = useState(24);
   const [textShadow, setTextShadow] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [downloadLoading, setDownloadLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fontFamily, setFontFamily] = useState("Arial");
   const [fabric, setFabric] = useState<any>(null);
@@ -477,9 +478,8 @@ const TextEditor: React.FC<TextEditorProps> = ({
       setError("No image selected for download.");
       return;
     }
-
     try {
-      setLoading(true);
+      setDownloadLoading(true);
       setError(""); // Clear any previous errors
       console.log("Starting enhanced download process");
 
@@ -692,7 +692,7 @@ const TextEditor: React.FC<TextEditorProps> = ({
         }`
       );
     } finally {
-      setLoading(false);
+      setDownloadLoading(false);
     }
   };
 
@@ -782,14 +782,14 @@ const TextEditor: React.FC<TextEditorProps> = ({
               {!loading && !error && canvasReady && (
                 <button
                   onClick={handleDownload}
-                  disabled={loading}
+                  disabled={downloadLoading}
                   className={`px-6 py-3 rounded-lg font-medium transition-all duration-200 ${
-                    loading
+                    downloadLoading
                       ? "bg-green-400 cursor-not-allowed text-white animate-pulse"
                       : "bg-green-600 hover:bg-green-700 text-white hover:scale-105 active:scale-95"
                   }`}
                 >
-                  {loading ? (
+                  {downloadLoading ? (
                     <span className="flex items-center gap-2">
                       <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
                         <circle
@@ -980,18 +980,18 @@ const TextEditor: React.FC<TextEditorProps> = ({
             className="flex-1 px-4 py-3 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors font-medium"
           >
             ← Back{" "}
-          </button>
+          </button>{" "}
           {!loading && !error && canvasReady && (
             <button
               onClick={handleDownload}
-              disabled={loading}
+              disabled={downloadLoading}
               className={`flex-1 px-4 py-3 rounded-lg font-medium transition-all duration-200 ${
-                loading
+                downloadLoading
                   ? "bg-green-400 cursor-not-allowed text-white animate-pulse"
                   : "bg-green-600 hover:bg-green-700 text-white hover:scale-105 active:scale-95"
               }`}
             >
-              {loading ? (
+              {downloadLoading ? (
                 <span className="flex items-center justify-center gap-2">
                   <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
                     <circle
