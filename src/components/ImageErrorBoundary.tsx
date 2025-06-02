@@ -19,15 +19,36 @@ class ImageErrorBoundary extends React.Component<
     super(props);
     this.state = { hasError: false };
   }
-
   static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    // Check for React DOM manipulation errors
+    const isDOMError =
+      error.message.includes("insertBefore") ||
+      error.message.includes("removeChild") ||
+      error.message.includes("appendChild") ||
+      error.message.includes("Node");
+
+    console.warn(
+      "Error boundary caught:",
+      error.message,
+      "isDOMError:",
+      isDOMError
+    );
+
     // Update state so the next render will show the fallback UI
     return { hasError: true, error };
   }
-
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    // Log the error
-    console.error("Image gallery error caught by boundary:", error, errorInfo);
+    // Log the error with more details
+    console.error("Image gallery error caught by boundary:", {
+      error: error.message,
+      stack: error.stack,
+      componentStack: errorInfo.componentStack,
+      isDOMManipulationError:
+        error.message.includes("insertBefore") ||
+        error.message.includes("removeChild") ||
+        error.message.includes("appendChild") ||
+        error.message.includes("Node"),
+    });
 
     // Call optional error handler
     if (this.props.onError) {

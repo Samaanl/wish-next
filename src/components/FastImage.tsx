@@ -1,5 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
-import { motion } from "framer-motion";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 
 interface FastImageProps {
   thumbnailUrl: string;
@@ -32,46 +31,49 @@ const FastImage: React.FC<FastImageProps> = ({
   const mountedRef = useRef(true);
 
   // Preload an image with timeout
-  const preloadImage = (src: string): Promise<void> => {
-    return new Promise((resolve, reject) => {
-      if (!mountedRef.current) {
-        reject(new Error("Component unmounted"));
-        return;
-      }
-
-      const img = new Image();
-      const timeoutId = setTimeout(() => {
-        reject(new Error(`Timeout loading ${src}`));
-      }, timeout);
-
-      img.onload = () => {
-        clearTimeout(timeoutId);
-        if (mountedRef.current) {
-          resolve();
+  const preloadImage = useCallback(
+    (src: string): Promise<void> => {
+      return new Promise((resolve, reject) => {
+        if (!mountedRef.current) {
+          reject(new Error("Component unmounted"));
+          return;
         }
-      };
 
-      img.onerror = () => {
-        clearTimeout(timeoutId);
-        reject(new Error(`Failed to load ${src}`));
-      };
+        const img = new Image();
+        const timeoutId = setTimeout(() => {
+          reject(new Error(`Timeout loading ${src}`));
+        }, timeout);
 
-      // Handle cancellation
-      if (abortControllerRef.current) {
-        abortControllerRef.current.signal.addEventListener("abort", () => {
+        img.onload = () => {
           clearTimeout(timeoutId);
-          reject(new Error("Cancelled"));
-        });
-      }
+          if (mountedRef.current) {
+            resolve();
+          }
+        };
 
-      // Don't set crossOrigin for placeholder images
-      if (!src.includes("placehold.co")) {
-        img.crossOrigin = "anonymous";
-      }
+        img.onerror = () => {
+          clearTimeout(timeoutId);
+          reject(new Error(`Failed to load ${src}`));
+        };
 
-      img.src = src;
-    });
-  };
+        // Handle cancellation
+        if (abortControllerRef.current) {
+          abortControllerRef.current.signal.addEventListener("abort", () => {
+            clearTimeout(timeoutId);
+            reject(new Error("Cancelled"));
+          });
+        }
+
+        // Don't set crossOrigin for placeholder images
+        if (!src.includes("placehold.co")) {
+          img.crossOrigin = "anonymous";
+        }
+
+        img.src = src;
+      });
+    },
+    [timeout]
+  );
 
   // Progressive upgrade strategy
   useEffect(() => {
@@ -87,8 +89,10 @@ const FastImage: React.FC<FastImageProps> = ({
     const upgradeImage = async () => {
       try {
         // Start with thumbnail (immediate)
-        setCurrentSrc(thumbnailUrl);
-        setLoadedSrc(thumbnailUrl);
+        if (isMounted) {
+          setCurrentSrc(thumbnailUrl);
+          setLoadedSrc(thumbnailUrl);
+        }
 
         // Try to upgrade to preview
         if (isMounted) {
@@ -151,7 +155,14 @@ const FastImage: React.FC<FastImageProps> = ({
         abortControllerRef.current.abort();
       }
     };
-  }, [thumbnailUrl, previewUrl, mediumUrl, fullUrl, loadHighQuality, timeout]);
+  }, [
+    thumbnailUrl,
+    previewUrl,
+    mediumUrl,
+    fullUrl,
+    loadHighQuality,
+    preloadImage,
+  ]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -163,7 +174,7 @@ const FastImage: React.FC<FastImageProps> = ({
     };
   }, []);
 
-  const handleClick = () => {
+  const handleClick = useCallback(() => {
     if (onClick) {
       // If not already upgraded and we have better sources, try to upgrade now
       if (!loadHighQuality && (previewUrl || mediumUrl)) {
@@ -183,13 +194,19 @@ const FastImage: React.FC<FastImageProps> = ({
       }
       onClick();
     }
-  };
+  }, [
+    onClick,
+    loadHighQuality,
+    previewUrl,
+    mediumUrl,
+    thumbnailUrl,
+    preloadImage,
+  ]);
+
   if (hasError) {
     return (
-      <motion.div
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-        className={`bg-gray-200 dark:bg-gray-700 flex items-center justify-center ${className}`}
+      <div
+        className={`bg-gray-200 dark:bg-gray-700 flex items-center justify-center cursor-pointer hover:scale-105 transition-transform duration-200 ${className}`}
         onClick={handleClick}
       >
         <div className="text-center text-gray-500 p-4">
@@ -197,14 +214,13 @@ const FastImage: React.FC<FastImageProps> = ({
           <div className="text-sm">Failed to load</div>
           <div className="text-xs text-gray-400 mt-1">Click to continue</div>
         </div>
-      </motion.div>
+      </div>
     );
   }
+
   return (
-    <motion.div
-      whileHover={{ scale: 1.05 }}
-      whileTap={{ scale: 0.95 }}
-      className={`relative overflow-hidden ${className}`}
+    <div
+      className={`relative overflow-hidden cursor-pointer hover:scale-105 transition-transform duration-200 ${className}`}
       onClick={handleClick}
     >
       <img
@@ -233,7 +249,7 @@ const FastImage: React.FC<FastImageProps> = ({
             : "LQ"}
         </div>
       )}
-    </motion.div>
+    </div>
   );
 };
 

@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   Occasion,
   OccasionImage,
@@ -16,7 +15,6 @@ interface OptimizedImageGalleryProps {
 
 interface ImageLoadState {
   id: string;
-  src: string;
   loaded: boolean;
   error: boolean;
   isLoading: boolean;
@@ -30,27 +28,33 @@ const OptimizedImageGallery: React.FC<OptimizedImageGalleryProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [useDummyImages, setUseDummyImages] = useState(false);
-  const [imageStates, setImageStates] = useState<Map<string, ImageLoadState>>(
-    new Map()
-  );
+  const [imageStates, setImageStates] = useState<
+    Record<string, ImageLoadState>
+  >({});
+  const [isSelecting, setIsSelecting] = useState(false);
+  const mountedRef = useRef(true);
+  const loadingTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Initialize image states when images change
   useEffect(() => {
-    const newImageStates = new Map<string, ImageLoadState>();
+    if (!mountedRef.current) return;
+
+    const newImageStates: Record<string, ImageLoadState> = {};
     images.forEach((image) => {
-      newImageStates.set(image.id, {
+      newImageStates[image.id] = {
         id: image.id,
-        src: image.thumbnailUrl,
         loaded: false,
         error: false,
         isLoading: true,
-      });
+      };
     });
     setImageStates(newImageStates);
   }, [images]);
 
   useEffect(() => {
     const fetchImages = async () => {
+      if (!mountedRef.current) return;
+
       try {
         setLoading(true);
         setError(null);
@@ -71,6 +75,8 @@ const OptimizedImageGallery: React.FC<OptimizedImageGalleryProps> = ({
             timeoutPromise,
           ]);
 
+          if (!mountedRef.current) return;
+
           // Check if we got dummy images
           if (
             occasionImages.length > 0 &&
@@ -84,6 +90,8 @@ const OptimizedImageGallery: React.FC<OptimizedImageGalleryProps> = ({
 
           setImages(occasionImages);
         } catch (fetchError) {
+          if (!mountedRef.current) return;
+
           console.warn("Main fetch failed or timed out, using dummy images");
           const dummyImages = getDummyImagesForOccasion(occasion.id);
           setImages(dummyImages);
@@ -91,6 +99,8 @@ const OptimizedImageGallery: React.FC<OptimizedImageGalleryProps> = ({
           setError("Using placeholder images - main fetch failed.");
         }
       } catch (err) {
+        if (!mountedRef.current) return;
+
         console.error("Fatal error in image fetching:", err);
         setError("Failed to load images. Using placeholder images instead.");
 
@@ -99,73 +109,90 @@ const OptimizedImageGallery: React.FC<OptimizedImageGalleryProps> = ({
         setImages(dummyImages);
         setUseDummyImages(true);
       } finally {
-        setLoading(false);
+        if (mountedRef.current) {
+          setLoading(false);
+        }
       }
     };
 
     fetchImages();
   }, [occasion.id]);
+  // Optimized image loading with safe state updates
+  const loadImageWithTimeout = useCallback(
+    (image: OccasionImage, timeoutMs = 4000) => {
+      return new Promise<void>((resolve, reject) => {
+        if (!mountedRef.current) {
+          reject(new Error("Component unmounted"));
+          return;
+        }
 
-  // Optimized image loading with timeout handling
-  const loadImageWithTimeout = (image: OccasionImage, timeoutMs = 4000) => {
-    return new Promise<void>((resolve, reject) => {
-      const img = new Image();
-      const timeout = setTimeout(() => {
-        console.warn(`Image ${image.id} timed out after ${timeoutMs}ms`);
-        reject(new Error("timeout"));
-      }, timeoutMs);
-
-      img.onload = () => {
-        clearTimeout(timeout);
-        setImageStates((prev) => {
-          const newStates = new Map(prev);
-          const state = newStates.get(image.id);
-          if (state) {
-            newStates.set(image.id, {
-              ...state,
-              loaded: true,
-              isLoading: false,
-            });
+        const img = new Image();
+        const timeout = setTimeout(() => {
+          console.warn(`Image ${image.id} timed out after ${timeoutMs}ms`);
+          if (mountedRef.current) {
+            setImageStates((prev) => ({
+              ...prev,
+              [image.id]: {
+                ...prev[image.id],
+                error: true,
+                isLoading: false,
+              },
+            }));
           }
-          return newStates;
-        });
-        resolve();
-      };
+          reject(new Error("timeout"));
+        }, timeoutMs);
 
-      img.onerror = () => {
-        clearTimeout(timeout);
-        setImageStates((prev) => {
-          const newStates = new Map(prev);
-          const state = newStates.get(image.id);
-          if (state) {
-            newStates.set(image.id, {
-              ...state,
-              error: true,
-              isLoading: false,
-            });
+        img.onload = () => {
+          clearTimeout(timeout);
+          if (mountedRef.current) {
+            setImageStates((prev) => ({
+              ...prev,
+              [image.id]: {
+                ...prev[image.id],
+                loaded: true,
+                isLoading: false,
+              },
+            }));
+            resolve();
           }
-          return newStates;
-        });
-        reject(new Error("load error"));
-      };
+        };
 
-      // Don't set crossOrigin for placeholder images
-      if (!image.thumbnailUrl.includes("placehold.co")) {
-        img.crossOrigin = "anonymous";
-      }
+        img.onerror = () => {
+          clearTimeout(timeout);
+          if (mountedRef.current) {
+            setImageStates((prev) => ({
+              ...prev,
+              [image.id]: {
+                ...prev[image.id],
+                error: true,
+                isLoading: false,
+              },
+            }));
+          }
+          reject(new Error("load error"));
+        };
 
-      img.src = image.thumbnailUrl;
-    });
-  };
+        // Don't set crossOrigin for placeholder images
+        if (!image.thumbnailUrl.includes("placehold.co")) {
+          img.crossOrigin = "anonymous";
+        }
+
+        img.src = image.thumbnailUrl;
+      });
+    },
+    [] // No dependencies needed since we're using refs and functional state updates
+  );
 
   // Load images progressively after the gallery is shown
   useEffect(() => {
-    if (images.length === 0) return;
+    if (images.length === 0 || !mountedRef.current) return;
 
     const loadImagesSequentially = async () => {
       // Load images one by one to avoid overwhelming the server
       for (const image of images.slice(0, 8)) {
         // Limit to first 8 images
+        if (!mountedRef.current) break;
+
         try {
           await loadImageWithTimeout(image, 3000); // 3 second timeout per image
           // Small delay between loads to be gentle on the server
@@ -178,15 +205,40 @@ const OptimizedImageGallery: React.FC<OptimizedImageGalleryProps> = ({
     };
 
     // Start loading after a brief delay to let the gallery render first
-    const timer = setTimeout(loadImagesSequentially, 100);
-    return () => clearTimeout(timer);
-  }, [images]);
+    loadingTimerRef.current = setTimeout(loadImagesSequentially, 100);
 
-  const handleImageClick = (image: OccasionImage) => {
-    // Always allow selection, even if image hasn't loaded yet
-    console.log(`Image ${image.id} selected`);
-    onSelectImage(image);
-  };
+    return () => {
+      if (loadingTimerRef.current) {
+        clearTimeout(loadingTimerRef.current);
+      }
+    };
+  }, [images, loadImageWithTimeout]);
+  const handleImageClick = useCallback(
+    (image: OccasionImage) => {
+      // Prevent multiple rapid clicks
+      if (isSelecting) return;
+
+      setIsSelecting(true);
+      console.log(`Image ${image.id} selected`);
+
+      // Small delay to ensure state is properly set before transitioning
+      setTimeout(() => {
+        onSelectImage(image);
+      }, 100);
+    },
+    [onSelectImage, isSelecting]
+  );
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+      if (loadingTimerRef.current) {
+        clearTimeout(loadingTimerRef.current);
+      }
+    };
+  }, []);
+
   if (loading) {
     return (
       <div className="flex justify-center items-center py-12">
@@ -223,19 +275,20 @@ const OptimizedImageGallery: React.FC<OptimizedImageGalleryProps> = ({
             {error} Gallery remains functional with placeholder images.
           </p>
         </div>
-      )}{" "}
+      )}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
         {images.map((image) => {
-          const imageState = imageStates.get(image.id);
+          const imageState = imageStates[image.id];
           const isLoaded = imageState?.loaded || false;
           const hasError = imageState?.error || false;
           const isLoading = imageState?.isLoading || false;
+
           return (
-            <motion.div
+            <div
               key={image.id}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="aspect-square rounded-lg overflow-hidden cursor-pointer hover:shadow-lg transition-all duration-200 relative"
+              className={`aspect-square rounded-lg overflow-hidden cursor-pointer hover:shadow-lg hover:scale-105 transition-all duration-200 relative ${
+                isSelecting ? "pointer-events-none opacity-75" : ""
+              }`}
               onClick={() => handleImageClick(image)}
             >
               {/* Base image - always clickable */}
@@ -273,7 +326,7 @@ const OptimizedImageGallery: React.FC<OptimizedImageGalleryProps> = ({
                   ✓
                 </div>
               )}
-            </motion.div>
+            </div>
           );
         })}
       </div>

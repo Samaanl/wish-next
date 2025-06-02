@@ -64,6 +64,7 @@ const TextEditor: React.FC<TextEditorProps> = ({
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fabricCanvasRef = useRef<any>(null);
+  const mountedRef = useRef<boolean>(true);
   const [textColor, setTextColor] = useState("#ffffff");
   const [fontSize, setFontSize] = useState(24);
   const [textShadow, setTextShadow] = useState(true);
@@ -131,14 +132,12 @@ const TextEditor: React.FC<TextEditorProps> = ({
     "Tahoma",
     "Verdana",
   ];
-
   // Load fabric.js
   useEffect(() => {
-    let isMounted = true;
     console.log("[FabricLoaderEffect] Initializing fabric load.");
     loadFabric()
       .then((fabricInstance) => {
-        if (isMounted) {
+        if (mountedRef.current) {
           console.log(
             "[FabricLoaderEffect] Fabric.js loaded successfully, setting fabric state."
           );
@@ -146,7 +145,7 @@ const TextEditor: React.FC<TextEditorProps> = ({
         }
       })
       .catch((err) => {
-        if (isMounted) {
+        if (mountedRef.current) {
           console.error("[FabricLoaderEffect] Failed to load fabric.js:", err);
           setError(
             "CRITICAL: Editor libraries failed to load. Please refresh."
@@ -155,7 +154,7 @@ const TextEditor: React.FC<TextEditorProps> = ({
         }
       });
     return () => {
-      isMounted = false;
+      mountedRef.current = false;
     };
   }, []);
 
@@ -165,10 +164,8 @@ const TextEditor: React.FC<TextEditorProps> = ({
       `[TextEditor LayoutEffect] After DOM mutation - loading: ${loading}, canvasRef.current populated: ${!!canvasRef.current}`
     );
   }, [loading]);
-
   // Initialize canvas with fabric.js when it's loaded AND selectedImage changes
   useEffect(() => {
-    let isCanvasSetupMounted = true;
     let imageLoadingTimeout: NodeJS.Timeout | null = null;
 
     console.log(
@@ -179,6 +176,11 @@ const TextEditor: React.FC<TextEditorProps> = ({
 
     if (!fabric) {
       console.log("[CanvasSetupEffect] Fabric not loaded yet. Returning.");
+      return;
+    }
+
+    if (!mountedRef.current) {
+      console.log("[CanvasSetupEffect] Component unmounted. Returning.");
       return;
     }
 
@@ -224,9 +226,8 @@ const TextEditor: React.FC<TextEditorProps> = ({
       );
       setError(null);
       setShowCanvasLoading(true);
-
       imageLoadingTimeout = setTimeout(() => {
-        if (isCanvasSetupMounted) {
+        if (mountedRef.current) {
           console.warn(
             "[_setupFabricCanvas] Image loading seems to be taking a while..."
           );
@@ -243,7 +244,7 @@ const TextEditor: React.FC<TextEditorProps> = ({
           backgroundColor: "#f0f0f0",
           preserveObjectStacking: true,
         });
-        if (!isCanvasSetupMounted) {
+        if (!mountedRef.current) {
           newCanvas.dispose();
           return;
         }
@@ -258,7 +259,7 @@ const TextEditor: React.FC<TextEditorProps> = ({
           }
         );
 
-        if (!isCanvasSetupMounted) {
+        if (!mountedRef.current) {
           newCanvas.dispose();
           return;
         }
@@ -325,7 +326,7 @@ const TextEditor: React.FC<TextEditorProps> = ({
           newCanvas.getActiveObject()
         );
       } catch (err: any) {
-        if (isCanvasSetupMounted) {
+        if (mountedRef.current) {
           console.error("[_setupFabricCanvas] Error during canvas setup:", err);
           const newAttempts = setupAttempts + 1;
           setSetupAttempts(newAttempts);
@@ -336,7 +337,7 @@ const TextEditor: React.FC<TextEditorProps> = ({
             );
             // Retry after a short delay
             setTimeout(() => {
-              if (isCanvasSetupMounted) {
+              if (mountedRef.current) {
                 _setupFabricCanvas();
               }
             }, 1000);
@@ -351,17 +352,16 @@ const TextEditor: React.FC<TextEditorProps> = ({
           }
         }
       } finally {
-        if (isCanvasSetupMounted) {
+        if (mountedRef.current) {
           console.log("[_setupFabricCanvas] Reached finally block.");
           if (imageLoadingTimeout) clearTimeout(imageLoadingTimeout);
           setShowCanvasLoading(false);
         }
       }
     };
-
     _setupFabricCanvas();
     return () => {
-      isCanvasSetupMounted = false;
+      mountedRef.current = false;
       if (imageLoadingTimeout) clearTimeout(imageLoadingTimeout);
       console.log(
         "[CanvasSetupEffect] Cleanup. Disposing fabric canvas if it exists."

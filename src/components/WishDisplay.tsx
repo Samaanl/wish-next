@@ -29,8 +29,6 @@ export default function WishDisplay({
   const [isAnimated, setIsAnimated] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-
-  // New state for image flow
   const [isImageMode, setIsImageMode] = useState(false);
   const [selectedOccasion, setSelectedOccasion] = useState<Occasion | null>(
     null
@@ -39,6 +37,7 @@ export default function WishDisplay({
     null
   );
   const [finalImage, setFinalImage] = useState<string | null>(null);
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
   useEffect(() => {
     // Start animation when component mounts
@@ -72,9 +71,17 @@ export default function WishDisplay({
     setSelectedOccasion(occasion);
     setSelectedImage(null);
   };
-
   const handleSelectImage = (image: OccasionImage) => {
-    setSelectedImage(image);
+    if (isTransitioning) return; // Prevent rapid transitions
+
+    setIsTransitioning(true);
+    console.log("Starting image selection transition", image.id);
+
+    // Small delay to ensure state is properly managed
+    setTimeout(() => {
+      setSelectedImage(image);
+      setIsTransitioning(false);
+    }, 50);
   };
 
   const handleSaveImage = (dataUrl: string) => {
@@ -82,15 +89,29 @@ export default function WishDisplay({
     setSelectedImage(null);
     setSelectedOccasion(null);
   };
-
   const handleBackToOccasion = () => {
-    setSelectedImage(null);
-  };
+    if (isTransitioning) return;
 
+    setIsTransitioning(true);
+    console.log("Starting back to occasion transition");
+
+    setTimeout(() => {
+      setSelectedImage(null);
+      setIsTransitioning(false);
+    }, 50);
+  };
   const handleBackToWish = () => {
-    setIsImageMode(false);
-    setSelectedOccasion(null);
-    setSelectedImage(null);
+    if (isTransitioning) return;
+
+    setIsTransitioning(true);
+    console.log("Starting back to wish transition");
+
+    setTimeout(() => {
+      setIsImageMode(false);
+      setSelectedOccasion(null);
+      setSelectedImage(null);
+      setIsTransitioning(false);
+    }, 50);
   };
 
   // Handle saving the image to Appwrite storage
@@ -215,11 +236,13 @@ export default function WishDisplay({
       </div>
     );
   }
-
   if (isImageMode) {
     if (selectedImage && selectedOccasion) {
       return (
-        <div className="w-full max-w-4xl mx-auto">
+        <div
+          key={`text-editor-${selectedImage.id}`}
+          className="w-full max-w-4xl mx-auto"
+        >
           <ImageErrorBoundary>
             <TextEditor
               wish={wishText}
@@ -232,7 +255,10 @@ export default function WishDisplay({
     }
     if (selectedOccasion) {
       return (
-        <div className="w-full max-w-4xl mx-auto">
+        <div
+          key={`gallery-${selectedOccasion.id}`}
+          className="w-full max-w-4xl mx-auto"
+        >
           <ImageErrorBoundary>
             <OptimizedImageGallery
               occasion={selectedOccasion}
@@ -250,9 +276,8 @@ export default function WishDisplay({
         </div>
       );
     }
-
     return (
-      <div className="w-full max-w-4xl mx-auto">
+      <div key="occasion-selector" className="w-full max-w-4xl mx-auto">
         <OccasionSelector
           onSelectOccasion={handleSelectOccasion}
           selectedOccasion={selectedOccasion}
