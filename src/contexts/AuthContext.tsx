@@ -84,10 +84,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       try {
         // Add rate limiting - check if we've made a request recently
         const lastAuthCheck = localStorage.getItem("last_auth_check");
-        const now = Date.now();
-
-        // If we made an auth check in the last 10 seconds, skip this check
-        if (lastAuthCheck && now - parseInt(lastAuthCheck) < 10000) {
+        const now = Date.now(); // If we made an auth check in the last 15 seconds, skip this check
+        if (lastAuthCheck && now - parseInt(lastAuthCheck) < 15000) {
           console.log("Skipping auth check - rate limited");
           const guestUser = getGuestUser();
           setCurrentUser(guestUser);
@@ -101,7 +99,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         const magicLinkVerifying = localStorage.getItem("magic_link_verifying");
 
         if (
-          (magicLinkProcess && now - parseInt(magicLinkProcess) < 15000) ||
+          (magicLinkProcess && now - parseInt(magicLinkProcess) < 20000) ||
           magicLinkVerifying
         ) {
           console.log(

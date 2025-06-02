@@ -3,6 +3,8 @@
 import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
+import { updateUserName } from "@/utils/authService";
+import NameCollectionForm from "@/components/NameCollectionForm";
 
 // Component that uses useSearchParams - needs to be wrapped in Suspense
 function MagicLinkContent() {
@@ -10,6 +12,9 @@ function MagicLinkContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [hasVerified, setHasVerified] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [showNameCollection, setShowNameCollection] = useState(false);
+  const [verifiedUser, setVerifiedUser] = useState<any>(null);
+  const [isUpdatingName, setIsUpdatingName] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
   const { verifyMagicLinkSession, updateCurrentUser, currentUser } = useAuth();
@@ -29,10 +34,29 @@ function MagicLinkContent() {
       setIsLoading(false);
       return;
     }
-
     const handleMagicLink = async () => {
       if (isProcessing) return; // Double-check to prevent race conditions
       setIsProcessing(true);
+
+      const userId = searchParams.get("userId");
+      const secret = searchParams.get("secret");
+
+      // Create a unique identifier for this specific magic link
+      const linkId = `${userId}_${secret}`;
+      const processedLinksKey = "processed_magic_links";
+
+      // Check if we've already processed this exact magic link
+      const processedLinks = JSON.parse(
+        localStorage.getItem(processedLinksKey) || "[]"
+      );
+      if (processedLinks.includes(linkId)) {
+        console.log("This magic link has already been processed");
+        setStatus("This link has already been used. Redirecting...");
+        setTimeout(() => router.push("/"), 2000);
+        setIsLoading(false);
+        setIsProcessing(false);
+        return;
+      }
 
       // Mark this verification attempt immediately
       localStorage.setItem("last_magic_link_process", now.toString());
@@ -52,11 +76,37 @@ function MagicLinkContent() {
 
         if (userId && secret) {
           setHasVerified(true);
-          setStatus("Verifying magic link...");
-
-          // Verify the magic link
+          setStatus("Verifying magic link..."); // Verify the magic link
           const user = await verifyMagicLinkSession(userId, secret);
           if (user) {
+            // Mark this specific magic link as processed
+            const processedLinks = JSON.parse(
+              localStorage.getItem(processedLinksKey) || "[]"
+            );
+            processedLinks.push(linkId);
+            // Keep only the last 10 processed links to prevent localStorage bloat
+            if (processedLinks.length > 10) {
+              processedLinks.shift();
+            }
+            localStorage.setItem(
+              processedLinksKey,
+              JSON.stringify(processedLinks)
+            );
+
+            // Check if user needs to provide their name
+            const needsName =
+              !user.name || user.name === "User" || user.name.trim() === "";
+
+            if (needsName) {
+              // Show name collection form
+              setVerifiedUser(user);
+              setShowNameCollection(true);
+              setStatus("Please tell us your name to complete setup");
+              setIsLoading(false);
+              return;
+            }
+
+            // User has a name, proceed with normal flow
             updateCurrentUser(user);
             setStatus("Authentication successful! Redirecting...");
 
@@ -116,9 +166,74 @@ function MagicLinkContent() {
         localStorage.removeItem("magic_link_verifying");
       }
     };
-
     handleMagicLink();
   }, []); // Remove all dependencies to run only once
+
+  // Handler for name submission
+  const handleNameSubmit = async (name: string) => {
+    if (!verifiedUser) return;
+
+    setIsUpdatingName(true);
+    try {
+      const updatedUser = await updateUserName(verifiedUser.id, name);
+      if (updatedUser) {
+        updateCurrentUser(updatedUser);
+        setStatus("Profile completed! Redirecting...");
+
+        // Clear all magic link flags
+        localStorage.removeItem("magic_link_verifying");
+        localStorage.removeItem("last_magic_link_process");
+
+        // Redirect after a short delay
+        const savedRedirect = localStorage.getItem("auth_redirect");
+        const redirectPath = savedRedirect || "/";
+        localStorage.removeItem("auth_redirect");
+
+        setTimeout(() => {
+          router.push(redirectPath);
+        }, 1500);
+      }
+    } catch (error) {
+      console.error("Error updating name:", error);
+      throw error; // Let the form handle the error display
+    } finally {
+      setIsUpdatingName(false);
+    }
+  };
+
+  // Handler for skipping name collection
+  const handleSkipName = () => {
+    if (!verifiedUser) return;
+
+    // Proceed without updating the name
+    updateCurrentUser(verifiedUser);
+    setStatus("Authentication successful! Redirecting...");
+
+    // Clear all magic link flags
+    localStorage.removeItem("magic_link_verifying");
+    localStorage.removeItem("last_magic_link_process");
+
+    // Redirect after a short delay
+    const savedRedirect = localStorage.getItem("auth_redirect");
+    const redirectPath = savedRedirect || "/";
+    localStorage.removeItem("auth_redirect");
+
+    setTimeout(() => {
+      router.push(redirectPath);
+    }, 1500);
+  };
+
+  // Show name collection form if needed
+  if (showNameCollection && verifiedUser) {
+    return (
+      <NameCollectionForm
+        email={verifiedUser.email}
+        onNameSubmit={handleNameSubmit}
+        onSkip={handleSkipName}
+        isLoading={isUpdatingName}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">

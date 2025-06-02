@@ -139,9 +139,15 @@ const Header: React.FC<HeaderProps> = ({
                         {displayName.charAt(0).toUpperCase()}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-gray-900 dark:text-white truncate">
-                          {displayName}
-                        </p>
+                        <div className="flex items-center space-x-2">
+                          <p className="font-semibold text-gray-900 dark:text-white truncate">
+                            {displayName}
+                          </p>
+                          <div className="flex items-center px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-md text-xs font-medium">
+                            <div className="w-2 h-2 bg-green-500 rounded-full mr-1"></div>
+                            Signed In
+                          </div>
+                        </div>
                         {currentUser?.email && (
                           <p className="text-sm text-gray-600 dark:text-gray-400 truncate">
                             {currentUser.email}
@@ -221,12 +227,48 @@ const Header: React.FC<HeaderProps> = ({
             </div>
           </>
         ) : (
-          <button
-            onClick={handleSignIn}
-            className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white py-2 px-4 sm:px-6 rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm min-h-[44px] shadow-sm"
-          >
-            Sign In
-          </button>
+          <div className="flex items-center space-x-2">
+            {/* Guest Status Indicator */}
+            {currentUser?.isGuest && (
+              <div className="hidden sm:flex items-center px-2 py-1 bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 rounded-md text-xs font-medium border border-amber-200 dark:border-amber-700">
+                <svg
+                  className="w-3 h-3 mr-1"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                Guest Mode
+              </div>
+            )}
+
+            {/* Sign In Button */}
+            <button
+              onClick={handleSignIn}
+              className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white py-2 px-4 sm:px-6 rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm min-h-[44px] shadow-sm hover:shadow-md"
+            >
+              <span className="flex items-center">
+                <svg
+                  className="w-4 h-4 mr-2"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                  />
+                </svg>
+                Sign In
+              </span>
+            </button>
+          </div>
         )}
       </div>{" "}
     </header>

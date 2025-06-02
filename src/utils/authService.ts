@@ -243,6 +243,56 @@ export const createUserInDatabase = async (
   );
 };
 
+// Update user name in both Appwrite Auth and database
+export const updateUserName = async (
+  userId: string,
+  name: string
+): Promise<UserData | null> => {
+  try {
+    console.log("Updating user name in both Appwrite Auth and database:", {
+      userId,
+      name,
+    });
+
+    // First, update the user's name in Appwrite Auth
+    try {
+      await account.updateName(name);
+      console.log("Successfully updated name in Appwrite Auth");
+    } catch (authError) {
+      console.warn("Failed to update name in Appwrite Auth:", authError);
+      // Continue with database update even if auth update fails
+    }
+
+    // Update the user document in database
+    await databases.updateDocument(DATABASE_ID, USERS_COLLECTION_ID, userId, {
+      name,
+    });
+    console.log("Successfully updated name in database");
+
+    // Get the updated user data
+    const updatedUserDoc = await databases.getDocument(
+      DATABASE_ID,
+      USERS_COLLECTION_ID,
+      userId
+    );
+
+    const updatedUser: UserData = {
+      id: userId,
+      email: updatedUserDoc.email,
+      name: updatedUserDoc.name,
+      credits: updatedUserDoc.credits,
+    };
+
+    // Update localStorage
+    storeUserInLocalStorage(updatedUser);
+
+    return updatedUser;
+  } catch (error) {
+    console.error("Error updating user name:", error);
+    throw new Error("Failed to update name. Please try again.");
+  }
+};
+
 export const signInWithGoogle = async () => {
   try {
     console.log("Starting Google OAuth flow");
@@ -419,34 +469,53 @@ export const signInWithMagicLink = async (email: string) => {
   }
 };
 
+// Global flag to prevent simultaneous magic link verifications
+let isVerifyingMagicLink = false;
+
 export const verifyMagicLink = async (userId: string, secret: string) => {
   try {
-    console.log("Verifying magic link session"); // Add rate limiting check - increased to 10 seconds to prevent rapid retries
+    // Check if we're already verifying a magic link
+    if (isVerifyingMagicLink) {
+      console.log("Magic link verification already in progress");
+      throw new Error("Verification already in progress. Please wait.");
+    } // Add rate limiting check FIRST - increased to 15 seconds to prevent rapid retries
     const lastVerifyAttempt = localStorage.getItem("last_magic_link_verify");
     const now = Date.now();
 
-    if (lastVerifyAttempt && now - parseInt(lastVerifyAttempt) < 10000) {
+    if (lastVerifyAttempt && now - parseInt(lastVerifyAttempt) < 15000) {
       console.log("Rate limiting magic link verification attempt");
       throw new Error("Please wait before trying again");
     }
 
+    // Set the global flag to prevent other attempts
+    isVerifyingMagicLink = true;
+    console.log("Verifying magic link session");
     localStorage.setItem("last_magic_link_verify", now.toString());
+
+    // Add a small delay to reduce rate limiting issues
+    await new Promise((resolve) => setTimeout(resolve, 500));
 
     // Update the magic link session
     await account.updateMagicURLSession(userId, secret);
 
     // Get the current user after verification
     const user = await getCurrentUser();
-
     if (user && !user.isGuest) {
       // Store in localStorage for persistence
       storeUserInLocalStorage(user);
+      // Clear the global flag on success
+      isVerifyingMagicLink = false;
       return user;
     }
 
+    // Clear the global flag on failure
+    isVerifyingMagicLink = false;
     throw new Error("Failed to get user after magic link verification");
   } catch (error: Error | unknown) {
     console.error("Magic link verification error:", error);
+
+    // Always clear the global flag on error
+    isVerifyingMagicLink = false;
 
     // If it's a rate limit error, provide a specific message
     if (error instanceof Error && error.message.includes("Rate limit")) {
