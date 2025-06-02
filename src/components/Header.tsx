@@ -91,7 +91,7 @@ const Header: React.FC<HeaderProps> = ({
           onClick={handleLogoClick}
           className="text-lg sm:text-2xl font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-lg px-2 py-1"
         >
-          AI Wish Generator
+          Message Create
         </button>
       </div>{" "}
       <div className="flex items-center space-x-2 sm:space-x-3">
