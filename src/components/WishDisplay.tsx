@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from "react";
+import React, { useRef, useState, useEffect, useMemo, Suspense } from "react";
 import {
   ClipboardDocumentIcon,
   PencilIcon,
@@ -10,6 +10,7 @@ import OccasionSelector from "./OccasionSelector";
 import OptimizedImageGallery from "./OptimizedImageGallery";
 import ImageErrorBoundary from "./ImageErrorBoundary";
 import TextEditor from "./TextEditor";
+import StableTransition from "./StableTransition";
 import { Occasion, OccasionImage, uploadWishImage } from "@/utils/imageService";
 
 interface WishDisplayProps {
@@ -38,6 +39,16 @@ export default function WishDisplay({
   );
   const [finalImage, setFinalImage] = useState<string | null>(null);
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const [viewMode, setViewMode] = useState<
+    "wish" | "occasions" | "gallery" | "editor"
+  >("wish");
+
+  // Use a stable component key to prevent unnecessary remounting
+  const componentKey = useMemo(() => {
+    if (selectedImage) return `editor-${selectedImage.id}`;
+    if (selectedOccasion) return `gallery-${selectedOccasion.id}`;
+    return "wish-view";
+  }, [selectedImage, selectedOccasion]);
 
   useEffect(() => {
     // Start animation when component mounts
@@ -66,52 +77,59 @@ export default function WishDisplay({
     e.target.style.height = "auto";
     e.target.style.height = `${e.target.scrollHeight}px`;
   };
-
   const handleSelectOccasion = (occasion: Occasion) => {
     setSelectedOccasion(occasion);
     setSelectedImage(null);
+    setViewMode("gallery");
   };
+
   const handleSelectImage = (image: OccasionImage) => {
-    if (isTransitioning) return; // Prevent rapid transitions
+    if (isTransitioning) return;
 
     setIsTransitioning(true);
     console.log("Starting image selection transition", image.id);
 
-    // Small delay to ensure state is properly managed
-    setTimeout(() => {
+    // Use requestAnimationFrame to ensure DOM is stable
+    requestAnimationFrame(() => {
       setSelectedImage(image);
+      setViewMode("editor");
       setIsTransitioning(false);
-    }, 50);
+    });
   };
 
   const handleSaveImage = (dataUrl: string) => {
     setFinalImage(dataUrl);
     setSelectedImage(null);
     setSelectedOccasion(null);
+    setViewMode("wish");
   };
+
   const handleBackToOccasion = () => {
     if (isTransitioning) return;
 
     setIsTransitioning(true);
     console.log("Starting back to occasion transition");
 
-    setTimeout(() => {
+    requestAnimationFrame(() => {
       setSelectedImage(null);
+      setViewMode("gallery");
       setIsTransitioning(false);
-    }, 50);
+    });
   };
+
   const handleBackToWish = () => {
     if (isTransitioning) return;
 
     setIsTransitioning(true);
     console.log("Starting back to wish transition");
 
-    setTimeout(() => {
+    requestAnimationFrame(() => {
       setIsImageMode(false);
       setSelectedOccasion(null);
       setSelectedImage(null);
+      setViewMode("wish");
       setIsTransitioning(false);
-    }, 50);
+    });
   };
 
   // Handle saving the image to Appwrite storage
@@ -237,59 +255,68 @@ export default function WishDisplay({
     );
   }
   if (isImageMode) {
-    if (selectedImage && selectedOccasion) {
-      return (
-        <div
-          key={`text-editor-${selectedImage.id}`}
-          className="w-full max-w-4xl mx-auto"
-        >
-          <ImageErrorBoundary>
-            <TextEditor
-              wish={wishText}
-              selectedImage={selectedImage}
-              onBack={handleBackToOccasion}
-            />
-          </ImageErrorBoundary>
-        </div>
-      );
-    }
-    if (selectedOccasion) {
-      return (
-        <div
-          key={`gallery-${selectedOccasion.id}`}
-          className="w-full max-w-4xl mx-auto"
-        >
-          <ImageErrorBoundary>
-            <OptimizedImageGallery
-              occasion={selectedOccasion}
-              onSelectImage={handleSelectImage}
-            />
-          </ImageErrorBoundary>
-          <div className="flex justify-center mt-6">
-            <button
-              onClick={() => setSelectedOccasion(null)}
-              className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
-            >
-              Back to Occasions
-            </button>
-          </div>
-        </div>
-      );
-    }
     return (
-      <div key="occasion-selector" className="w-full max-w-4xl mx-auto">
-        <OccasionSelector
-          onSelectOccasion={handleSelectOccasion}
-          selectedOccasion={selectedOccasion}
-        />
-        <div className="flex justify-center mt-6">
-          <button
-            onClick={handleBackToWish}
-            className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+      <div key={componentKey} className="w-full max-w-4xl mx-auto">
+        <ImageErrorBoundary key={`error-boundary-${componentKey}`}>
+          {" "}
+          <Suspense
+            fallback={<div className="text-center p-8">Loading...</div>}
           >
-            Back to Wish
-          </button>
-        </div>
+            <StableTransition
+              transitionKey={componentKey}
+              onTransitionStart={() =>
+                console.log("Transition starting:", componentKey)
+              }
+              onTransitionEnd={() =>
+                console.log("Transition complete:", componentKey)
+              }
+            >
+              {viewMode === "editor" && selectedImage && selectedOccasion && (
+                <div className="w-full">
+                  <TextEditor
+                    wish={wishText}
+                    selectedImage={selectedImage}
+                    onBack={handleBackToOccasion}
+                  />
+                </div>
+              )}
+
+              {viewMode === "gallery" && selectedOccasion && !selectedImage && (
+                <div className="w-full">
+                  <OptimizedImageGallery
+                    occasion={selectedOccasion}
+                    onSelectImage={handleSelectImage}
+                  />
+                  <div className="flex justify-center mt-6">
+                    <button
+                      onClick={() => setSelectedOccasion(null)}
+                      className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                    >
+                      Back to Occasions
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {(!selectedOccasion || viewMode === "occasions") && (
+                <div className="w-full">
+                  <OccasionSelector
+                    onSelectOccasion={handleSelectOccasion}
+                    selectedOccasion={selectedOccasion}
+                  />
+                  <div className="flex justify-center mt-6">
+                    <button
+                      onClick={handleBackToWish}
+                      className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                    >
+                      Back to Wish
+                    </button>
+                  </div>
+                </div>
+              )}
+            </StableTransition>
+          </Suspense>
+        </ImageErrorBoundary>
       </div>
     );
   }

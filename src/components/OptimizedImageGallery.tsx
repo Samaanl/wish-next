@@ -5,6 +5,7 @@ import {
   listImagesByOccasion,
   getDummyImagesForOccasion,
 } from "@/utils/imageService";
+import { useStableOperation, useThrottle } from "@/hooks/useStableHooks";
 import LoadingAnimation from "./LoadingAnimation";
 import LoadingFeedback from "./LoadingFeedback";
 
@@ -34,6 +35,7 @@ const OptimizedImageGallery: React.FC<OptimizedImageGalleryProps> = ({
   const [isSelecting, setIsSelecting] = useState(false);
   const mountedRef = useRef(true);
   const loadingTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const { executeStable, isOperating } = useStableOperation();
 
   // Initialize image states when images change
   useEffect(() => {
@@ -213,20 +215,31 @@ const OptimizedImageGallery: React.FC<OptimizedImageGalleryProps> = ({
       }
     };
   }, [images, loadImageWithTimeout]);
-  const handleImageClick = useCallback(
-    (image: OccasionImage) => {
-      // Prevent multiple rapid clicks
-      if (isSelecting) return;
+  const handleImageClick = useThrottle(
+    async (image: OccasionImage) => {
+      // Prevent multiple rapid clicks and operations
+      if (isSelecting || isOperating) return;
 
-      setIsSelecting(true);
-      console.log(`Image ${image.id} selected`);
+      try {
+        await executeStable(() => {
+          setIsSelecting(true);
+          console.log(`Image ${image.id} selected`);
+          onSelectImage(image);
+          return true;
+        });
 
-      // Small delay to ensure state is properly set before transitioning
-      setTimeout(() => {
-        onSelectImage(image);
-      }, 100);
+        // Reset after operation completes
+        setTimeout(() => {
+          if (mountedRef.current) {
+            setIsSelecting(false);
+          }
+        }, 300);
+      } catch (error) {
+        console.error("Error in image selection:", error);
+        setIsSelecting(false);
+      }
     },
-    [onSelectImage, isSelecting]
+    300 // Throttle for 300ms
   );
 
   // Cleanup on unmount
