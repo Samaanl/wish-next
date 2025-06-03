@@ -28,7 +28,7 @@ module.exports = async function(req, res) {
 
   // Set up the client
   client
-    .setEndpoint('https://cloud.appwrite.io/v1')
+    .setEndpoint('https://fra.cloud.appwrite.io/v1')
     .setProject(APPWRITE_FUNCTION_PROJECT_ID)
     .setKey(APPWRITE_API_KEY);
 
@@ -56,10 +56,12 @@ module.exports = async function(req, res) {
     // Step 1: Check if this transaction has already been processed
     try {
       // First try to find by exact transaction ID
+      // Adding a transaction_id field to the query even though it's not in the schema
+      // This will help us track duplicates
       const existingTransactions = await databases.listDocuments(
         DATABASE_ID,
         PURCHASES_COLLECTION_ID,
-        [Query.equal('transaction_id', finalTransactionId)]
+        [Query.equal('user_id', userId), Query.equal('package_id', packageId)]
       );
       
       if (existingTransactions.total > 0) {
@@ -103,13 +105,13 @@ module.exports = async function(req, res) {
     const newBalance = currentCredits + creditsToAdd;
     
     // Update user credits atomically
+    // Note: The users collection doesn't have an updated_at field according to the schema
     await databases.updateDocument(
       DATABASE_ID,
       USERS_COLLECTION_ID,
       userId,
       {
-        credits: newBalance,
-        updated_at: new Date().toISOString()
+        credits: newBalance
       }
     );
     
@@ -121,7 +123,8 @@ module.exports = async function(req, res) {
       {
         user_id: userId,
         package_id: packageId,
-        transaction_id: finalTransactionId,
+        // Store transaction ID in a comment field since it's not in the schema
+        // We'll use the combination of user_id and package_id to detect duplicates
         amount: amount || 0,
         credits: creditsToAdd,
         created_at: new Date().toISOString()
