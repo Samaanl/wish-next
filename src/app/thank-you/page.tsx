@@ -148,7 +148,7 @@ function ThankYouContent() {
     if (attempts >= 5) {
       console.log("Max attempts reached for:", uniqueKey);
       setProcessingStatus(
-        "Maximum attempts reached. Please try the Force Add Credits button."
+        "Maximum attempts reached. Please contact support if credits are missing."
       );
       setIsLoading(false);
       return;
@@ -289,93 +289,6 @@ function ThankYouContent() {
     window.location.reload();
   };
 
-  // Add function to force process credits (for debugging)
-  const forceProcessCredits = async () => {
-    if (!sessionId) return;
-
-    setIsLoading(true);
-    setErrorDetails(null);
-
-    // Clear all session storage to force fresh processing
-    const keysToRemove = [];
-    for (let i = 0; i < sessionStorage.length; i++) {
-      const key = sessionStorage.key(i);
-      if (
-        key &&
-        (key.startsWith("processed_") ||
-          key.startsWith("processing_") ||
-          key.startsWith("attempts_"))
-      ) {
-        keysToRemove.push(key);
-      }
-    }
-    keysToRemove.forEach((key) => sessionStorage.removeItem(key));
-
-    // Process immediately
-    try {
-      setProcessingStatus("Force processing credits...");
-
-      let userId = currentUser?.id;
-      let userEmail = currentUser?.email;
-
-      if (!userId) {
-        const checkoutInfo = getStoredCheckoutInfo();
-        if (checkoutInfo?.id) {
-          userId = checkoutInfo.id;
-          userEmail = checkoutInfo.email;
-        }
-      }
-
-      if (!userId) {
-        throw new Error("Cannot identify user");
-      }
-
-      const selectedPackage = CREDIT_PACKAGES.find(
-        (pkg) => pkg.id === packageId
-      );
-      const packageCredits = selectedPackage?.credits || 10;
-      const transactionId = `force_${sessionId}_${packageId}_${Date.now()}`;
-
-      const response = await axios.post(
-        "/api/process-purchase",
-        {
-          userId,
-          userEmail,
-          packageId,
-          amount: selectedPackage?.price || 1,
-          credits: packageCredits,
-          transactionId,
-          directUpdate: true,
-          forceProcess: true, // Add flag to force processing
-        },
-        {
-          headers: userId ? { "x-user-id": userId } : {},
-        }
-      );
-
-      if (response.data.success) {
-        setProcessingStatus("Credits added successfully!");
-        await refreshUserCredits();
-        const updatedUser = await getCurrentUser();
-        if (updatedUser) {
-          setFinalCredits(updatedUser.credits);
-        }
-        localStorage.setItem("credits_need_refresh", "true");
-      } else {
-        throw new Error(response.data.error || "Force processing failed");
-      }
-    } catch (error) {
-      console.error("Force processing error:", error);
-      setProcessingStatus("Force processing failed. Please contact support.");
-      setErrorDetails({
-        message: error instanceof Error ? error.message : "Unknown error",
-        response: error instanceof AxiosError ? error.response?.data : null,
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -442,21 +355,13 @@ function ThankYouContent() {
             {(processingStatus.includes("Error") ||
               processingStatus.includes("Maximum") ||
               processingStatus.includes("already")) && (
-              <div className="mt-2 space-x-2">
+              <div className="mt-2">
                 <button
                   onClick={handleRetry}
                   className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
                   disabled={isLoading}
                 >
                   {isLoading ? "Retrying..." : "Retry Credit Update"}
-                </button>
-
-                <button
-                  onClick={forceProcessCredits}
-                  className="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700"
-                  disabled={isLoading}
-                >
-                  {isLoading ? "Processing..." : "Force Add Credits"}
                 </button>
               </div>
             )}
