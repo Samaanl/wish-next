@@ -18,75 +18,120 @@ const sdk = require('node-appwrite');
 
 module.exports = async function(context) {
   try {
-    // Initialize Appwrite SDK
-    const client = new sdk.Client();
-    
-    // Use Appwrite Function variables to get credentials with fallbacks
-    const variables = context.req?.variables || {};
-    
-    // Use proper logging
-    context.log("Available variables:", Object.keys(variables));
-    
-    // Define hardcoded fallback values for development/testing
-    const APPWRITE_FUNCTION_PROJECT_ID = variables.APPWRITE_FUNCTION_PROJECT_ID || process.env.APPWRITE_FUNCTION_PROJECT_ID || '64f8d2a0e5d8b0e4d0a4';
-    const APPWRITE_API_KEY = variables.APPWRITE_API_KEY || process.env.APPWRITE_API_KEY;
-    const DATABASE_ID = variables.DATABASE_ID || process.env.DATABASE_ID || 'default';
-    const USERS_COLLECTION_ID = variables.USERS_COLLECTION_ID || process.env.USERS_COLLECTION_ID || 'users';
-    const PURCHASES_COLLECTION_ID = variables.PURCHASES_COLLECTION_ID || process.env.PURCHASES_COLLECTION_ID || 'purchases';
-    
-    // Validate required variables
-    if (!APPWRITE_FUNCTION_PROJECT_ID || !APPWRITE_API_KEY) {
-      context.error("Missing critical environment variables");
+    // Log the start of function execution
+    context.log("Starting process-credits function");
+    context.log("Context req:", context.req ? "exists" : "missing");
+    context.log("Raw body:", context.req?.body || "no body");
+    context.log("Raw headers:", JSON.stringify(context.req?.headers || {}));
+
+    // Get environment variables with fallbacks
+    const APPWRITE_FUNCTION_PROJECT_ID = context.req?.variables?.APPWRITE_FUNCTION_PROJECT_ID || process.env.APPWRITE_FUNCTION_PROJECT_ID;
+    const APPWRITE_API_KEY = context.req?.variables?.APPWRITE_API_KEY || process.env.APPWRITE_API_KEY;
+    const DATABASE_ID = context.req?.variables?.DATABASE_ID || process.env.DATABASE_ID;
+    const USERS_COLLECTION_ID = context.req?.variables?.USERS_COLLECTION_ID || process.env.USERS_COLLECTION_ID;
+    const PURCHASES_COLLECTION_ID = context.req?.variables?.PURCHASES_COLLECTION_ID || process.env.PURCHASES_COLLECTION_ID;
+
+    // Log all environment variables for debugging
+    context.log("Environment variables:", {
+      APPWRITE_FUNCTION_PROJECT_ID: APPWRITE_FUNCTION_PROJECT_ID ? "set" : "missing",
+      APPWRITE_API_KEY: APPWRITE_API_KEY ? "set" : "missing",
+      DATABASE_ID: DATABASE_ID ? "set" : "missing",
+      USERS_COLLECTION_ID: USERS_COLLECTION_ID ? "set" : "missing",
+      PURCHASES_COLLECTION_ID: PURCHASES_COLLECTION_ID ? "set" : "missing"
+    });
+
+    // Validate required environment variables
+    if (!APPWRITE_FUNCTION_PROJECT_ID) {
+      context.error("Missing APPWRITE_FUNCTION_PROJECT_ID environment variable");
       return context.res.json({
         success: false,
-        message: "Server configuration error: Missing critical environment variables"
+        message: "Server configuration error: Missing project ID"
       }, 500);
     }
 
-  // Set up the client
-  client
-    .setEndpoint('https://fra.cloud.appwrite.io/v1')
-    .setProject(APPWRITE_FUNCTION_PROJECT_ID)
-    .setKey(APPWRITE_API_KEY);
+    if (!APPWRITE_API_KEY) {
+      context.error("Missing APPWRITE_API_KEY environment variable");
+      return context.res.json({
+        success: false,
+        message: "Server configuration error: Missing API key"
+      }, 500);
+    }
 
-  // Initialize Appwrite services
-  const databases = new sdk.Databases(client);
-  const { ID, Query } = sdk;
+    if (!DATABASE_ID) {
+      context.error("Missing DATABASE_ID environment variable");
+      return context.res.json({
+        success: false,
+        message: "Server configuration error: Missing database ID"
+      }, 500);
+    }
+
+    if (!USERS_COLLECTION_ID) {
+      context.error("Missing USERS_COLLECTION_ID environment variable");
+      return context.res.json({
+        success: false,
+        message: "Server configuration error: Missing users collection ID"
+      }, 500);
+    }
+
+    if (!PURCHASES_COLLECTION_ID) {
+      context.error("Missing PURCHASES_COLLECTION_ID environment variable");
+      return context.res.json({
+        success: false,
+        message: "Server configuration error: Missing purchases collection ID"
+      }, 500);
+    }
+
+    // Initialize Appwrite SDK
+    const client = new sdk.Client();
+    
+    // Set up the client
+    client
+      .setEndpoint('https://fra.cloud.appwrite.io/v1')
+      .setProject(APPWRITE_FUNCTION_PROJECT_ID)
+      .setKey(APPWRITE_API_KEY);
+
+    // Initialize Appwrite services
+    const databases = new sdk.Databases(client);
+    const { ID, Query } = sdk;
 
     // Parse request data
     let userId, packageId, transactionId, amount;
     try {
-      // Log the raw payload for debugging
-      context.log("Raw payload type:", typeof context.req?.payload);
-      context.log("Raw payload:", JSON.stringify(context.req?.payload || {}));
+      // Log raw request data for debugging
+      context.log("Request payload:", context.req.payload);
+      context.log("Request body:", context.req.body);
       
-      // Handle different payload formats
+      // Get the payload - Appwrite functions receive the payload in req.payload
       let payload;
-      if (typeof context.req?.payload === 'object') {
-        // Payload is already an object
-        payload = context.req.payload;
-        context.log("Using payload as object");
-      } else if (typeof context.req?.payload === 'string') {
-        // Try to parse the payload as JSON
+      
+      // If payload is a string, try to parse it as JSON
+      if (typeof context.req.payload === 'string') {
         try {
-          payload = JSON.parse(context.req.payload || '{}');
+          payload = JSON.parse(context.req.payload);
           context.log("Successfully parsed payload string as JSON");
         } catch (e) {
           context.error("Failed to parse payload string as JSON:", e.message);
           payload = {};
         }
-      } else {
-        // Fallback to empty object
+      } 
+      // If payload is already an object, use it directly
+      else if (typeof context.req.payload === 'object' && context.req.payload !== null) {
+        payload = context.req.payload;
+        context.log("Using payload as object");
+      } 
+      // Fallback to empty object
+      else {
         context.error("Payload is neither object nor string, using empty object");
         payload = {};
       }
       
-      // Extract values with detailed logging
+      // Extract the required fields
       userId = payload.userId;
       packageId = payload.packageId;
       transactionId = payload.transactionId;
       amount = payload.amount;
       
+      // Log the extracted values
       context.log("Extracted values from payload:");
       context.log("- userId:", userId);
       context.log("- packageId:", packageId);

@@ -229,9 +229,11 @@ function ThankYouContent() {
     
     console.log("Stringified payload:", JSON.stringify(payload));
     
+    // Appwrite functions expect a specific format
+    // Send the payload directly as a JSON string
     const execution = await functions.createExecution(
       '683eaf99003799365f40', // Function ID for process-credits
-      JSON.stringify(payload),
+      JSON.stringify(payload), // Send as JSON string
       false // Async execution
     );
 
