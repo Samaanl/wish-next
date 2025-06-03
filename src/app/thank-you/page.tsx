@@ -64,14 +64,8 @@ function ThankYouContent() {
       if (!window.wishMaker) window.wishMaker = {};
     }
 
-    const processedPaymentKey = `processed_payment_${sessionId}_${packageId}`;
-    const wasProcessed = sessionStorage.getItem(processedPaymentKey);
-    if (wasProcessed) {
-      console.log(`Payment was already processed: ${sessionId}_${packageId}`);
-      setPaymentProcessed(true);
-      setProcessingStatus("Your payment has been processed!");
-      setIsLoading(false);
-    }
+    // We'll handle duplicate detection in the second useEffect after generating a stable session ID
+    // This ensures we don't incorrectly mark payments as duplicates when they're not
 
     console.log("Processing payment for session:", sessionId, "package:", packageId);
 
@@ -103,6 +97,18 @@ function ThankYouContent() {
   useEffect(() => {
     if (!sessionId) return;
     
+    // Clear any session storage entries related to payment processing
+    // to ensure we don't have stale data preventing purchases
+    if (typeof window !== 'undefined') {
+      // Clear only payment-related items from sessionStorage
+      Object.keys(sessionStorage)
+        .filter(key => key.startsWith('processed_payment_') && key.includes(`_${packageId}`))
+        .forEach(key => {
+          console.log('Clearing session storage key:', key);
+          sessionStorage.removeItem(key);
+        });
+    }
+    
     // Only generate a new session ID if we don't have one yet
     if (!generatedSessionId) {
       // Check if we need to generate a new session ID
@@ -116,7 +122,7 @@ function ThankYouContent() {
         setGeneratedSessionId(sessionId);
       }
     }
-  }, [sessionId, generatedSessionId]);
+  }, [sessionId, packageId, generatedSessionId]);
 
   useEffect(() => {
     // Don't proceed if we're missing any required data
