@@ -1,9 +1,6 @@
 const sdk = require('node-appwrite');
 
 /*
-  The Appwrite function format has changed. The new format uses a context object
-  instead of req and res. This provides better logging and error handling.
-  
   'context' variable has:
     'req' - object with request data
       'headers' - object with request headers
@@ -20,18 +17,41 @@ module.exports = async function(context) {
   try {
     // Log the start of function execution
     context.log("Starting process-credits function");
-    context.log("Context req:", context.req ? "exists" : "missing");
-    context.log("Raw body:", context.req?.body || "no body");
-    context.log("Raw headers:", JSON.stringify(context.req?.headers || {}));
+    
+    // Log ALL request data for debugging
+    if (context.req) {
+      context.log("Request object keys:", Object.keys(context.req));
+      
+      // Log the raw request body
+      if (context.req.body) {
+        context.log("Raw body:", typeof context.req.body === 'object' ? 
+          JSON.stringify(context.req.body) : context.req.body);
+      } else {
+        context.log("Body is undefined");
+      }
+      
+      // Log the raw request payload
+      if (context.req.payload) {
+        context.log("Raw payload:", typeof context.req.payload === 'object' ? 
+          JSON.stringify(context.req.payload) : context.req.payload);
+      } else {
+        context.log("Payload is undefined");
+      }
+      
+      // Log headers
+      context.log("Raw headers:", JSON.stringify(context.req.headers || {}));
+    } else {
+      context.log("Request object is undefined");
+    }
+    
+    // Get environment variables
+    const APPWRITE_FUNCTION_PROJECT_ID = process.env.APPWRITE_FUNCTION_PROJECT_ID;
+    const APPWRITE_API_KEY = process.env.APPWRITE_API_KEY;
+    const DATABASE_ID = process.env.DATABASE_ID;
+    const USERS_COLLECTION_ID = process.env.USERS_COLLECTION_ID;
+    const PURCHASES_COLLECTION_ID = process.env.PURCHASES_COLLECTION_ID;
 
-    // Get environment variables with fallbacks
-    const APPWRITE_FUNCTION_PROJECT_ID = context.req?.variables?.APPWRITE_FUNCTION_PROJECT_ID || process.env.APPWRITE_FUNCTION_PROJECT_ID;
-    const APPWRITE_API_KEY = context.req?.variables?.APPWRITE_API_KEY || process.env.APPWRITE_API_KEY;
-    const DATABASE_ID = context.req?.variables?.DATABASE_ID || process.env.DATABASE_ID;
-    const USERS_COLLECTION_ID = context.req?.variables?.USERS_COLLECTION_ID || process.env.USERS_COLLECTION_ID;
-    const PURCHASES_COLLECTION_ID = context.req?.variables?.PURCHASES_COLLECTION_ID || process.env.PURCHASES_COLLECTION_ID;
-
-    // Log all environment variables for debugging
+    // Log environment variables
     context.log("Environment variables:", {
       APPWRITE_FUNCTION_PROJECT_ID: APPWRITE_FUNCTION_PROJECT_ID ? "set" : "missing",
       APPWRITE_API_KEY: APPWRITE_API_KEY ? "set" : "missing",
@@ -94,45 +114,77 @@ module.exports = async function(context) {
     const databases = new sdk.Databases(client);
     const { ID, Query } = sdk;
 
-    // Parse request data
+    // Parse request data - CRITICAL FIX
     let userId, packageId, transactionId, amount;
     try {
-      // Log raw request data for debugging
-      context.log("Request payload:", context.req.payload);
-      context.log("Request body:", context.req.body);
+      // Try to get the payload from all possible locations
+      let payload = null;
       
-      // Get the payload - Appwrite functions receive the payload in req.payload
-      let payload;
-      
-      // If payload is a string, try to parse it as JSON
-      if (typeof context.req.payload === 'string') {
-        try {
-          payload = JSON.parse(context.req.payload);
-          context.log("Successfully parsed payload string as JSON");
-        } catch (e) {
-          context.error("Failed to parse payload string as JSON:", e.message);
-          payload = {};
+      // First try to access payload directly from the request
+      if (context.req.payload) {
+        if (typeof context.req.payload === 'string') {
+          try {
+            // Try to parse the payload string as JSON
+            payload = JSON.parse(context.req.payload);
+            context.log("Successfully parsed payload string");
+          } catch (e) {
+            context.error("Failed to parse payload string:", e.message);
+          }
+        } else if (typeof context.req.payload === 'object' && context.req.payload !== null) {
+          // Use the payload object directly
+          payload = context.req.payload;
+          context.log("Using payload object directly");
         }
-      } 
-      // If payload is already an object, use it directly
-      else if (typeof context.req.payload === 'object' && context.req.payload !== null) {
-        payload = context.req.payload;
-        context.log("Using payload as object");
-      } 
-      // Fallback to empty object
-      else {
-        context.error("Payload is neither object nor string, using empty object");
+      }
+      
+      // If payload is still null, try the body
+      if (!payload && context.req.body) {
+        if (typeof context.req.body === 'string') {
+          try {
+            // Try to parse the body string as JSON
+            payload = JSON.parse(context.req.body);
+            context.log("Successfully parsed body string");
+          } catch (e) {
+            context.error("Failed to parse body string:", e.message);
+          }
+        } else if (typeof context.req.body === 'object' && context.req.body !== null) {
+          // Use the body object directly
+          payload = context.req.body;
+          context.log("Using body object directly");
+        }
+      }
+      
+      // If we still don't have a payload, try to parse the raw request
+      if (!payload && context.req) {
+        try {
+          // Last resort: try to parse the entire request as JSON
+          const reqStr = JSON.stringify(context.req);
+          const reqObj = JSON.parse(reqStr);
+          
+          // Look for payload in the parsed request
+          if (reqObj.body) {
+            payload = typeof reqObj.body === 'string' ? JSON.parse(reqObj.body) : reqObj.body;
+            context.log("Extracted payload from stringified request");
+          }
+        } catch (e) {
+          context.error("Failed to extract payload from request:", e.message);
+        }
+      }
+      
+      // If we still don't have a payload, create an empty object
+      if (!payload) {
+        context.error("Could not find payload in request, using empty object");
         payload = {};
       }
       
-      // Extract the required fields
+      // Extract data from the payload
       userId = payload.userId;
       packageId = payload.packageId;
       transactionId = payload.transactionId;
       amount = payload.amount;
       
       // Log the extracted values
-      context.log("Extracted values from payload:");
+      context.log("Final extracted values:");
       context.log("- userId:", userId);
       context.log("- packageId:", packageId);
       context.log("- transactionId:", transactionId);
@@ -142,18 +194,38 @@ module.exports = async function(context) {
       return context.res.json({
         success: false,
         message: "Invalid payload format",
-        error: parseError.message,
-        rawPayloadType: typeof context.req?.payload
+        error: parseError.message
       }, 400);
     }
     
     // Validate required fields
     if (!userId || !packageId || !transactionId) {
-      context.error("Missing required fields in payload");
+      context.error("Missing required fields");
       return context.res.json({
         success: false,
-        message: "Missing required fields: userId, packageId, and transactionId are required"
+        message: "Missing required fields",
+        provided: { userId, packageId, transactionId }
       }, 400);
+    }
+    
+    // Determine credit amount based on package if not provided
+    if (!amount) {
+      context.log("Amount not provided, determining from package ID");
+      if (packageId === "basic") {
+        amount = 1;
+      } else if (packageId === "premium") {
+        amount = 5;
+      } else if (packageId === "pro") {
+        amount = 50;
+      } else {
+        context.error("Invalid package ID");
+        return context.res.json({
+          success: false,
+          message: "Invalid package ID",
+          provided: { packageId }
+        }, 400);
+      }
+      context.log("Determined amount:", amount);
     }
 
     context.log(`Processing credit addition for user ${userId}, package ${packageId}, transaction ${transactionId}`);

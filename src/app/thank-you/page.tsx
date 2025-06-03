@@ -227,19 +227,49 @@ function ThankYouContent() {
       transactionId: transactionId
     };
     
+    console.log("Payload to send:", payload);
     console.log("Stringified payload:", JSON.stringify(payload));
     
-    // Appwrite functions expect a specific format
-    // Send the payload directly as a JSON string
-    const execution = await functions.createExecution(
-      '683eaf99003799365f40', // Function ID for process-credits
-      JSON.stringify(payload), // Send as JSON string
-      false // Async execution
-    );
+    // IMPORTANT: Appwrite functions need the payload as a string
+    // The function ID must match the one in your Appwrite console
+    let executionResponse;
+    let responseData;
+    
+    try {
+      const execution = await functions.createExecution(
+        '683eaf99003799365f40', // Function ID for process-credits
+        JSON.stringify(payload), // Send as JSON string
+        false // Async execution
+      );
+      
+      executionResponse = execution;
+      console.log("Appwrite function execution response:", execution);
+    } catch (error) {
+      console.error("Error calling Appwrite function:", error);
+      
+      // Try again with a direct API call as fallback
+      try {
+        console.log("Trying fallback API call...");
+        const response = await fetch('https://fra.cloud.appwrite.io/v1/functions/683eaf99003799365f40/executions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Appwrite-Project': process.env.NEXT_PUBLIC_APPWRITE_PROJECT || '682a20150028bfd73ea8',
+          },
+          body: JSON.stringify(payload)
+        });
+        
+        const fallbackData = await response.json();
+        console.log("Fallback API response:", fallbackData);
+        executionResponse = { responseBody: JSON.stringify(fallbackData) };
+      } catch (fallbackError) {
+        console.error("Fallback API call also failed:", fallbackError);
+        executionResponse = { responseBody: '{}' };
+      }
+    }
 
-    console.log("Appwrite function execution response:", execution);
-
-    const data = JSON.parse(execution.responseBody || '{}');
+    console.log("Final execution response:", executionResponse);
+    const data = JSON.parse(executionResponse?.responseBody || '{}');
     console.log("Purchase processed via Cloud Function:", data);
 
     setDebugInfo({
