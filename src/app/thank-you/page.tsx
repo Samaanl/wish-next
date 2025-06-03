@@ -216,28 +216,91 @@ function ThankYouContent() {
         const transactionId = `tx_${sessionId}_${packageId}`;
         console.log("Using consistent transaction ID to prevent duplicates:", transactionId);
 
-        // Call the API to process the purchase
-        const response = await axios.post(
-          "/api/process-purchase",
-          {
-            userId,
-            packageId,
-            amount: selectedPackage?.price || 1,
-            credits: packageCredits,
-            processingId: transactionId, // Use consistent ID as processingId
-          },
-          {
-            headers: userId ? { "x-user-id": userId } : {},
+        // Function to process the purchase and add credits using Appwrite Cloud Function
+        const processPurchase = async (sessionId: string, packageId: string) => {
+          if (!currentUser) {
+            console.error("User not authenticated");
+            return false;
           }
-        );
 
-        const result = response.data;
+          // EMERGENCY FIX: Use a global window-level flag to prevent multiple API calls
+          // @ts-ignore - window.wishMaker is a custom property
+          if (window.wishMaker && window.wishMaker.processingPayment) {
+            console.log("EMERGENCY DUPLICATE PREVENTION: Payment already being processed");
+            return false;
+          }
 
-        if (result.success) {
-          console.log("Purchase processed successfully:", result);
+          // Set global flag to prevent multiple calls
+          // @ts-ignore - window.wishMaker is a custom property
+          if (!window.wishMaker) window.wishMaker = {};
+          // @ts-ignore - window.wishMaker is a custom property
+          window.wishMaker.processingPayment = true;
+
+          // EMERGENCY FIX: Check if this payment was already processed using sessionStorage
+          const processedPaymentKey = `processed_payment_${sessionId}_${packageId}`;
+          const wasProcessed = sessionStorage.getItem(processedPaymentKey);
+          
+          if (wasProcessed) {
+            console.log("EMERGENCY DUPLICATE PREVENTION: Payment was already processed", { sessionId, packageId });
+            return false;
+          }
+
+          try {
+            // EMERGENCY FIX: Generate a consistent transaction ID that will be the same if the page reloads
+            // This helps prevent duplicate credit additions
+            const transactionId = `tx_${sessionId}_${packageId}`;
+            console.log("Using transaction ID:", transactionId);
+
+            // Get the Appwrite client
+            const { client, functions } = await import('@/utils/appwrite');
+            
+            // Call the Appwrite Cloud Function to process the purchase
+            // This is much more reliable than calling our API endpoint
+            const execution = await functions.createExecution(
+              'process-credits', // Function ID - update this with your actual function ID
+              JSON.stringify({
+                userId: currentUser.id, // Use id instead of $id
+                packageId,
+                amount: packageId === "basic" ? 1 : packageId === "premium" ? 5 : 0,
+                transactionId,
+              }),
+              false // Async execution
+            );
+
+            // Parse the response
+            const data = JSON.parse(execution.responseBody || '{}');
+            console.log("Purchase processed via Cloud Function:", data);
+
+            // EMERGENCY FIX: Mark this payment as processed in sessionStorage
+            // This prevents duplicate processing if the user refreshes the page
+            sessionStorage.setItem(processedPaymentKey, "true");
+            
+            // EMERGENCY FIX: Keep the processed payment flag for a longer time (1 hour)
+            setTimeout(() => {
+              // @ts-ignore - window.wishMaker is a custom property
+              if (window.wishMaker) window.wishMaker.processingPayment = false;
+            }, 60 * 60 * 1000);
+
+            return data.success;
+          } catch (error) {
+            console.error("Error processing purchase via Cloud Function:", error);
+            
+            // Reset the processing flag after error
+            // @ts-ignore - window.wishMaker is a custom property
+            if (window.wishMaker) window.wishMaker.processingPayment = false;
+            
+            return false;
+          }
+        };
+
+        // Call the cloud function to process the purchase
+        const functionResult = await processPurchase(sessionId, packageId);
+
+        if (functionResult) {
+          console.log("Purchase processed successfully via Cloud Function");
           
           // SECURITY FIX: Handle duplicate transaction detection
-          if (result.duplicate) {
+          if (functionResult.duplicate) {
             console.log("DUPLICATE TRANSACTION DETECTED - Credits were already added");
             setProcessingStatus("Credits were already added to your account!");
           } else {
@@ -260,10 +323,10 @@ function ThankYouContent() {
             packageCredits,
             sessionId,
             transactionId,
-            processResult: response.data,
+            processResult: functionResult, // Use the result from cloud function
           });
         } else {
-          throw new Error(response.data.error || "Payment processing failed");
+          throw new Error("Payment processing failed");
         }
       } catch (error) {
         console.error("Payment processing error:", error);

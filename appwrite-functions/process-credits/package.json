@@ -1,0 +1,12 @@
+{
+  "name": "process-credits",
+  "version": "1.0.0",
+  "description": "Appwrite Cloud Function to handle credit additions for Wish Maker",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "node-appwrite": "^9.0.0"
+  }
+}
