@@ -1,30 +1,47 @@
 const sdk = require('node-appwrite');
 
 /*
-  'req' variable has:
-    'headers' - object with request headers
-    'payload' - request body data as a string
-    'variables' - object with function variables
-
-  'res' variable has:
-    'send(text, status)' - function to return text response. Status code defaults to 200
-    'json(obj, status)' - function to return JSON response. Status code defaults to 200
+  The Appwrite function format has changed. The new format uses a context object
+  instead of req and res. This provides better logging and error handling.
   
-  If an error is thrown, a response with code 500 will be returned.
+  'context' variable has:
+    'req' - object with request data
+      'headers' - object with request headers
+      'payload' - request body data as a string
+      'variables' - object with function variables
+    'log(text)' - function to log information
+    'error(text)' - function to log errors
+    'res' - methods to return responses
+      'send(text, status)' - function to return text response
+      'json(obj, status)' - function to return JSON response
 */
 
-module.exports = async function(req, res) {
-  // Initialize Appwrite SDK
-  const client = new sdk.Client();
-  
-  // Use Appwrite Function variables to get credentials
-  const { 
-    APPWRITE_FUNCTION_PROJECT_ID, 
-    APPWRITE_API_KEY,
-    DATABASE_ID,
-    USERS_COLLECTION_ID,
-    PURCHASES_COLLECTION_ID
-  } = req.variables;
+module.exports = async function(context) {
+  try {
+    // Initialize Appwrite SDK
+    const client = new sdk.Client();
+    
+    // Use Appwrite Function variables to get credentials with fallbacks
+    const variables = context.req?.variables || {};
+    
+    // Use proper logging
+    context.log("Available variables:", Object.keys(variables));
+    
+    // Define hardcoded fallback values for development/testing
+    const APPWRITE_FUNCTION_PROJECT_ID = variables.APPWRITE_FUNCTION_PROJECT_ID || process.env.APPWRITE_FUNCTION_PROJECT_ID || '64f8d2a0e5d8b0e4d0a4';
+    const APPWRITE_API_KEY = variables.APPWRITE_API_KEY || process.env.APPWRITE_API_KEY;
+    const DATABASE_ID = variables.DATABASE_ID || process.env.DATABASE_ID || 'default';
+    const USERS_COLLECTION_ID = variables.USERS_COLLECTION_ID || process.env.USERS_COLLECTION_ID || 'users';
+    const PURCHASES_COLLECTION_ID = variables.PURCHASES_COLLECTION_ID || process.env.PURCHASES_COLLECTION_ID || 'purchases';
+    
+    // Validate required variables
+    if (!APPWRITE_FUNCTION_PROJECT_ID || !APPWRITE_API_KEY) {
+      context.error("Missing critical environment variables");
+      return context.res.json({
+        success: false,
+        message: "Server configuration error: Missing critical environment variables"
+      }, 500);
+    }
 
   // Set up the client
   client
@@ -36,19 +53,50 @@ module.exports = async function(req, res) {
   const databases = new sdk.Databases(client);
   const { ID, Query } = sdk;
 
-  try {
     // Parse request data
-    const { userId, packageId, transactionId, amount } = JSON.parse(req.payload);
+    let userId, packageId, transactionId, amount;
+    try {
+      // Log the raw payload for debugging
+      context.log("Raw payload:", context.req?.payload);
+      
+      // Handle different payload formats
+      let payload;
+      if (typeof context.req?.payload === 'object') {
+        // Payload is already an object
+        payload = context.req.payload;
+      } else if (typeof context.req?.payload === 'string') {
+        // Try to parse the payload as JSON
+        payload = JSON.parse(context.req.payload || '{}');
+      } else {
+        // Fallback to empty object
+        payload = {};
+      }
+      
+      userId = payload.userId;
+      packageId = payload.packageId;
+      transactionId = payload.transactionId;
+      amount = payload.amount;
+      
+      context.log("Processed payload:", { userId, packageId, transactionId, amount });
+    } catch (parseError) {
+      context.error("Error parsing payload:", parseError);
+      return context.res.json({
+        success: false,
+        message: "Invalid payload format",
+        error: parseError.message
+      }, 400);
+    }
     
     // Validate required fields
     if (!userId || !packageId || !transactionId) {
-      return res.json({
+      context.error("Missing required fields in payload");
+      return context.res.json({
         success: false,
         message: "Missing required fields: userId, packageId, and transactionId are required"
       }, 400);
     }
 
-    console.log(`Processing credit addition for user ${userId}, package ${packageId}, transaction ${transactionId}`);
+    context.log(`Processing credit addition for user ${userId}, package ${packageId}, transaction ${transactionId}`);
     
     // Create a unique, deterministic transaction ID if not provided
     const finalTransactionId = transactionId || `tx_${userId}_${packageId}_${Date.now()}`;
@@ -65,15 +113,15 @@ module.exports = async function(req, res) {
       );
       
       if (existingTransactions.total > 0) {
-        console.log(`Transaction ${finalTransactionId} already processed`);
-        return res.json({
+        context.log(`Transaction ${finalTransactionId} already processed`);
+        return context.res.json({
           success: true,
           duplicate: true,
           message: "Credits were already added for this transaction"
         });
       }
     } catch (error) {
-      console.error("Error checking for existing transaction:", error);
+      context.error("Error checking for existing transaction:", error);
       // Continue processing - it's better to risk a duplicate than to fail
     }
     
@@ -90,7 +138,7 @@ module.exports = async function(req, res) {
       creditsToAdd = Math.min(Math.max(0, amount || 0) * 20, 1000);
     }
     
-    console.log(`Adding ${creditsToAdd} credits for package ${packageId}`);
+    context.log(`Adding ${creditsToAdd} credits for package ${packageId}`);
     
     // Step 3: Add credits to user - using atomic operations
     // Get current user document
@@ -131,10 +179,10 @@ module.exports = async function(req, res) {
       }
     );
     
-    console.log(`Successfully added ${creditsToAdd} credits to user ${userId}. New balance: ${newBalance}`);
+    context.log(`Successfully added ${creditsToAdd} credits to user ${userId}. New balance: ${newBalance}`);
     
     // Return success response
-    return res.json({
+    return context.res.json({
       success: true,
       newBalance,
       creditsAdded: creditsToAdd,
@@ -142,9 +190,10 @@ module.exports = async function(req, res) {
     });
     
   } catch (error) {
-    console.error("Error processing credit addition:", error);
+    context.error("Error processing credit addition:", error);
     
-    return res.json({
+    // Always use context.res for responses
+    return context.res.json({
       success: false,
       message: "Failed to process credit addition",
       error: error.message

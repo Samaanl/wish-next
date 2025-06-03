@@ -166,14 +166,19 @@ function ThankYouContent() {
     // @ts-ignore - Access custom window property
     if (window.wishMaker) window.wishMaker.processingPayment = true;
 
+    // Prepare payload with explicit types to ensure proper formatting
+    const payload = {
+      userId: currentUser.id,
+      packageId: packageId,
+      amount: packageId === "basic" ? 1 : packageId === "premium" ? 5 : 50, // 50 for pro package
+      transactionId: transactionId
+    };
+    
+    console.log("Stringified payload:", JSON.stringify(payload));
+    
     const execution = await functions.createExecution(
       '683eaf99003799365f40', // Function ID for process-credits
-      JSON.stringify({
-        userId: currentUser.id,
-        packageId,
-        amount: packageId === "basic" ? 1 : packageId === "premium" ? 5 : 0,
-        transactionId,
-      }),
+      JSON.stringify(payload),
       false // Async execution
     );
 
