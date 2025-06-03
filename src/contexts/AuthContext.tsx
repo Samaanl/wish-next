@@ -82,26 +82,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
       setIsLoading(true);
       try {
-        // Add rate limiting - check if we've made a request recently
-        const lastAuthCheck = localStorage.getItem("last_auth_check");
-        const now = Date.now(); // If we made an auth check in the last 15 seconds, skip this check
-        if (lastAuthCheck && now - parseInt(lastAuthCheck) < 15000) {
-          console.log("Skipping auth check - rate limited");
-          const guestUser = getGuestUser();
-          setCurrentUser(guestUser);
-          setIsLoading(false);
-          setHasInitialized(true);
-          return;
-        } // Also check if we're in the middle of a magic link verification
-        const magicLinkProcess = localStorage.getItem(
-          "last_magic_link_process"
-        );
+        // Check if we're in the middle of a magic link verification
         const magicLinkVerifying = localStorage.getItem("magic_link_verifying");
 
-        if (
-          (magicLinkProcess && now - parseInt(magicLinkProcess) < 20000) ||
-          magicLinkVerifying
-        ) {
+        if (magicLinkVerifying) {
           console.log(
             "Skipping auth check - magic link verification in progress"
           );
@@ -109,7 +93,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           setHasInitialized(true);
           return;
         }
-
+        
+        // Record this auth check attempt but don't use it for rate limiting
+        // This ensures we always check auth on page load/refresh
+        const now = Date.now();
         localStorage.setItem("last_auth_check", now.toString());
 
         // First try to get the stored user from localStorage

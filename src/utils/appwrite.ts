@@ -39,7 +39,7 @@ console.log("Appwrite Configuration:", {
   projectId: process.env.NEXT_PUBLIC_APPWRITE_PROJECT,
 });
 
-// Helper to works check if we should try to use Appwrite authentication
+// Helper to check if we should try to use Appwrite authentication
 export const shouldUseAppwrite = () => {
   // Check if we're in the browser
   if (typeof window === "undefined") return false;
@@ -53,9 +53,16 @@ export const shouldUseAppwrite = () => {
   }
 
   try {
-    // Check if the user is a registered user who's signed in
-    const session = localStorage.getItem("appwrite_session");
-    return !!session; // Only use Appwrite if we have a session
+    // Check if the user has an Appwrite session cookie
+    // Appwrite stores session in a cookie named 'a_session_[PROJECT_ID]'
+    const projectId = process.env.NEXT_PUBLIC_APPWRITE_PROJECT || "682a20150028bfd73ea8";
+    const hasSessionCookie = document.cookie.includes(`a_session_${projectId}`);
+    
+    // Also check localStorage as a fallback for the currentUser
+    const storedUser = localStorage.getItem("currentUser");
+    const hasStoredUser = !!storedUser && !JSON.parse(storedUser).isGuest;
+    
+    return hasSessionCookie || hasStoredUser;
   } catch {
     // If there's any error checking, be safe and use guest mode
     return false;
