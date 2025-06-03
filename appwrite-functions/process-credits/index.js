@@ -1,4 +1,5 @@
-const sdk = require('node-appwrite');
+// Using native fetch instead of the Appwrite SDK to avoid request body errors
+const fetch = require('node-fetch');
 
 /*
   'context' variable has:
@@ -101,18 +102,46 @@ module.exports = async function(context) {
       }, 500);
     }
 
-    // Initialize Appwrite SDK
-    const client = new sdk.Client();
+    // Setup for direct API calls
+    const API_ENDPOINT = 'https://cloud.appwrite.io/v1';
     
-    // Set up the client
-    client
-      .setEndpoint('https://fra.cloud.appwrite.io/v1')
-      .setProject(APPWRITE_FUNCTION_PROJECT_ID)
-      .setKey(APPWRITE_API_KEY);
-
-    // Initialize Appwrite services
-    const databases = new sdk.Databases(client);
-    const { ID, Query } = sdk;
+    // Helper function for making authenticated API calls to Appwrite
+    const appwriteApi = async (path, method = 'GET', body = null) => {
+      const url = `${API_ENDPOINT}${path}`;
+      const headers = {
+        'Content-Type': 'application/json',
+        'X-Appwrite-Project': APPWRITE_FUNCTION_PROJECT_ID,
+        'X-Appwrite-Key': APPWRITE_API_KEY
+      };
+      
+      const options = {
+        method,
+        headers,
+        // Only include body for non-GET requests and when body is provided
+        ...((method !== 'GET' && body) ? { body: JSON.stringify(body) } : {})
+      };
+      
+      context.log(`Making API call to ${method} ${url}`);
+      
+      try {
+        const response = await fetch(url, options);
+        const data = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(`API error: ${response.status} ${data.message || JSON.stringify(data)}`);
+        }
+        
+        return data;
+      } catch (error) {
+        context.error(`API call failed: ${error.message}`);
+        throw error;
+      }
+    };
+    
+    // Generate a unique ID for documents
+    const generateUniqueId = () => {
+      return 'unique_' + Date.now() + '_' + Math.random().toString(36).substring(2, 15);
+    };
 
     // Parse request data - CRITICAL FIX
     let userId, packageId, transactionId, amount;
@@ -235,26 +264,38 @@ module.exports = async function(context) {
     
     // Step 1: Check if this transaction has already been processed
     try {
-      // First try to find by exact transaction ID
-      // Adding a transaction_id field to the query even though it's not in the schema
-      // This will help us track duplicates
-      const existingTransactions = await databases.listDocuments(
-        DATABASE_ID,
-        PURCHASES_COLLECTION_ID,
-        [Query.equal('user_id', userId), Query.equal('package_id', packageId)]
+      context.log(`Checking for existing transaction: user=${userId}, package=${packageId}`);
+      
+      // Use direct API call to list documents with filters
+      // Appwrite requires specific query format
+      const queryParams = new URLSearchParams({
+        'queries[]': `equal("user_id", ["${userId}"])`,
+        'limit': '50'
+      }).toString();
+      
+      const existingTransactions = await appwriteApi(
+        `/databases/${DATABASE_ID}/collections/${PURCHASES_COLLECTION_ID}/documents?${queryParams}`
       );
       
-      if (existingTransactions.total > 0) {
-        context.log(`Transaction ${finalTransactionId} already processed`);
+      // Check if any of the existing transactions match our package ID
+      const matchingTransaction = existingTransactions.documents?.find(
+        doc => doc.package_id === packageId
+      );
+      
+      if (matchingTransaction) {
+        context.log(`Transaction for user ${userId} and package ${packageId} already processed`);
         return context.res.json({
           success: true,
           duplicate: true,
           message: "Credits were already added for this transaction"
         });
       }
+      
+      context.log("No duplicate transaction found, proceeding with credit addition");
     } catch (error) {
-      context.error("Error checking for existing transaction:", error);
+      context.error("Error checking for existing transaction:", error.message);
       // Continue processing - it's better to risk a duplicate than to fail
+      context.log("Continuing despite error in duplicate check");
     }
     
     // Step 2: Determine the correct credit amount based on the package ID
@@ -272,54 +313,71 @@ module.exports = async function(context) {
     
     context.log(`Adding ${creditsToAdd} credits for package ${packageId}`);
     
-    // Step 3: Add credits to user - using atomic operations
-    // Get current user document
-    const user = await databases.getDocument(
-      DATABASE_ID,
-      USERS_COLLECTION_ID,
-      userId
-    );
-    
-    // Calculate new balance
-    const currentCredits = user.credits || 0;
-    const newBalance = currentCredits + creditsToAdd;
-    
-    // Update user credits atomically
-    // Note: The users collection doesn't have an updated_at field according to the schema
-    await databases.updateDocument(
-      DATABASE_ID,
-      USERS_COLLECTION_ID,
-      userId,
-      {
-        credits: newBalance
-      }
-    );
-    
-    // Step 4: Record the purchase with a unique ID to prevent duplicates
-    await databases.createDocument(
-      DATABASE_ID,
-      PURCHASES_COLLECTION_ID,
-      ID.unique(),
-      {
+    // Step 3: Get current user document and update credits
+    try {
+      context.log(`Getting user document for ID: ${userId}`);
+      
+      // Get the current user document
+      const user = await appwriteApi(
+        `/databases/${DATABASE_ID}/collections/${USERS_COLLECTION_ID}/documents/${userId}`
+      );
+      
+      // Calculate new balance
+      const currentCredits = user.credits || 0;
+      const newBalance = currentCredits + creditsToAdd;
+      
+      context.log(`Updating user credits. Current: ${currentCredits}, Adding: ${creditsToAdd}, New: ${newBalance}`);
+      
+      // Update user credits with direct API call
+      // Appwrite requires data to be wrapped in a 'data' object
+      await appwriteApi(
+        `/databases/${DATABASE_ID}/collections/${USERS_COLLECTION_ID}/documents/${userId}`,
+        'PATCH',
+        { data: { credits: newBalance } }
+      );
+      
+      // Step 4: Record the purchase with a unique ID to prevent duplicates
+      const purchaseData = {
         user_id: userId,
         package_id: packageId,
-        // Store transaction ID in a comment field since it's not in the schema
-        // We'll use the combination of user_id and package_id to detect duplicates
         amount: amount || 0,
         credits: creditsToAdd,
         created_at: new Date().toISOString()
+      };
+      
+      // Add a comment field with the transaction ID if possible
+      if (transactionId) {
+        purchaseData.comment = `Transaction ID: ${transactionId}`;
       }
-    );
-    
-    context.log(`Successfully added ${creditsToAdd} credits to user ${userId}. New balance: ${newBalance}`);
-    
-    // Return success response
-    return context.res.json({
-      success: true,
-      newBalance,
-      creditsAdded: creditsToAdd,
-      message: "Credits added successfully"
-    });
+      
+      const uniqueId = generateUniqueId();
+      context.log(`Creating purchase record with ID: ${uniqueId}`);
+      
+      // Create document with correct Appwrite API format
+      // Appwrite requires data to be wrapped in a 'data' object
+      await appwriteApi(
+        `/databases/${DATABASE_ID}/collections/${PURCHASES_COLLECTION_ID}/documents/${uniqueId}`,
+        'POST',
+        { data: purchaseData }
+      );
+      
+      context.log(`Successfully processed credit addition for user ${userId}. New balance: ${newBalance}`);
+      
+      // Return success response
+      return context.res.json({
+        success: true,
+        newBalance,
+        creditsAdded: creditsToAdd,
+        message: "Credits added successfully"
+      });
+    } catch (error) {
+      context.error(`Error processing credits: ${error.message}`);
+      return context.res.json({
+        success: false,
+        message: "Error processing credits",
+        error: error.message
+      }, 500);
+    }
     
   } catch (error) {
     context.error("Error processing credit addition:", error);

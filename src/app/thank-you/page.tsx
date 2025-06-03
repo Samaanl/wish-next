@@ -235,36 +235,54 @@ function ThankYouContent() {
     let executionResponse;
     let responseData;
     
-    try {
-      const execution = await functions.createExecution(
-        '683eaf99003799365f40', // Function ID for process-credits
-        JSON.stringify(payload), // Send as JSON string
-        false // Async execution
-      );
+    // Set a flag in sessionStorage to prevent duplicate API calls during this session
+    const functionCallKey = `function_call_${transactionId}`;
+    
+    // Check if we've already called the function with this transaction ID
+    if (sessionStorage.getItem(functionCallKey)) {
+      console.log("Preventing duplicate function call for transaction:", transactionId);
+      executionResponse = { responseBody: JSON.stringify({ 
+        success: true, 
+        message: "Credits already being processed", 
+        duplicate: true 
+      })};
+    } else {
+      // Mark that we're calling the function
+      sessionStorage.setItem(functionCallKey, Date.now().toString());
       
-      executionResponse = execution;
-      console.log("Appwrite function execution response:", execution);
-    } catch (error) {
-      console.error("Error calling Appwrite function:", error);
-      
-      // Try again with a direct API call as fallback
       try {
-        console.log("Trying fallback API call...");
-        const response = await fetch('https://fra.cloud.appwrite.io/v1/functions/683eaf99003799365f40/executions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Appwrite-Project': process.env.NEXT_PUBLIC_APPWRITE_PROJECT || '682a20150028bfd73ea8',
-          },
-          body: JSON.stringify(payload)
-        });
+        const execution = await functions.createExecution(
+          '683eaf99003799365f40', // Function ID for process-credits
+          JSON.stringify(payload), // Send as JSON string
+          false // Async execution
+        );
         
-        const fallbackData = await response.json();
-        console.log("Fallback API response:", fallbackData);
-        executionResponse = { responseBody: JSON.stringify(fallbackData) };
-      } catch (fallbackError) {
-        console.error("Fallback API call also failed:", fallbackError);
-        executionResponse = { responseBody: '{}' };
+        executionResponse = execution;
+        console.log("Appwrite function execution response:", execution);
+      } catch (error) {
+        console.error("Error calling Appwrite function:", error);
+        
+        // Try again with a direct API call as fallback, but only if we haven't succeeded already
+        if (!executionResponse) {
+          try {
+            console.log("Trying fallback API call...");
+            const response = await fetch('https://fra.cloud.appwrite.io/v1/functions/683eaf99003799365f40/executions', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-Appwrite-Project': process.env.NEXT_PUBLIC_APPWRITE_PROJECT || '682a20150028bfd73ea8',
+              },
+              body: JSON.stringify(payload)
+            });
+            
+            const fallbackData = await response.json();
+            console.log("Fallback API response:", fallbackData);
+            executionResponse = { responseBody: JSON.stringify(fallbackData) };
+          } catch (fallbackError) {
+            console.error("Fallback API call also failed:", fallbackError);
+            executionResponse = { responseBody: '{}' };
+          }
+        }
       }
     }
 
