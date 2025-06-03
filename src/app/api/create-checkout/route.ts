@@ -66,9 +66,7 @@ export async function POST(request: NextRequest) {
     try {
       // Make sure any tes credits value is converted to a string
       const credits = custom?.credits ? String(custom.credits) : "0";
-      const originalPackageId = custom?.package_id || "basic";
-
-      // First, validate the variant exists and is active
+      const originalPackageId = custom?.package_id || "basic"; // First, validate the variant exists and is active
       console.log(`🔍 Validating variant ${packageId}...`);
 
       try {
@@ -82,10 +80,24 @@ export async function POST(request: NextRequest) {
           }
         );
 
-        const variantStatus = variantResponse.data?.data?.attributes?.status;
-        if (variantStatus !== "published") {
+        const variantData = variantResponse.data?.data?.attributes;
+        const variantStatus = variantData?.status;
+
+        console.log(`📊 Variant ${packageId} details:`, {
+          status: variantStatus,
+          name: variantData?.name,
+          price: variantData?.price,
+          isSubscription: variantData?.is_subscription,
+        });
+
+        // Allow both "published" and "draft" status for flexibility
+        // Some valid variants might be in "draft" status but still purchasable
+        if (
+          !variantStatus ||
+          (variantStatus !== "published" && variantStatus !== "draft")
+        ) {
           console.error(
-            `Variant ${packageId} is not published. Status: ${variantStatus}`
+            `Variant ${packageId} has invalid status: ${variantStatus}`
           );
           return NextResponse.json(
             {
@@ -96,15 +108,30 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        console.log(`✅ Variant ${packageId} is valid and published`);
-      } catch (variantError) {
-        console.error("Variant validation failed:", variantError);
-        return NextResponse.json(
-          {
-            error: "Invalid product variant",
-            details: { variantId: packageId },
-          },
-          { status: 400 }
+        console.log(
+          `✅ Variant ${packageId} is valid with status: ${variantStatus}`
+        );
+      } catch (variantError: any) {
+        console.error("Variant validation failed:", {
+          message: variantError?.message,
+          status: variantError?.response?.status,
+          data: variantError?.response?.data,
+        });
+
+        // If it's just a 404, the variant doesn't exist
+        if (variantError?.response?.status === 404) {
+          return NextResponse.json(
+            {
+              error: "Product variant not found",
+              details: { variantId: packageId },
+            },
+            { status: 400 }
+          );
+        }
+
+        // For other errors, log but continue with checkout attempt
+        console.warn(
+          "⚠️ Variant validation failed, but continuing with checkout attempt"
         );
       }
 
