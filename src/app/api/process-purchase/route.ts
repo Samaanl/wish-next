@@ -135,7 +135,6 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     console.log("Processing purchase manually:", body);
-
     const {
       userId,
       userEmail,
@@ -146,12 +145,12 @@ export async function POST(request: NextRequest) {
       directUpdate,
       isRetry,
       transactionId,
+      forceProcess,
     } = body;
 
     // Generate or use transaction ID for idempotency
     const processingId =
       transactionId || `tx_${userId}_${packageId}_${Date.now()}`;
-
     console.log("Purchase details:", {
       userId,
       userEmail,
@@ -161,6 +160,7 @@ export async function POST(request: NextRequest) {
       forceUpdate: !!forceUpdate,
       directUpdate: !!directUpdate,
       isRetry: !!isRetry,
+      forceProcess: !!forceProcess,
       processingId,
       bodyType: typeof body,
       userIdType: typeof userId,
@@ -186,65 +186,74 @@ export async function POST(request: NextRequest) {
       creditsNumber,
       amountNumber,
       userId: typeof userId === "string" ? userId : String(userId),
-    }); // Check if this transaction has already been processed to prevent duplicates
-    try {
-      // Try to fetch user data first to check current credits
-      const user = await databases.getDocument(
-        DATABASE_ID,
-        USERS_COLLECTION_ID,
-        userId
-      );
+    });
 
-      console.log("Current user credits before processing:", user.credits);
+    // Check if this transaction has already been processed to prevent duplicates
+    // BUT only do this if it's not a force process request
+    if (!forceProcess) {
+      try {
+        // Try to fetch user data first to check current credits
+        const user = await databases.getDocument(
+          DATABASE_ID,
+          USERS_COLLECTION_ID,
+          userId
+        );
 
-      // Only consider it a duplicate if this is a retry and we explicitly use the same transactionId
-      // This allows multiple purchases of the same package to be processed correctly
-      if (isRetry && transactionId && user.credits >= creditsNumber) {
-        // First check if this exact transaction was already processed
-        try {
-          const existingPurchases = await databases.listDocuments(
-            DATABASE_ID,
-            PURCHASES_COLLECTION_ID,
-            [
-              Query.equal("user_id", userId),
-              Query.equal("package_id", packageId),
-              Query.orderDesc("$createdAt"),
-              Query.limit(10),
-            ]
-          );
+        console.log("Current user credits before processing:", user.credits);
 
-          // Check if we can find a matching transaction in recent history
-          const matchingPurchase = existingPurchases.documents.find(
-            (purchase) => purchase.$id === transactionId
-          );
-
-          if (matchingPurchase) {
-            console.log(
-              "Found matching transaction ID, skipping duplicate processing"
+        // Only check for duplicates if this is an explicit retry with the same transaction ID
+        if (isRetry && transactionId) {
+          try {
+            const existingPurchases = await databases.listDocuments(
+              DATABASE_ID,
+              PURCHASES_COLLECTION_ID,
+              [
+                Query.equal("user_id", userId),
+                Query.orderDesc("$createdAt"),
+                Query.limit(20),
+              ]
             );
-            return NextResponse.json({
-              success: true,
-              newBalance: user.credits,
-              message:
-                "Credits were already added (duplicate transaction avoided)",
-              wasAlreadyProcessed: true,
-              purchaseId: matchingPurchase.$id,
-            });
-          }
 
-          console.log(
-            "No matching transaction found, continuing with processing"
-          );
-        } catch (err) {
-          console.log("Error checking for existing transaction:", err);
-          // Continue with processing as we couldn't verify
+            // Check if we can find a matching transaction in recent history (last 24 hours)
+            const oneDayAgo = new Date(
+              Date.now() - 24 * 60 * 60 * 1000
+            ).toISOString();
+            const matchingPurchase = existingPurchases.documents.find(
+              (purchase) =>
+                purchase.$id === transactionId &&
+                purchase.$createdAt > oneDayAgo
+            );
+
+            if (matchingPurchase) {
+              console.log(
+                "Found matching transaction ID within 24 hours, skipping duplicate processing"
+              );
+              return NextResponse.json({
+                success: true,
+                newBalance: user.credits,
+                message:
+                  "Credits were already added (duplicate transaction avoided)",
+                wasAlreadyProcessed: true,
+                purchaseId: matchingPurchase.$id,
+              });
+            }
+
+            console.log(
+              "No recent matching transaction found, continuing with processing"
+            );
+          } catch (err) {
+            console.log("Error checking for existing transaction:", err);
+            // Continue with processing as we couldn't verify
+          }
         }
+      } catch (error) {
+        console.log(
+          "Error checking user credits, will continue with processing:",
+          error
+        );
       }
-    } catch (error) {
-      console.log(
-        "Error checking user credits, will continue with processing:",
-        error
-      );
+    } else {
+      console.log("Force process enabled, skipping duplicate checks");
     }
 
     // Create debug object to track each step

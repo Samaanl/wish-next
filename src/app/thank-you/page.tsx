@@ -42,7 +42,6 @@ function ThankYouContent() {
   const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null);
   const [initialCredits, setInitialCredits] = useState<number | null>(null);
   const [finalCredits, setFinalCredits] = useState<number | null>(null);
-
   useEffect(() => {
     // Redirect if no session ID
     if (!sessionId) {
@@ -50,28 +49,107 @@ function ThankYouContent() {
       return;
     }
 
-    // Check if already processed
-    const processedKey = `processed_${sessionId}`;
-    if (sessionStorage.getItem(processedKey)) {
-      console.log("Purchase already processed");
-      setProcessingStatus("Credits already added!");
-      setIsLoading(false);
-      return;
+    // FOR IMMEDIATE FIX: Clear any existing session storage that might be blocking
+    // This ensures fresh processing for each payment
+    const clearBlockingStorage = () => {
+      const keysToCheck = [];
+      for (let i = 0; i < sessionStorage.length; i++) {
+        const key = sessionStorage.key(i);
+        if (key && (key.includes(sessionId) || key.includes(packageId))) {
+          keysToCheck.push(key);
+        }
+      }
+
+      keysToCheck.forEach((key) => {
+        const value = sessionStorage.getItem(key);
+        console.log(`Removing potentially blocking storage: ${key} = ${value}`);
+        sessionStorage.removeItem(key);
+      });
+    };
+
+    // Clear blocking storage immediately
+    clearBlockingStorage(); // Use simple session-based keys without time windows to avoid blocking legitimate payments
+    const uniqueKey = `${sessionId}_${packageId}`;
+    const processedKey = `processed_${uniqueKey}`;
+    const processingKey = `processing_${uniqueKey}`;
+    const attemptsKey = `attempts_${uniqueKey}`;
+
+    console.log(
+      "Processing payment for session:",
+      sessionId,
+      "package:",
+      packageId
+    );
+
+    // Clean up old session storage entries (older than 2 hours to be more lenient)
+    const twoHoursAgo = Date.now() - 2 * 60 * 60 * 1000;
+    for (let i = sessionStorage.length - 1; i >= 0; i--) {
+      const key = sessionStorage.key(i);
+      if (
+        key &&
+        (key.startsWith("processed_") ||
+          key.startsWith("processing_") ||
+          key.startsWith("attempts_"))
+      ) {
+        const storedValue = sessionStorage.getItem(key);
+        if (
+          storedValue &&
+          !isNaN(Number(storedValue)) &&
+          Number(storedValue) < twoHoursAgo
+        ) {
+          sessionStorage.removeItem(key);
+        }
+      }
     }
 
-    // Check processing flag to prevent multiple calls
-    const processingKey = `processing_${sessionId}`;
-    if (sessionStorage.getItem(processingKey)) {
-      console.log("Purchase currently being processed");
-      return;
+    // Check if this specific purchase was already successfully processed
+    const processedTimestamp = sessionStorage.getItem(processedKey);
+    if (processedTimestamp) {
+      const processedTime = parseInt(processedTimestamp);
+      const timeSinceProcessed = Date.now() - processedTime;
+
+      // Only block if processed less than 10 minutes ago to allow for genuine retries
+      if (timeSinceProcessed < 10 * 60 * 1000) {
+        console.log(
+          "This specific purchase recently processed:",
+          uniqueKey,
+          "at",
+          new Date(processedTime)
+        );
+        setProcessingStatus("Credits already added!");
+        setIsLoading(false);
+        return;
+      } else {
+        // Remove old processed flag to allow retry
+        sessionStorage.removeItem(processedKey);
+        console.log("Removed old processed flag, allowing retry");
+      }
     }
 
-    // Limit attempts to prevent infinite loops
-    const attemptsKey = `attempts_${sessionId}`;
+    // Check processing flag to prevent multiple simultaneous calls
+    const processingTimestamp = sessionStorage.getItem(processingKey);
+    if (processingTimestamp) {
+      const processingTime = parseInt(processingTimestamp);
+      const timeSinceProcessing = Date.now() - processingTime;
+
+      // Only block if processing started less than 2 minutes ago
+      if (timeSinceProcessing < 2 * 60 * 1000) {
+        console.log("Purchase currently being processed");
+        return;
+      } else {
+        // Remove old processing flag
+        sessionStorage.removeItem(processingKey);
+        console.log("Removed stale processing flag");
+      }
+    }
+
+    // Limit attempts to prevent infinite loops (more lenient)
     const attempts = parseInt(sessionStorage.getItem(attemptsKey) || "0");
-    if (attempts >= 3) {
-      console.log("Max attempts reached");
-      setProcessingStatus("Maximum attempts reached. Please contact support.");
+    if (attempts >= 5) {
+      console.log("Max attempts reached for:", uniqueKey);
+      setProcessingStatus(
+        "Maximum attempts reached. Please try the Force Add Credits button."
+      );
       setIsLoading(false);
       return;
     }
@@ -79,7 +157,6 @@ function ThankYouContent() {
     // Mark as processing and increment attempts
     sessionStorage.setItem(processingKey, Date.now().toString());
     sessionStorage.setItem(attemptsKey, (attempts + 1).toString());
-
     const processPayment = async () => {
       try {
         setProcessingStatus("Processing your purchase...");
@@ -141,7 +218,7 @@ function ThankYouContent() {
             setFinalCredits(updatedUser.credits);
           }
 
-          // Mark as successfully processed
+          // Mark as successfully processed using the unique key
           sessionStorage.setItem(processedKey, Date.now().toString());
           localStorage.setItem("credits_need_refresh", "true");
 
@@ -189,17 +266,114 @@ function ThankYouContent() {
     refreshUserCredits,
     initialCredits,
   ]);
-
   const handleRetry = async () => {
-    setIsLoading(true);
-    setErrorDetails(null);
+    // Clear ALL payment-related session storage entries
+    const keysToRemove = [];
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const key = sessionStorage.key(i);
+      if (
+        key &&
+        (key.startsWith("processed_") ||
+          key.startsWith("processing_") ||
+          key.startsWith("attempts_"))
+      ) {
+        keysToRemove.push(key);
+      }
+    }
 
-    // Clear processed flag to allow retry
-    sessionStorage.removeItem(`processed_${sessionId}`);
-    sessionStorage.removeItem(`attempts_${sessionId}`);
+    keysToRemove.forEach((key) => sessionStorage.removeItem(key));
+
+    console.log("Cleared all payment session data, reloading page...");
 
     // Trigger a page reload to restart the process
     window.location.reload();
+  };
+
+  // Add function to force process credits (for debugging)
+  const forceProcessCredits = async () => {
+    if (!sessionId) return;
+
+    setIsLoading(true);
+    setErrorDetails(null);
+
+    // Clear all session storage to force fresh processing
+    const keysToRemove = [];
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const key = sessionStorage.key(i);
+      if (
+        key &&
+        (key.startsWith("processed_") ||
+          key.startsWith("processing_") ||
+          key.startsWith("attempts_"))
+      ) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach((key) => sessionStorage.removeItem(key));
+
+    // Process immediately
+    try {
+      setProcessingStatus("Force processing credits...");
+
+      let userId = currentUser?.id;
+      let userEmail = currentUser?.email;
+
+      if (!userId) {
+        const checkoutInfo = getStoredCheckoutInfo();
+        if (checkoutInfo?.id) {
+          userId = checkoutInfo.id;
+          userEmail = checkoutInfo.email;
+        }
+      }
+
+      if (!userId) {
+        throw new Error("Cannot identify user");
+      }
+
+      const selectedPackage = CREDIT_PACKAGES.find(
+        (pkg) => pkg.id === packageId
+      );
+      const packageCredits = selectedPackage?.credits || 10;
+      const transactionId = `force_${sessionId}_${packageId}_${Date.now()}`;
+
+      const response = await axios.post(
+        "/api/process-purchase",
+        {
+          userId,
+          userEmail,
+          packageId,
+          amount: selectedPackage?.price || 1,
+          credits: packageCredits,
+          transactionId,
+          directUpdate: true,
+          forceProcess: true, // Add flag to force processing
+        },
+        {
+          headers: userId ? { "x-user-id": userId } : {},
+        }
+      );
+
+      if (response.data.success) {
+        setProcessingStatus("Credits added successfully!");
+        await refreshUserCredits();
+        const updatedUser = await getCurrentUser();
+        if (updatedUser) {
+          setFinalCredits(updatedUser.credits);
+        }
+        localStorage.setItem("credits_need_refresh", "true");
+      } else {
+        throw new Error(response.data.error || "Force processing failed");
+      }
+    } catch (error) {
+      console.error("Force processing error:", error);
+      setProcessingStatus("Force processing failed. Please contact support.");
+      setErrorDetails({
+        message: error instanceof Error ? error.message : "Unknown error",
+        response: error instanceof AxiosError ? error.response?.data : null,
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   if (isLoading) {
@@ -257,7 +431,6 @@ function ThankYouContent() {
             }`}
           >
             {processingStatus}
-
             {errorDetails && (
               <button
                 onClick={() => console.log("Error details:", errorDetails)}
@@ -265,17 +438,27 @@ function ThankYouContent() {
               >
                 See console for error details
               </button>
-            )}
-
+            )}{" "}
             {(processingStatus.includes("Error") ||
-              processingStatus.includes("Maximum")) && (
-              <button
-                onClick={handleRetry}
-                className="mt-2 px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
-                disabled={isLoading}
-              >
-                {isLoading ? "Retrying..." : "Retry Credit Update"}
-              </button>
+              processingStatus.includes("Maximum") ||
+              processingStatus.includes("already")) && (
+              <div className="mt-2 space-x-2">
+                <button
+                  onClick={handleRetry}
+                  className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
+                  disabled={isLoading}
+                >
+                  {isLoading ? "Retrying..." : "Retry Credit Update"}
+                </button>
+
+                <button
+                  onClick={forceProcessCredits}
+                  className="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700"
+                  disabled={isLoading}
+                >
+                  {isLoading ? "Processing..." : "Force Add Credits"}
+                </button>
+              </div>
             )}
           </div>
         )}
