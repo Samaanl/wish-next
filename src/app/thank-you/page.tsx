@@ -257,7 +257,7 @@ function ThankYouContent() {
             // Call the Appwrite Cloud Function to process the purchase
             // This is much more reliable than calling our API endpoint
             const execution = await functions.createExecution(
-              'process-credits', // Function ID - update this with your actual function ID
+              '683eaf99003799365f40', // Function ID for process-credits
               JSON.stringify({
                 userId: currentUser.id, // Use id instead of $id
                 packageId,

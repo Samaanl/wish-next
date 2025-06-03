@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
             
             // Call the cloud function to process the purchase
             const execution = await functions.createExecution(
-              'process-credits', // Function ID - update this with your actual function ID
+              '683eaf99003799365f40', // Function ID for process-credits
               JSON.stringify({
                 userId,
                 packageId,
