@@ -64,82 +64,13 @@ export async function POST(request: NextRequest) {
       );
     }
     try {
-      // Make sure any tes credits value is converted to a string
+      // Make sure any credits value is converted to a string
       const credits = custom?.credits ? String(custom.credits) : "0";
-      const originalPackageId = custom?.package_id || "basic"; // First, validate the variant exists and is active
-      console.log(`🔍 Validating variant ${packageId}...`);
-
-      try {
-        const variantResponse = await axios.get(
-          `https://api.lemonsqueezy.com/v1/variants/${packageId}`,
-          {
-            headers: {
-              Authorization: `Bearer ${LEMON_SQUEEZY_API_KEY}`,
-              Accept: "application/vnd.api+json",
-            },
-          }
-        );
-
-        const variantData = variantResponse.data?.data?.attributes;
-        const variantStatus = variantData?.status;
-
-        console.log(`📊 Variant ${packageId} details:`, {
-          status: variantStatus,
-          name: variantData?.name,
-          price: variantData?.price,
-          isSubscription: variantData?.is_subscription,
-        });
-
-        // Allow both "published" and "draft" status for flexibility
-        // Some valid variants might be in "draft" status but still purchasable
-        if (
-          !variantStatus ||
-          (variantStatus !== "published" && variantStatus !== "draft")
-        ) {
-          console.error(
-            `Variant ${packageId} has invalid status: ${variantStatus}`
-          );
-          return NextResponse.json(
-            {
-              error: "Product variant is not available for purchase",
-              details: { variantStatus, variantId: packageId },
-            },
-            { status: 400 }
-          );
-        }
-
-        console.log(
-          `✅ Variant ${packageId} is valid with status: ${variantStatus}`
-        );
-      } catch (variantError: any) {
-        console.error("Variant validation failed:", {
-          message: variantError?.message,
-          status: variantError?.response?.status,
-          data: variantError?.response?.data,
-        });
-
-        // If it's just a 404, the variant doesn't exist
-        if (variantError?.response?.status === 404) {
-          return NextResponse.json(
-            {
-              error: "Product variant not found",
-              details: { variantId: packageId },
-            },
-            { status: 400 }
-          );
-        }
-
-        // For other errors, log but continue with checkout attempt
-        console.warn(
-          "⚠️ Variant validation failed, but continuing with checkout attempt"
-        );
-      }
-
+      const originalPackageId = custom?.package_id || "basic";
       const checkoutPayload = {
         data: {
           type: "checkouts",
           attributes: {
-            custom_price: null, // Use the product's default price
             checkout_data: {
               email: userEmail,
               custom: {
@@ -148,33 +79,12 @@ export async function POST(request: NextRequest) {
                 credits: credits,
               },
             },
-            checkout_options: {
-              embed: false,
-              media: false,
-              logo: true,
-              desc: true,
-              discount: true,
-              dark: false,
-              subscription_preview: true,
-              button_color: "#7C3AED",
-            },
             product_options: {
-              name: `Wish Generator Credits - ${originalPackageId.charAt(0).toUpperCase() + originalPackageId.slice(1)} Package`,
-              description: `${credits} credits for the Wish Generator application`,
               redirect_url: `${
                 process.env.NEXT_PUBLIC_URL || "https://wish-next.vercel.app"
               }/thank-you?session_id={checkout_session_id}&package_id=${originalPackageId}`,
-              receipt_button_text: "Go to Dashboard",
-              receipt_link_url: `${
-                process.env.NEXT_PUBLIC_URL || "https://wish-next.vercel.app"
-              }/`,
-              receipt_thank_you_note:
-                "Thank you for your purchase! Your credits have been added to your account.",
-              enabled_variants: [packageId],
             },
             expires_at: null,
-            preview: false,
-            test_mode: process.env.NODE_ENV === "development",
           },
           relationships: {
             store: {
