@@ -82,11 +82,11 @@ export async function GET(request: NextRequest) {
             name: "Test PayPal Checkout - Wish Generator Credits",
             description: "PayPal compatibility test for Wish Generator",
             redirect_url: `${
-              process.env.NEXT_PUBLIC_URL || "https://wish-next.vercel.app"
+              process.env.NEXT_PUBLIC_URL || "https://messagecreate.pro"
             }/thank-you?session_id={checkout_session_id}&package_id=basic&test=paypal`,
             receipt_button_text: "Return to App",
             receipt_link_url: `${
-              process.env.NEXT_PUBLIC_URL || "https://wish-next.vercel.app"
+              process.env.NEXT_PUBLIC_URL || "https://messagecreate.pro"
             }/`,
             receipt_thank_you_note: "PayPal test completed successfully!",
             enabled_variants: [variantId],

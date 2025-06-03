@@ -27,7 +27,7 @@ export async function GET() {
           },
           product_options: {
             redirect_url: `${
-              process.env.NEXT_PUBLIC_URL || "https://wish-next.vercel.app"
+              process.env.NEXT_PUBLIC_URL || "https://messagecreate.pro"
             }/thank-you?session_id={checkout_session_id}`,
           },
         },
