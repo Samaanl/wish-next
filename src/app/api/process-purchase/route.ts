@@ -229,9 +229,80 @@ export async function POST(request: NextRequest) {
     // This prevents multiple credit additions for the same transaction
     if (processingId) {
       try {
-        console.log("Checking for duplicate transaction with ID:", processingId);
+        console.log("DUPLICATE CHECK: Checking for transaction with ID:", processingId);
         debug.steps.push({ step: "checkDuplicate", result: "attempting" });
         
+        // First check in the purchases collection directly
+        try {
+          const existingDoc = await databases.getDocument(
+            DATABASE_ID,
+            PURCHASES_COLLECTION_ID,
+            processingId
+          );
+          
+          if (existingDoc) {
+            console.log("DUPLICATE TRANSACTION DETECTED - Direct ID match:", processingId);
+            debug.steps[debug.steps.length - 1].result = "duplicate_found_direct";
+            debug.finalResult = {
+              success: true,
+              method: "duplicate_prevention",
+              message: "Credits were already added for this transaction"
+            };
+            
+            return NextResponse.json({
+              success: true,
+              duplicate: true,
+              message: "Credits were already added for this transaction",
+              debug,
+            });
+          }
+        } catch (directError) {
+          // If not found by direct ID, continue to other checks
+          console.log("No direct ID match found, continuing checks...");
+        }
+        
+        // Then check with a query to find any similar transaction IDs
+        try {
+          const existingTransactions = await databases.listDocuments(
+            DATABASE_ID,
+            PURCHASES_COLLECTION_ID,
+            [Query.equal("user_id", userId), Query.equal("package_id", packageId)]
+          );
+          
+          // Check if any existing transaction has a similar ID pattern
+          if (existingTransactions.total > 0) {
+            console.log(`Found ${existingTransactions.total} previous transactions for this user/package`);
+            
+            // Check if any of these transactions match our processing ID pattern
+            const baseIdPattern = processingId.split('_').slice(0, 3).join('_');
+            const matchingTransaction = existingTransactions.documents.find(doc => 
+              doc.$id.includes(baseIdPattern) || 
+              (doc.transaction_id && doc.transaction_id.includes(baseIdPattern))
+            );
+            
+            if (matchingTransaction) {
+              console.log("DUPLICATE TRANSACTION DETECTED - Similar ID pattern:", matchingTransaction.$id);
+              debug.steps[debug.steps.length - 1].result = "duplicate_found_similar";
+              debug.finalResult = {
+                success: true,
+                method: "duplicate_prevention",
+                message: "Credits were already added for a similar transaction"
+              };
+              
+              return NextResponse.json({
+                success: true,
+                duplicate: true,
+                message: "Credits were already added for this transaction",
+                debug,
+              });
+            }
+          }
+        } catch (queryError) {
+          console.log("Error in query-based duplicate check:", queryError);
+          // Continue to next check
+        }
+        
+        // Finally, try to create a purchase record as a definitive check
         const purchaseRecord = await recordPurchaseInDatabase(
           userId,
           packageId,
@@ -241,8 +312,8 @@ export async function POST(request: NextRequest) {
         );
         
         if (purchaseRecord && purchaseRecord.duplicate === true) {
-          console.log("DUPLICATE TRANSACTION DETECTED - Preventing duplicate credits");
-          debug.steps[debug.steps.length - 1].result = "duplicate_found";
+          console.log("DUPLICATE TRANSACTION DETECTED - Purchase record already exists");
+          debug.steps[debug.steps.length - 1].result = "duplicate_found_record";
           debug.finalResult = {
             success: true,
             method: "duplicate_prevention",
@@ -258,6 +329,7 @@ export async function POST(request: NextRequest) {
         }
         
         debug.steps[debug.steps.length - 1].result = "no_duplicate_found";
+        console.log("NO DUPLICATE FOUND - Proceeding with credit addition");
       } catch (dupError) {
         console.error("Error checking for duplicates:", dupError);
         debug.steps[debug.steps.length - 1].result = "check_failed";

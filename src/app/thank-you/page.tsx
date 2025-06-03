@@ -42,10 +42,19 @@ function ThankYouContent() {
   const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null);
   const [initialCredits, setInitialCredits] = useState<number | null>(null);
   const [finalCredits, setFinalCredits] = useState<number | null>(null);
+  // CRITICAL FIX: Add a global flag to prevent multiple API calls within the same page session
+  const [hasProcessedPayment, setHasProcessedPayment] = useState(false);
+
   useEffect(() => {
     // Redirect if no session ID
     if (!sessionId) {
       router.push("/");
+      return;
+    }
+    
+    // CRITICAL FIX: If we've already processed a payment in this component instance, don't do it again
+    if (hasProcessedPayment) {
+      console.log("DUPLICATE PREVENTION: Payment already processed in this session");
       return;
     }
 
@@ -194,8 +203,10 @@ function ThankYouContent() {
           setInitialCredits(currentUser.credits);
         }
 
-        // Generate unique transaction ID
-        const transactionId = `tx_${sessionId}_${packageId}_${Date.now()}`;
+        // CRITICAL FIX: Generate a consistent transaction ID without timestamp
+        // This ensures the same transaction ID is used even if the page is refreshed
+        const transactionId = `tx_${sessionId}_${packageId}`;
+        console.log("Using consistent transaction ID to prevent duplicates:", transactionId);
 
         // Call the API to process the purchase
         const response = await axios.post(
@@ -205,7 +216,7 @@ function ThankYouContent() {
             packageId,
             amount: selectedPackage?.price || 1,
             credits: packageCredits,
-            transactionId,
+            processingId: transactionId, // Use consistent ID as processingId
           },
           {
             headers: userId ? { "x-user-id": userId } : {},
@@ -224,6 +235,9 @@ function ThankYouContent() {
           } else {
             setProcessingStatus("Credits added successfully!");
           }
+          
+          // CRITICAL FIX: Set the flag to prevent multiple API calls in this session
+          setHasProcessedPayment(true);
           
           // Mark this purchase as processed with a timestamp
           sessionStorage.setItem(processedKey, Date.now().toString());

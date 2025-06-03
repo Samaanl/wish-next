@@ -93,13 +93,27 @@ export async function POST(request: NextRequest) {
         const attributes = data.attributes;
         const customData = attributes.custom_data || {};
         const total = attributes.total || 0;
-        const orderId = data.id || `order_${Date.now()}`;
+        
+        // CRITICAL FIX: Use a consistent transaction ID format
+        // If we have a session ID in custom data, use the same format as thank-you page
+        const sessionId = customData.session_id || "";
+        const packageId = customData.package_id || "";
+        
+        // If we have both session_id and package_id, use the same format as the thank-you page
+        // Otherwise fall back to the order ID
+        const orderId = (sessionId && packageId) 
+          ? `tx_${sessionId}_${packageId}` 
+          : (data.id || `order_${Date.now()}`);
 
         console.log("Processing order_created webhook with data:", {
           orderId,
           customData,
           total,
+          isConsistentFormat: !!(sessionId && packageId)
         });
+        
+        // Add extra logging to track duplicate prevention
+        console.log("DUPLICATE CHECK: Using transaction ID:", orderId);
 
         if (!customData.user_id || !customData.package_id) {
           console.error("Missing required custom_data in webhook");
