@@ -49,20 +49,23 @@ function ThankYouContent() {
       return;
     }
 
-    // FOR IMMEDIATE FIX: Clear any existing session storage that might be blocking
-    // This ensures fresh processing for each payment
+    // SECURITY FIX: Only clear processing flags, not processed flags
+    // This prevents payment processing loops
     const clearBlockingStorage = () => {
       const keysToCheck = [];
       for (let i = 0; i < sessionStorage.length; i++) {
         const key = sessionStorage.key(i);
-        if (key && (key.includes(sessionId) || key.includes(packageId))) {
+        // Only clear processing_ flags, not processed_ flags
+        // This prevents the payment from being processed multiple times
+        if (key && key.startsWith('processing_') && 
+            (key.includes(sessionId) || key.includes(packageId))) {
           keysToCheck.push(key);
         }
       }
 
       keysToCheck.forEach((key) => {
         const value = sessionStorage.getItem(key);
-        console.log(`Removing potentially blocking storage: ${key} = ${value}`);
+        console.log(`Removing stale processing flag: ${key} = ${value}`);
         sessionStorage.removeItem(key);
       });
     };
@@ -102,27 +105,29 @@ function ThankYouContent() {
       }
     }
 
+    // SECURITY FIX: Improved check for already processed payments
     // Check if this specific purchase was already successfully processed
     const processedTimestamp = sessionStorage.getItem(processedKey);
     if (processedTimestamp) {
       const processedTime = parseInt(processedTimestamp);
       const timeSinceProcessed = Date.now() - processedTime;
 
-      // Only block if processed less than 10 minutes ago to allow for genuine retries
-      if (timeSinceProcessed < 10 * 60 * 1000) {
+      // Extend the window to 24 hours to prevent duplicate processing
+      // This helps prevent credit duplication issues
+      if (timeSinceProcessed < 24 * 60 * 60 * 1000) {
         console.log(
-          "This specific purchase recently processed:",
+          "PAYMENT ALREADY PROCESSED - Preventing duplicate credits:",
           uniqueKey,
           "at",
           new Date(processedTime)
         );
-        setProcessingStatus("Credits already added!");
+        setProcessingStatus("Credits already added to your account!");
         setIsLoading(false);
         return;
       } else {
-        // Remove old processed flag to allow retry
+        // Only remove very old processed flags (older than 24 hours)
         sessionStorage.removeItem(processedKey);
-        console.log("Removed old processed flag, allowing retry");
+        console.log("Removed old processed flag (>24h), allowing retry");
       }
     }
 
@@ -143,12 +148,13 @@ function ThankYouContent() {
       }
     }
 
-    // Limit attempts to prevent infinite loops (more lenient)
+    // SECURITY FIX: Stricter attempt limits to prevent credit duplication
     const attempts = parseInt(sessionStorage.getItem(attemptsKey) || "0");
-    if (attempts >= 5) {
-      console.log("Max attempts reached for:", uniqueKey);
+    // Reduce max attempts from 5 to 2 to prevent excessive processing attempts
+    if (attempts >= 2) {
+      console.log("SECURITY: Max attempts reached for:", uniqueKey, "- Blocking further attempts");
       setProcessingStatus(
-        "Maximum attempts reached. Please contact support if credits are missing."
+        "Your payment is being processed. Credits will appear in your account shortly. If they don't appear within 5 minutes, please contact support."
       );
       setIsLoading(false);
       return;
@@ -201,7 +207,7 @@ function ThankYouContent() {
             amount: selectedPackage?.price || 1,
             credits: packageCredits,
             transactionId,
-            directUpdate: true,
+            // directUpdate parameter removed for security - credits are now enforced on the server
           },
           {
             headers: userId ? { "x-user-id": userId } : {},

@@ -2,7 +2,12 @@
 
 ## Latest Update: Credit Enforcement System
 
-A critical security vulnerability has been fixed in the payment processing system. The system now strictly enforces that users receive exactly the correct number of credits based on their subscription plan:
+### June 3, 2025: Credit Enforcement and Anti-Duplication Fixes
+
+Two critical security vulnerabilities have been fixed in the payment processing system:
+
+1. **Server-Side Credit Enforcement**: The system now strictly enforces that users receive exactly the correct number of credits based on their subscription plan:
+
 
 - Basic Plan ($1): Exactly 10 credits
 - Premium Plan ($5): Exactly 100 credits
@@ -27,6 +32,25 @@ A critical security vulnerability has been fixed in the payment processing syste
 3. **Process Purchase API**: All credit addition methods now enforce the exact credit amounts based on the package ID.
 
 4. **Security Hardening**: Removed potentially exploitable parameters and added validation to prevent credit manipulation.
+
+2. **Client-Side Credit Duplication Prevention**: Fixed a critical issue where users could receive multiple credit additions for a single purchase:
+
+### Client-Side Duplication Issues Fixed
+
+1. **Payment Processing Loop**: Fixed an issue in the thank-you page where the payment processing code could run multiple times, resulting in duplicate credit additions.
+
+2. **Session Storage Management**: Improved how payment processing flags are managed to prevent multiple processing attempts:
+   - Extended the processed payment tracking window from 10 minutes to 24 hours
+   - Only clearing processing flags, not processed flags, to maintain payment history
+   - Reduced maximum retry attempts from 5 to 2 to prevent excessive processing
+
+3. **Parameter Cleanup**: Removed legacy parameters from client-side API calls:
+   - Removed `directUpdate` parameter from thank-you page API calls
+   - Removed `credits` parameter from `processSuccessfulPurchase` function
+
+4. **Improved Logging**: Added more detailed logging to help identify and debug payment processing issues:
+   - Clear logging when duplicate payment attempts are blocked
+   - Better error messages for users when payments are being processed
 
 ## Overview
 

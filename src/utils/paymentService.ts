@@ -176,15 +176,16 @@ export const processSuccessfulPurchase = async (
   userId: string,
   packageId: string,
   amount: number,
-  credits: number
+  // credits parameter removed - credits are now enforced on the server based on packageId
 ) => {
   try {
     // This would make a call to your API which would then use creditService.recordPurchase
+    // Credits are enforced on the server based on the packageId for security
     const response = await axios.post("/api/process-purchase", {
       userId,
       packageId,
       amount,
-      credits: String(credits),
+      // No credits parameter - server will determine the correct amount based on packageId
     });
 
     return response.data;
