@@ -344,7 +344,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       setIsLoading(false);
     }
   };
-  const value = {
+  const value: AuthContextType = {
     currentUser,
     isLoading,
     logOut,
