@@ -42,9 +42,8 @@ function ThankYouContent() {
   const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null);
   const [initialCredits, setInitialCredits] = useState<number | null>(null);
   const [finalCredits, setFinalCredits] = useState<number | null>(null);
-  // CRITICAL FIX: Add a global flag to prevent multiple API calls within the same page session
-  const [hasProcessedPayment, setHasProcessedPayment] = useState(false);
-
+  // EMERGENCY FIX: Use a global variable to track processed payments across all component instances
+  // This is a more aggressive approach to prevent multiple API calls
   useEffect(() => {
     // Redirect if no session ID
     if (!sessionId) {
@@ -52,11 +51,21 @@ function ThankYouContent() {
       return;
     }
     
-    // CRITICAL FIX: If we've already processed a payment in this component instance, don't do it again
-    if (hasProcessedPayment) {
-      console.log("DUPLICATE PREVENTION: Payment already processed in this session");
+    // Create a unique key for this specific transaction
+    const transactionKey = `${sessionId}_${packageId}`;
+    const globalProcessingKey = `GLOBAL_PROCESSING_${transactionKey}`;
+    
+    // EMERGENCY FIX: Check if this transaction is already being processed globally
+    if (window[globalProcessingKey as any]) {
+      console.log("EMERGENCY DUPLICATE PREVENTION: Transaction already being processed globally");
+      setProcessingStatus("Your payment is being processed. Please wait...");
+      setIsLoading(false);
       return;
     }
+    
+    // Set global processing flag
+    (window as any)[globalProcessingKey] = true;
+    console.log("Set global processing flag to prevent duplicates:", globalProcessingKey);
 
     // SECURITY FIX: Only clear processing flags, not processed flags
     // This prevents payment processing loops
@@ -81,10 +90,9 @@ function ThankYouContent() {
 
     // Clear blocking storage immediately
     clearBlockingStorage(); // Use simple session-based keys without time windows to avoid blocking legitimate payments
-    const uniqueKey = `${sessionId}_${packageId}`;
-    const processedKey = `processed_${uniqueKey}`;
-    const processingKey = `processing_${uniqueKey}`;
-    const attemptsKey = `attempts_${uniqueKey}`;
+    const processedKey = `processed_${transactionKey}`;
+    const processingKey = `processing_${transactionKey}`;
+    const attemptsKey = `attempts_${transactionKey}`;
 
     console.log(
       "Processing payment for session:",
@@ -126,7 +134,7 @@ function ThankYouContent() {
       if (timeSinceProcessed < 24 * 60 * 60 * 1000) {
         console.log(
           "PAYMENT ALREADY PROCESSED - Preventing duplicate credits:",
-          uniqueKey,
+          transactionKey,
           "at",
           new Date(processedTime)
         );
@@ -161,7 +169,7 @@ function ThankYouContent() {
     const attempts = parseInt(sessionStorage.getItem(attemptsKey) || "0");
     // Reduce max attempts from 5 to 2 to prevent excessive processing attempts
     if (attempts >= 2) {
-      console.log("SECURITY: Max attempts reached for:", uniqueKey, "- Blocking further attempts");
+      console.log("SECURITY: Max attempts reached for:", transactionKey, "- Blocking further attempts");
       setProcessingStatus(
         "Your payment is being processed. Credits will appear in your account shortly. If they don't appear within 5 minutes, please contact support."
       );
@@ -236,8 +244,8 @@ function ThankYouContent() {
             setProcessingStatus("Credits added successfully!");
           }
           
-          // CRITICAL FIX: Set the flag to prevent multiple API calls in this session
-          setHasProcessedPayment(true);
+          // EMERGENCY FIX: Mark this transaction as permanently processed globally
+          (window as any)[`GLOBAL_PROCESSED_${transactionKey}`] = true;
           
           // Mark this purchase as processed with a timestamp
           sessionStorage.setItem(processedKey, Date.now().toString());

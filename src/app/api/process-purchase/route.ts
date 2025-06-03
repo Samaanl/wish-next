@@ -6,6 +6,21 @@ import { ID, Query } from "appwrite";
 // Define the purchases collection ID
 const PURCHASES_COLLECTION_ID = "purchases";
 
+// EMERGENCY FIX: Function to get exact credits based on package ID
+function getCreditsForPackage(packageId: string): number {
+  // Define exact credit amounts for each package
+  switch (packageId) {
+    case "basic":
+      return 10;  // $1 plan gets exactly 10 credits
+    case "premium":
+      return 100; // $5 plan gets exactly 100 credits
+    case "pro":
+      return 500; // $20 plan gets exactly 500 credits
+    default:
+      return 10;  // Default to 10 credits for unknown packages
+  }
+}
+
 // Define error type
 interface AppError extends Error {
   response?: {
@@ -167,153 +182,119 @@ async function recordPurchaseInDatabase(
 }
 
 export async function POST(request: NextRequest) {
+  // Create debug object to track each step
+  const debug = {
+    steps: [] as Array<{ step: string; result: string; error?: string }>,
+    finalResult: null as null | {
+      success: boolean;
+      newBalance?: number;
+      method?: string;
+      message: string;
+    },
+    requestData: {} as any, // Add requestData property to fix TypeScript error
+    processingId: "", // Add processingId property to fix TypeScript error
+  };
+  
   try {
-    const body = await request.json();
-    console.log("Process purchase request received:", body);
-
-    // Extract and validate required fields
-    const {
-      userId,
-      packageId,
-      amount,
-      credits,
-      processingId, // Unique ID for this processing attempt
-    } = body;
-
-    // Basic validation
-    if (!userId || !packageId) {
-      return NextResponse.json(
-        { error: "Missing required fields" },
-        { status: 400 }
-      );
+    // Parse the request body
+    const requestData = await request.json();
+    debug.requestData = requestData;
+    
+    // Extract the user ID from the request headers or body
+    const userId = request.headers.get("x-user-id") || requestData.userId;
+    if (!userId) {
+      return NextResponse.json({
+        success: false,
+        error: "User ID is required",
+      });
+    }
+    
+    // Extract other required fields
+    const { packageId, amount, credits, transactionId, processingId } = requestData;
+    if (!packageId || !amount) {
+      return NextResponse.json({
+        success: false,
+        error: "Package ID and amount are required",
+      });
     }
 
-    // Convert amount to number if it's a string
-    const amountNumber = typeof amount === "string" ? parseFloat(amount) : amount;
-    const creditsNumber =
-      typeof credits === "string" ? parseInt(credits) : credits;
+    // Convert amount to number
+    const amountNumber = parseFloat(amount);
+    
+    // SECURITY FIX: Determine exact credits based on package, ignoring client input
+    // This prevents tampering with credit amounts
+    const packageCredits = getCreditsForPackage(packageId);
+    const creditsNumber = packageCredits;
+    
+    // EMERGENCY FIX: Add a global lock in memory to prevent concurrent processing
+    console.log("EMERGENCY DUPLICATE PREVENTION: Using global lock for transaction:", processingId || transactionId);
 
-    // Check if user exists
+        // EMERGENCY FIX: Use a distributed lock approach to prevent concurrent processing
+    // This is the most aggressive approach to prevent duplicate credit additions
+    const finalProcessingId = processingId || transactionId || `tx_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+    debug.processingId = finalProcessingId;
+    
+    // Create a unique lock ID for this transaction
+    const lockId = `lock_${finalProcessingId}`;
+    let lockAcquired = false;
+    
     try {
-      const user = await databases.getDocument(
-        DATABASE_ID,
-        USERS_COLLECTION_ID,
-        userId
-      );
-
-      if (!user) {
-        return NextResponse.json(
-          { error: "User not found" },
-          { status: 404 }
-        );
-      }
-    } catch (error) {
-      console.log(
-        "Error checking user credits, will continue with processing:",
-        error
-      );
-    }
-
-    // Create debug object to track each step
-    const debug = {
-      steps: [] as Array<{ step: string; result: string; error?: string }>,
-      finalResult: null as null | {
-        success: boolean;
-        newBalance?: number;
-        method?: string;
-        message: string;
-      },
-    };
-
-    // CRITICAL FIX: Check for duplicate transactions first
-    // This prevents multiple credit additions for the same transaction
-    if (processingId) {
+      console.log("EMERGENCY DUPLICATE PREVENTION: Attempting to acquire lock for transaction:", finalProcessingId);
+      debug.steps.push({ step: "acquireLock", result: "attempting" });
+      
+      // Try to create a lock document with a very short TTL
       try {
-        console.log("DUPLICATE CHECK: Checking for transaction with ID:", processingId);
-        debug.steps.push({ step: "checkDuplicate", result: "attempting" });
-        
-        // First check in the purchases collection directly
-        try {
-          const existingDoc = await databases.getDocument(
-            DATABASE_ID,
-            PURCHASES_COLLECTION_ID,
-            processingId
-          );
-          
-          if (existingDoc) {
-            console.log("DUPLICATE TRANSACTION DETECTED - Direct ID match:", processingId);
-            debug.steps[debug.steps.length - 1].result = "duplicate_found_direct";
-            debug.finalResult = {
-              success: true,
-              method: "duplicate_prevention",
-              message: "Credits were already added for this transaction"
-            };
-            
-            return NextResponse.json({
-              success: true,
-              duplicate: true,
-              message: "Credits were already added for this transaction",
-              debug,
-            });
+        await databases.createDocument(
+          DATABASE_ID,
+          PURCHASES_COLLECTION_ID,
+          lockId,
+          {
+            user_id: userId,
+            package_id: packageId,
+            amount: amountNumber,
+            credits: packageCredits,
+            created_at: new Date().toISOString(),
+            is_lock: true,
+            lock_expiry: new Date(Date.now() + 60000).toISOString() // 1 minute lock
           }
-        } catch (directError) {
-          // If not found by direct ID, continue to other checks
-          console.log("No direct ID match found, continuing checks...");
-        }
+        );
+        lockAcquired = true;
+        console.log("Lock acquired for transaction:", finalProcessingId);
+        debug.steps[debug.steps.length - 1].result = "lock_acquired";
+      } catch (lockError) {
+        // If we can't create the lock, another process might have created it
+        console.log("DUPLICATE PREVENTION: Failed to acquire lock, transaction may be in progress:", lockError);
+        debug.steps[debug.steps.length - 1].result = "lock_failed";
+        debug.finalResult = {
+          success: true,
+          method: "lock_prevention",
+          message: "This transaction is already being processed"
+        };
         
-        // Then check with a query to find any similar transaction IDs
-        try {
-          const existingTransactions = await databases.listDocuments(
-            DATABASE_ID,
-            PURCHASES_COLLECTION_ID,
-            [Query.equal("user_id", userId), Query.equal("package_id", packageId)]
-          );
-          
-          // Check if any existing transaction has a similar ID pattern
-          if (existingTransactions.total > 0) {
-            console.log(`Found ${existingTransactions.total} previous transactions for this user/package`);
-            
-            // Check if any of these transactions match our processing ID pattern
-            const baseIdPattern = processingId.split('_').slice(0, 3).join('_');
-            const matchingTransaction = existingTransactions.documents.find(doc => 
-              doc.$id.includes(baseIdPattern) || 
-              (doc.transaction_id && doc.transaction_id.includes(baseIdPattern))
-            );
-            
-            if (matchingTransaction) {
-              console.log("DUPLICATE TRANSACTION DETECTED - Similar ID pattern:", matchingTransaction.$id);
-              debug.steps[debug.steps.length - 1].result = "duplicate_found_similar";
-              debug.finalResult = {
-                success: true,
-                method: "duplicate_prevention",
-                message: "Credits were already added for a similar transaction"
-              };
-              
-              return NextResponse.json({
-                success: true,
-                duplicate: true,
-                message: "Credits were already added for this transaction",
-                debug,
-              });
-            }
-          }
-        } catch (queryError) {
-          console.log("Error in query-based duplicate check:", queryError);
-          // Continue to next check
-        }
-        
-        // Finally, try to create a purchase record as a definitive check
-        const purchaseRecord = await recordPurchaseInDatabase(
-          userId,
-          packageId,
-          amountNumber,
-          0, // Credits will be determined later
-          processingId
+        return NextResponse.json({
+          success: true,
+          duplicate: true,
+          message: "This transaction is already being processed",
+          debug,
+        });
+      }
+      
+      // Now check for existing completed transactions to prevent duplicates
+      console.log("DUPLICATE CHECK: Checking for completed transaction with ID:", finalProcessingId);
+      debug.steps.push({ step: "checkDuplicate", result: "attempting" });
+      
+      // First check for exact ID match
+      try {
+        // Check for a non-lock document with this ID
+        const existingDocs = await databases.listDocuments(
+          DATABASE_ID,
+          PURCHASES_COLLECTION_ID,
+          [Query.equal("$id", finalProcessingId), Query.notEqual("is_lock", true)]
         );
         
-        if (purchaseRecord && purchaseRecord.duplicate === true) {
-          console.log("DUPLICATE TRANSACTION DETECTED - Purchase record already exists");
-          debug.steps[debug.steps.length - 1].result = "duplicate_found_record";
+        if (existingDocs.total > 0) {
+          console.log("DUPLICATE TRANSACTION DETECTED - Direct ID match:", finalProcessingId);
+          debug.steps[debug.steps.length - 1].result = "duplicate_found_direct";
           debug.finalResult = {
             success: true,
             method: "duplicate_prevention",
@@ -327,16 +308,50 @@ export async function POST(request: NextRequest) {
             debug,
           });
         }
-        
-        debug.steps[debug.steps.length - 1].result = "no_duplicate_found";
-        console.log("NO DUPLICATE FOUND - Proceeding with credit addition");
-      } catch (dupError) {
-        console.error("Error checking for duplicates:", dupError);
-        debug.steps[debug.steps.length - 1].result = "check_failed";
-        debug.steps[debug.steps.length - 1].error = 
-          dupError instanceof Error ? dupError.message : "Unknown error";
-        // Continue with processing, but be cautious
+      } catch (directError) {
+        // Continue to other checks
+        console.log("Error in direct ID check:", directError);
       }
+      
+      // Then check for transactions with the same user and package in the last 5 minutes
+      try {
+        const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+        const recentTransactions = await databases.listDocuments(
+          DATABASE_ID,
+          PURCHASES_COLLECTION_ID,
+          [
+            Query.equal("user_id", userId),
+            Query.equal("package_id", packageId),
+            Query.greaterThan("timestamp", fiveMinutesAgo),
+            Query.notEqual("is_lock", true)
+          ]
+        );
+        
+        if (recentTransactions.total > 0) {
+          console.log(`DUPLICATE PREVENTION: Found ${recentTransactions.total} recent transactions for this user/package`);
+          debug.steps[debug.steps.length - 1].result = "duplicate_found_recent";
+          debug.finalResult = {
+            success: true,
+            method: "duplicate_prevention",
+            message: "Credits were recently added for this package"
+          };
+          
+          return NextResponse.json({
+            success: true,
+            duplicate: true,
+            message: "Credits were recently added for this package",
+            debug,
+          });
+        }
+      } catch (recentError) {
+        console.log("Error checking recent transactions:", recentError);
+      }
+      
+      debug.steps[debug.steps.length - 1].result = "no_duplicate_found";
+      console.log("NO DUPLICATE FOUND - Proceeding with credit addition");
+    } catch (lockError) {
+      console.error("Error with locking mechanism:", lockError);
+      debug.steps.push({ step: "lockError", result: "failed", error: lockError instanceof Error ? lockError.message : "Unknown error" });
     }
 
     // Try approach 1: Use the recordPurchase function
@@ -344,16 +359,11 @@ export async function POST(request: NextRequest) {
       console.log("Attempting to record purchase via recordPurchase function");
       debug.steps.push({ step: "recordPurchase", result: "attempting" });
       
-      // Determine the correct credit amount based on the package ID
-      let creditsToAdd = 0;
-      if (packageId === "basic") {
-        creditsToAdd = 10; // $1 plan gets exactly 10 credits
-      } else if (packageId === "premium") {
-        creditsToAdd = 100; // $5 plan gets exactly 100 credits
-      } else {
-        // Fallback to the requested credits only if it's a valid number and within reasonable limits
-        creditsToAdd = Math.min(Math.max(0, creditsNumber), 1000); // Cap at 1000 credits for safety
-      }
+      // EMERGENCY FIX: Always use the packageCredits value from our getCreditsForPackage function
+      // This ensures consistent credit amounts and prevents any client-side manipulation
+      const creditsToAdd = packageCredits;
+      
+      console.log(`EMERGENCY FIX: Enforcing exact credit amount: ${creditsToAdd} for package ${packageId}`);
       
       console.log(`Enforcing exact credit amount: ${creditsToAdd} for package ${packageId}`);
 
@@ -368,22 +378,42 @@ export async function POST(request: NextRequest) {
       debug.finalResult = {
         success: true,
         newBalance,
-        method: "recordPurchase",
+        method: "addCredits",
         message: "Credits added successfully"
       };
 
-      // Still try to record purchase in database if not already done
+      // Still try to record purchase in database
       try {
         await recordPurchaseInDatabase(
           userId,
           packageId,
           amountNumber,
           creditsToAdd,
-          processingId
+          finalProcessingId // Use our consistent finalProcessingId
         );
-      } catch (dbErr) {
-        // Non-critical error, don't fail the whole operation
-        console.warn("Failed to record purchase in database:", dbErr);
+        debug.steps.push({ step: "recordPurchaseInDatabase", result: "success" });
+
+        // EMERGENCY FIX: Release the lock after successful processing
+        if (lockAcquired) {
+          try {
+            await databases.deleteDocument(
+              DATABASE_ID,
+              PURCHASES_COLLECTION_ID,
+              lockId
+            );
+            console.log("Lock released for transaction:", finalProcessingId);
+          } catch (unlockError) {
+            console.log("Failed to release lock, will expire automatically:", unlockError);
+          }
+        }
+      } catch (recordError) {
+        console.error("Error recording purchase in database:", recordError);
+        debug.steps.push({
+          step: "recordPurchaseInDatabase",
+          result: "failed",
+          error: recordError instanceof Error ? recordError.message : "Unknown error",
+        });
+        // Non-critical error, continue
       }
 
       return NextResponse.json({
@@ -392,32 +422,24 @@ export async function POST(request: NextRequest) {
         message: "Credits added successfully",
         debug,
       });
-    } catch (error1) {
-      const err1 = error1 as AppError;
+    } catch (error2) {
+      const err2 = error2 as AppError;
       console.error(
-        "Error in recordPurchase:",
-        err1?.message || "Unknown error"
+        "Primary credit addition method failed:",
+        err2?.message || "Unknown error"
       );
 
       debug.steps[debug.steps.length - 1].result = "failed";
-      debug.steps[debug.steps.length - 1].error =
-        err1?.message || "Unknown error";
+      debug.steps[debug.steps.length - 1].error = err2?.message || "Unknown error";
 
-      // Try approach 2: Use addCredits function
+      // Try approach 2: Use addCredits function as fallback
       try {
         console.log("Attempting addCredits fallback");
         debug.steps.push({ step: "addCredits", result: "attempting" });
-
-        // Determine the correct credit amount based on the package ID
-        let creditsToAdd = 0;
-        if (packageId === "basic") {
-          creditsToAdd = 10; // $1 plan gets exactly 10 credits
-        } else if (packageId === "premium") {
-          creditsToAdd = 100; // $5 plan gets exactly 100 credits
-        } else {
-          // Fallback to the requested credits only if it's a valid number and within reasonable limits
-          creditsToAdd = Math.min(Math.max(0, creditsNumber), 1000); // Cap at 1000 credits for safety
-        }
+        
+        // EMERGENCY FIX: Always use the packageCredits value from our getCreditsForPackage function
+        const creditsToAdd = packageCredits;
+        console.log(`EMERGENCY FIX: Enforcing exact credit amount: ${creditsToAdd} for package ${packageId}`);
         
         console.log(`Enforcing exact credit amount: ${creditsToAdd} for package ${packageId}`);
 
