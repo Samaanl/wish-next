@@ -197,34 +197,35 @@ function ThankYouContent() {
         // Generate unique transaction ID
         const transactionId = `tx_${sessionId}_${packageId}_${Date.now()}`;
 
-        // Make API call to process purchase
+        // Call the API to process the purchase
         const response = await axios.post(
           "/api/process-purchase",
           {
             userId,
-            userEmail,
             packageId,
             amount: selectedPackage?.price || 1,
             credits: packageCredits,
             transactionId,
-            // directUpdate parameter removed for security - credits are now enforced on the server
           },
           {
             headers: userId ? { "x-user-id": userId } : {},
           }
         );
 
-        if (response.data.success) {
-          setProcessingStatus("Credits added successfully!");
+        const result = response.data;
 
-          // Refresh user data
-          await refreshUserCredits();
-          const updatedUser = await getCurrentUser();
-          if (updatedUser) {
-            setFinalCredits(updatedUser.credits);
+        if (result.success) {
+          console.log("Purchase processed successfully:", result);
+          
+          // SECURITY FIX: Handle duplicate transaction detection
+          if (result.duplicate) {
+            console.log("DUPLICATE TRANSACTION DETECTED - Credits were already added");
+            setProcessingStatus("Credits were already added to your account!");
+          } else {
+            setProcessingStatus("Credits added successfully!");
           }
-
-          // Mark as successfully processed using the unique key
+          
+          // Mark this purchase as processed with a timestamp
           sessionStorage.setItem(processedKey, Date.now().toString());
           localStorage.setItem("credits_need_refresh", "true");
 

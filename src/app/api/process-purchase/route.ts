@@ -58,7 +58,7 @@ async function recordPurchaseInDatabase(
   transactionId?: string
 ) {
   try {
-    console.log("Recording purchase in database:", {
+    console.log("STRICT DUPLICATE CHECK: Recording purchase in database:", {
       userId,
       packageId,
       amount,
@@ -73,7 +73,44 @@ async function recordPurchaseInDatabase(
         .toString(36)
         .substring(2, 7)}`;
 
-    // First check if this exact purchase ID already exists to avoid conflicts
+    // CRITICAL FIX: Check if ANY purchase with this transaction ID exists
+    // This prevents duplicate credit additions from different sources
+    if (transactionId) {
+      try {
+        // First try exact match by ID
+        try {
+          const exactMatch = await databases.getDocument(
+            DATABASE_ID,
+            PURCHASES_COLLECTION_ID,
+            transactionId
+          );
+          
+          if (exactMatch) {
+            console.log("DUPLICATE PREVENTED: Purchase already exists with exact ID:", transactionId);
+            return { $id: transactionId, status: "already_exists", duplicate: true };
+          }
+        } catch (exactError) {
+          // If not found by exact ID, continue to query search
+        }
+        
+        // Then try query search for the transaction ID in any field
+        const existingTransactions = await databases.listDocuments(
+          DATABASE_ID,
+          PURCHASES_COLLECTION_ID,
+          [Query.equal("$id", transactionId)]
+        );
+
+        if (existingTransactions.total > 0) {
+          console.log("DUPLICATE PREVENTED: Purchase already exists with transaction ID:", transactionId);
+          return { $id: transactionId, status: "already_exists", duplicate: true };
+        }
+      } catch (error) {
+        // Continue if there's an error in the duplicate check
+        console.log("Error checking for duplicate transaction, will proceed with caution:", error);
+      }
+    }
+
+    // Check if this exact purchase ID already exists to avoid conflicts
     try {
       const existingPurchase = await databases.getDocument(
         DATABASE_ID,
@@ -82,8 +119,8 @@ async function recordPurchaseInDatabase(
       );
 
       if (existingPurchase) {
-        console.log("Purchase already exists with ID:", purchaseId);
-        return existingPurchase;
+        console.log("DUPLICATE PREVENTED: Purchase already exists with ID:", purchaseId);
+        return { $id: purchaseId, status: "already_exists", duplicate: true };
       }
     } catch (error) {
       // 404 error is expected if the document doesn't exist
@@ -117,7 +154,7 @@ async function recordPurchaseInDatabase(
       ) {
         console.log("Purchase record already exists with ID:", purchaseId);
         // Not a critical error for the overall flow
-        return { $id: purchaseId, status: "already_exists" };
+        return { $id: purchaseId, status: "already_exists", duplicate: true };
       }
 
       throw error;
@@ -130,117 +167,45 @@ async function recordPurchaseInDatabase(
 }
 
 export async function POST(request: NextRequest) {
-  console.log("Process purchase API called", new Date().toISOString());
-
   try {
     const body = await request.json();
-    console.log("Processing purchase manually:", body);
+    console.log("Process purchase request received:", body);
 
+    // Extract and validate required fields
     const {
       userId,
-      userEmail,
       packageId,
       amount,
       credits,
-      isRetry,
-      transactionId,
+      processingId, // Unique ID for this processing attempt
     } = body;
-    
-    // Remove forceUpdate and directUpdate options for security
-    // These could be exploited to add arbitrary credits
 
-    // Generate or use transaction ID for idempotency
-    const processingId =
-      transactionId || `tx_${userId}_${packageId}_${Date.now()}`;
-
-    console.log("Purchase details:", {
-      userId,
-      userEmail,
-      packageId,
-      amount,
-      credits,
-      isRetry: !!isRetry,
-      processingId,
-      bodyType: typeof body,
-      userIdType: typeof userId,
-      creditsType: typeof credits,
-    });
-
+    // Basic validation
     if (!userId || !packageId) {
-      console.error("Missing required fields:", { userId, packageId });
       return NextResponse.json(
-        { error: "Missing required fields", details: { userId, packageId } },
+        { error: "Missing required fields" },
         { status: 400 }
       );
     }
 
-    // Validate inputs to avoid type errors
-    // Check if this is a numeric string and convert it
+    // Convert amount to number if it's a string
+    const amountNumber = typeof amount === "string" ? parseFloat(amount) : amount;
     const creditsNumber =
-      typeof credits === "string" ? parseInt(credits, 10) : credits || 0;
-    const amountNumber =
-      typeof amount === "string" ? parseFloat(amount) : amount || 0;
+      typeof credits === "string" ? parseInt(credits) : credits;
 
-    console.log("Normalized values:", {
-      creditsNumber,
-      amountNumber,
-      userId: typeof userId === "string" ? userId : String(userId),
-    });
-
-    // Check if this transaction has already been processed to prevent duplicates
+    // Check if user exists
     try {
-      // Try to fetch user data first to check current credits
       const user = await databases.getDocument(
         DATABASE_ID,
         USERS_COLLECTION_ID,
         userId
       );
 
-      console.log("Current user credits before processing:", user.credits);
-
-      // Only check for duplicates if this is an explicit retry with the same transaction ID
-      if (isRetry && transactionId) {
-        try {
-          const existingPurchases = await databases.listDocuments(
-            DATABASE_ID,
-            PURCHASES_COLLECTION_ID,
-            [
-              Query.equal("user_id", userId),
-              Query.orderDesc("$createdAt"),
-              Query.limit(20),
-            ]
-          );
-
-          // Check if we can find a matching transaction in recent history (last 24 hours)
-          const oneDayAgo = new Date(
-            Date.now() - 24 * 60 * 60 * 1000
-          ).toISOString();
-          const matchingPurchase = existingPurchases.documents.find(
-            (purchase) =>
-              purchase.$id === transactionId && purchase.$createdAt > oneDayAgo
-          );
-
-          if (matchingPurchase) {
-            console.log(
-              "Found matching transaction ID within 24 hours, skipping duplicate processing"
-            );
-            return NextResponse.json({
-              success: true,
-              newBalance: user.credits,
-              message:
-                "Credits were already added (duplicate transaction avoided)",
-              wasAlreadyProcessed: true,
-              purchaseId: matchingPurchase.$id,
-            });
-          }
-
-          console.log(
-            "No recent matching transaction found, continuing with processing"
-          );
-        } catch (err) {
-          console.log("Error checking for existing transaction:", err);
-          // Continue with processing as we couldn't verify
-        }
+      if (!user) {
+        return NextResponse.json(
+          { error: "User not found" },
+          { status: 404 }
+        );
       }
     } catch (error) {
       console.log(
@@ -259,6 +224,48 @@ export async function POST(request: NextRequest) {
         message: string;
       },
     };
+
+    // CRITICAL FIX: Check for duplicate transactions first
+    // This prevents multiple credit additions for the same transaction
+    if (processingId) {
+      try {
+        console.log("Checking for duplicate transaction with ID:", processingId);
+        debug.steps.push({ step: "checkDuplicate", result: "attempting" });
+        
+        const purchaseRecord = await recordPurchaseInDatabase(
+          userId,
+          packageId,
+          amountNumber,
+          0, // Credits will be determined later
+          processingId
+        );
+        
+        if (purchaseRecord && purchaseRecord.duplicate === true) {
+          console.log("DUPLICATE TRANSACTION DETECTED - Preventing duplicate credits");
+          debug.steps[debug.steps.length - 1].result = "duplicate_found";
+          debug.finalResult = {
+            success: true,
+            method: "duplicate_prevention",
+            message: "Credits were already added for this transaction"
+          };
+          
+          return NextResponse.json({
+            success: true,
+            duplicate: true,
+            message: "Credits were already added for this transaction",
+            debug,
+          });
+        }
+        
+        debug.steps[debug.steps.length - 1].result = "no_duplicate_found";
+      } catch (dupError) {
+        console.error("Error checking for duplicates:", dupError);
+        debug.steps[debug.steps.length - 1].result = "check_failed";
+        debug.steps[debug.steps.length - 1].error = 
+          dupError instanceof Error ? dupError.message : "Unknown error";
+        // Continue with processing, but be cautious
+      }
+    }
 
     // Try approach 1: Use the recordPurchase function
     try {
@@ -290,16 +297,16 @@ export async function POST(request: NextRequest) {
         success: true,
         newBalance,
         method: "recordPurchase",
-        message: "Credits added successfully",
+        message: "Credits added successfully"
       };
 
-      // Still try to record purchase in database
+      // Still try to record purchase in database if not already done
       try {
         await recordPurchaseInDatabase(
           userId,
           packageId,
           amountNumber,
-          creditsToAdd, // Use the enforced credit amount
+          creditsToAdd,
           processingId
         );
       } catch (dbErr) {
@@ -313,16 +320,16 @@ export async function POST(request: NextRequest) {
         message: "Credits added successfully",
         debug,
       });
-    } catch (error: unknown) {
-      const err = error as AppError;
+    } catch (error1) {
+      const err1 = error1 as AppError;
       console.error(
         "Error in recordPurchase:",
-        err?.message || "Unknown error"
+        err1?.message || "Unknown error"
       );
 
       debug.steps[debug.steps.length - 1].result = "failed";
       debug.steps[debug.steps.length - 1].error =
-        err?.message || "Unknown error";
+        err1?.message || "Unknown error";
 
       // Try approach 2: Use addCredits function
       try {
@@ -340,7 +347,8 @@ export async function POST(request: NextRequest) {
           creditsToAdd = Math.min(Math.max(0, creditsNumber), 1000); // Cap at 1000 credits for safety
         }
         
-        console.log(`Enforcing exact credit amount (addCredits fallback): ${creditsToAdd} for package ${packageId}`);
+        console.log(`Enforcing exact credit amount: ${creditsToAdd} for package ${packageId}`);
+
         const newBalance = await addCredits(userId, creditsToAdd);
 
         debug.steps[debug.steps.length - 1].result = "success";
@@ -348,29 +356,33 @@ export async function POST(request: NextRequest) {
           success: true,
           newBalance,
           method: "addCredits",
-          message: "Credits added via addCredits fallback",
+          message: "Credits added successfully"
         };
 
         // Still try to record purchase in database
-        await recordPurchaseInDatabase(
-          userId,
-          packageId,
-          amountNumber,
-          creditsToAdd, // Use the enforced credit amount
-          processingId
-        );
+        try {
+          await recordPurchaseInDatabase(
+            userId,
+            packageId,
+            amountNumber,
+            creditsToAdd,
+            processingId
+          );
+        } catch (dbErr) {
+          // Non-critical error, don't fail the whole operation
+          console.warn("Failed to record purchase in database:", dbErr);
+        }
 
         return NextResponse.json({
           success: true,
           newBalance,
-          message: "Credits added via addCredits fallback",
-          wasFirstFailover: true,
+          message: "Credits added successfully",
           debug,
         });
-      } catch (error2: unknown) {
+      } catch (error2) {
         const err2 = error2 as AppError;
         console.error(
-          "Error in addCredits fallback:",
+          "Error in addCredits:",
           err2?.message || "Unknown error"
         );
 
@@ -378,10 +390,10 @@ export async function POST(request: NextRequest) {
         debug.steps[debug.steps.length - 1].error =
           err2?.message || "Unknown error";
 
-        // Final approach: Direct Appwrite interaction
+        // Try approach 3: Direct database update as a last resort
         try {
-          console.log("Attempting direct Appwrite interaction");
-          debug.steps.push({ step: "directAppwrite", result: "attempting" });
+          console.log("Attempting direct credit addition as last resort");
+          debug.steps.push({ step: "directAddition", result: "attempting" });
 
           // Determine the correct credit amount based on the package ID
           let creditsToAdd = 0;
@@ -394,34 +406,39 @@ export async function POST(request: NextRequest) {
             creditsToAdd = Math.min(Math.max(0, creditsNumber), 1000); // Cap at 1000 credits for safety
           }
           
-          console.log(`Enforcing exact credit amount (direct update): ${creditsToAdd} for package ${packageId}`);
+          console.log(`Enforcing exact credit amount: ${creditsToAdd} for package ${packageId}`);
+
           const newBalance = await addCreditsDirectly(userId, creditsToAdd);
 
           debug.steps[debug.steps.length - 1].result = "success";
           debug.finalResult = {
             success: true,
             newBalance,
-            method: "directAppwrite",
-            message: "Credits added via direct update",
+            method: "directAddition",
+            message: "Credits added successfully"
           };
 
           // Still try to record purchase in database
-          await recordPurchaseInDatabase(
-            userId,
-            packageId,
-            amountNumber,
-            creditsToAdd, // Use the enforced credit amount
-            processingId
-          );
+          try {
+            await recordPurchaseInDatabase(
+              userId,
+              packageId,
+              amountNumber,
+              creditsToAdd,
+              processingId
+            );
+          } catch (dbErr) {
+            // Non-critical error, don't fail the whole operation
+            console.warn("Failed to record purchase in database:", dbErr);
+          }
 
           return NextResponse.json({
             success: true,
             newBalance,
-            message: "Credits added via direct update",
-            wasSecondFailover: true,
+            message: "Credits added successfully",
             debug,
           });
-        } catch (error3: unknown) {
+        } catch (error3) {
           const err3 = error3 as AppError;
           console.error(
             "All credit addition methods failed:",
@@ -431,20 +448,11 @@ export async function POST(request: NextRequest) {
           debug.steps[debug.steps.length - 1].result = "failed";
           debug.steps[debug.steps.length - 1].error =
             err3?.message || "Unknown error";
-          debug.finalResult = {
-            success: false,
-            message: "All methods failed",
-          };
 
-          // Return comprehensive error details
           return NextResponse.json(
             {
-              error: "Failed to process purchase after multiple attempts",
-              details: {
-                initialError: err?.message || "Unknown error in recordPurchase",
-                fallbackError: err2?.message || "Unknown error in addCredits",
-                directError: err3?.message || "Unknown error in direct update",
-              },
+              error: "Failed to add credits after multiple attempts",
+              details: err3?.message || "Unknown error",
               debug,
             },
             { status: 500 }
@@ -453,13 +461,11 @@ export async function POST(request: NextRequest) {
       }
     }
   } catch (error) {
-    const err = error as AppError;
-    console.error("Unexpected error in POST handler:", err.message || error);
-
+    console.error("Unexpected error in process-purchase:", error);
     return NextResponse.json(
       {
-        error: "Unexpected server error",
-        details: err.message || "Unknown server error",
+        error: "Unexpected error processing purchase",
+        details: error instanceof Error ? error.message : "Unknown error",
       },
       { status: 500 }
     );

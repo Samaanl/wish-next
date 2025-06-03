@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { recordPurchase, refundPurchase } from "@/utils/creditService";
 import crypto from "crypto";
+import { databases, DATABASE_ID } from "@/utils/appwrite";
+import { Query } from "appwrite";
 
 // Webhook secret from Lemon Squeezy dashboard
 const WEBHOOK_SECRET = process.env.LEMON_SQUEEZY_WEBHOOK_SECRET;
@@ -87,43 +89,98 @@ export async function POST(request: NextRequest) {
 
     switch (eventName) {
       case "order_created":
-        console.log("Processing new purchase:", {
+        // Extract the custom_data from the webhook payload
+        const attributes = data.attributes;
+        const customData = attributes.custom_data || {};
+        const total = attributes.total || 0;
+        const orderId = data.id || `order_${Date.now()}`;
+
+        console.log("Processing order_created webhook with data:", {
           orderId,
-          userId: customData.user_id,
-          packageId: customData.package_id,
-          requestedCredits: customData.credits,
+          customData,
           total,
         });
 
+        if (!customData.user_id || !customData.package_id) {
+          console.error("Missing required custom_data in webhook");
+          return NextResponse.json(
+            { error: "Missing required custom_data" },
+            { status: 400 }
+          );
+        }
+
+        // CRITICAL FIX: Check if this order has already been processed
         try {
-          // Determine the correct credit amount based on the package ID
-          let creditsToAdd = 0;
-          if (customData.package_id === "basic") {
-            creditsToAdd = 10; // $1 plan gets exactly 10 credits
-          } else if (customData.package_id === "premium") {
-            creditsToAdd = 100; // $5 plan gets exactly 100 credits
-          } else {
-            // Fallback to the requested credits only if it's a valid number
-            const requestedCredits = parseInt(customData.credits, 10);
-            creditsToAdd = !isNaN(requestedCredits) ? requestedCredits : 0;
+          // Use the databases module to check for existing purchase records
+          const existingPurchases = await databases.listDocuments(
+            DATABASE_ID,
+            "purchases", // Use the purchases collection
+            [Query.equal("$id", orderId)]
+          );
+
+          if (existingPurchases.total > 0) {
+            console.log("DUPLICATE ORDER DETECTED - Order already processed:", orderId);
+            return NextResponse.json({
+              success: true,
+              duplicate: true,
+              message: "Order already processed",
+            });
           }
-          
-          console.log(`Enforcing exact credit amount: ${creditsToAdd} for package ${customData.package_id}`);
-          
+        } catch (error) {
+          // Log the error but continue processing
+          console.error("Error checking for duplicate order:", error);
+        }
+
+        // Determine the correct credit amount based on the package ID
+        let creditsToAdd = 0;
+        if (customData.package_id === "basic") {
+          creditsToAdd = 10; // $1 plan gets exactly 10 credits
+        } else if (customData.package_id === "premium") {
+          creditsToAdd = 100; // $5 plan gets exactly 100 credits
+        } else {
+          // Fallback to the requested credits only if it's a valid number
+          creditsToAdd = parseInt(customData.credits) || 0;
+        }
+
+        console.log(
+          `Enforcing exact credit amount: ${creditsToAdd} for package ${customData.package_id}`
+        );
+
+        // Record the purchase with the order ID to prevent duplicates
+        try {
+          // First create a purchase record to prevent duplicate processing
+          await databases.createDocument(
+            DATABASE_ID,
+            "purchases",
+            orderId,
+            {
+              user_id: customData.user_id,
+              package_id: customData.package_id,
+              amount: Math.round(total),
+              credits: creditsToAdd,
+              timestamp: new Date().toISOString(),
+              source: "webhook",
+            }
+          );
+
+          // Then add the credits
           await recordPurchase(
             customData.user_id,
             customData.package_id,
             total,
-            creditsToAdd
+            creditsToAdd // Use the enforced credit amount
           );
-          console.log("✅ Purchase successfully recorded via webhook");
+
+          return NextResponse.json({ success: true });
         } catch (error) {
-          console.error("❌ Failed to record purchase via webhook:", error);
-          // Don't fail the webhook response to avoid retries for legitimate duplicates
-          if (error instanceof Error && error.message.includes("already")) {
-            console.log(
-              "Purchase already processed, this is expected behavior"
-            );
+          // If there's a document conflict (409), it means this order was already processed
+          if (error && typeof error === "object" && "code" in error && error.code === 409) {
+            console.log("Order already processed (document conflict):", orderId);
+            return NextResponse.json({
+              success: true,
+              duplicate: true,
+              message: "Order already processed",
+            });
           } else {
             throw error; // Re-throw unexpected errors
           }
