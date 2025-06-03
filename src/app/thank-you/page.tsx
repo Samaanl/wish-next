@@ -109,8 +109,14 @@ function ThankYouContent() {
     console.log("Starting payment processing for session:", sessionId, "package:", packageId);
     setProcessingStatus("Processing your payment...");
 
-    const transactionId = `tx_${sessionId}_${packageId}`;
+    // Make sure we have a valid session ID (not a placeholder)
+    const actualSessionId = sessionId?.includes('{checkout_session_id}') 
+      ? `manual_${Date.now()}` // Use a timestamp if we have a placeholder
+      : sessionId;
+    
+    const transactionId = `tx_${actualSessionId}_${packageId}`;
     console.log("Using consistent transaction ID:", transactionId);
+    console.log("Using actual session ID:", actualSessionId);
 
     const processPayment = async () => {
       try {
@@ -149,9 +155,15 @@ function ThankYouContent() {
       setInitialCredits(currentUser.credits);
     }
 
-    const transactionId = `tx_${sessionId}_${packageId}`;
+    // Make sure we have a valid session ID (not a placeholder)
+    const actualSessionId = sessionId?.includes('{checkout_session_id}') 
+      ? `manual_${Date.now()}` // Use a timestamp if we have a placeholder
+      : sessionId;
+    
+    const transactionId = `tx_${actualSessionId}_${packageId}`;
 
     console.log("FORCING APPWRITE FUNCTION CALL regardless of duplicate detection");
+    console.log("Using actual session ID:", actualSessionId);
 
     const { client, functions } = await import('@/utils/appwrite');
 
