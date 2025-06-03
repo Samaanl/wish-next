@@ -223,30 +223,31 @@ function ThankYouContent() {
             return false;
           }
 
-          // EMERGENCY FIX: Use a global window-level flag to prevent multiple API calls
+          // CRITICAL FIX: Log duplicate detection but ALWAYS continue with the function call
           // @ts-ignore - window.wishMaker is a custom property
           if (window.wishMaker && window.wishMaker.processingPayment) {
-            console.log("EMERGENCY DUPLICATE PREVENTION: Transaction already being processed globally");
-            // IMPORTANT: Don't return false here, continue with the function call
-            // This ensures the Appwrite function is called at least once
+            console.log("DUPLICATE DETECTION: Transaction already being processed globally, but continuing anyway");
+            // We'll continue anyway and let the server handle duplicates
           }
 
-          // Set global flag to prevent multiple calls
+          // Set global flag to prevent multiple calls (for logging purposes only)
           // @ts-ignore - window.wishMaker is a custom property
           if (!window.wishMaker) window.wishMaker = {};
           // @ts-ignore - window.wishMaker is a custom property
           window.wishMaker.processingPayment = true;
-          console.log("Set global processing flag to prevent duplicates: GLOBAL_PROCESSING_${sessionId}_${packageId}");
+          console.log(`Processing payment for session: ${sessionId} package: ${packageId}`);
 
-          // EMERGENCY FIX: Check if this payment was already processed using sessionStorage
+          // Check if this payment was already processed (for logging purposes only)
           const processedPaymentKey = `processed_payment_${sessionId}_${packageId}`;
           const wasProcessed = sessionStorage.getItem(processedPaymentKey);
           
           if (wasProcessed) {
-            console.log(`PAYMENT ALREADY PROCESSED - Preventing duplicate credits: ${sessionId}_${packageId} at ${new Date().toString()}`);
-            // IMPORTANT: Don't return false here, continue with the function call
-            // The Appwrite function will handle duplicate detection server-side
+            console.log(`DUPLICATE DETECTED: Payment was already processed: ${sessionId}_${packageId} at ${new Date().toString()}`);
+            // We'll continue anyway and let the server handle duplicates
           }
+          
+          // FORCE EXECUTION: Always proceed with the function call regardless of duplicate flags
+          console.log("FORCING APPWRITE FUNCTION CALL regardless of duplicate detection");
 
           try {
             // EMERGENCY FIX: Generate a consistent transaction ID that will be the same if the page reloads
@@ -256,6 +257,9 @@ function ThankYouContent() {
 
             // Get the Appwrite client
             const { client, functions } = await import('@/utils/appwrite');
+            
+            console.log("Calling Appwrite function with ID: 683eaf99003799365f40");
+            // Don't try to access client.endpoint as it's not exposed in the type
             
             // Call the Appwrite Cloud Function to process the purchase
             // This is much more reliable than calling our API endpoint
@@ -269,6 +273,8 @@ function ThankYouContent() {
               }),
               false // Async execution
             );
+            
+            console.log("Appwrite function execution response:", execution);
 
             // Parse the response
             const data = JSON.parse(execution.responseBody || '{}');

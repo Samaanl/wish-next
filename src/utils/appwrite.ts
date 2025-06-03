@@ -11,12 +11,9 @@ import {
 // Initialize the Appwrite client
 const client = new Client();
 
-// Set the project endpoint and ID
+// Set the project endpoint and ID - ALWAYS use Frankfurt endpoint
 client
-  .setEndpoint(
-    process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT ||
-      "https://fra.cloud.appwrite.io/v1"
-  )
+  .setEndpoint("https://fra.cloud.appwrite.io/v1")
   .setProject(
     process.env.NEXT_PUBLIC_APPWRITE_PROJECT || "682a20150028bfd73ea8"
   );
