@@ -91,16 +91,30 @@ export async function POST(request: NextRequest) {
           orderId,
           userId: customData.user_id,
           packageId: customData.package_id,
-          credits: customData.credits,
+          requestedCredits: customData.credits,
           total,
         });
 
         try {
+          // Determine the correct credit amount based on the package ID
+          let creditsToAdd = 0;
+          if (customData.package_id === "basic") {
+            creditsToAdd = 10; // $1 plan gets exactly 10 credits
+          } else if (customData.package_id === "premium") {
+            creditsToAdd = 100; // $5 plan gets exactly 100 credits
+          } else {
+            // Fallback to the requested credits only if it's a valid number
+            const requestedCredits = parseInt(customData.credits, 10);
+            creditsToAdd = !isNaN(requestedCredits) ? requestedCredits : 0;
+          }
+          
+          console.log(`Enforcing exact credit amount: ${creditsToAdd} for package ${customData.package_id}`);
+          
           await recordPurchase(
             customData.user_id,
             customData.package_id,
             total,
-            customData.credits
+            creditsToAdd
           );
           console.log("✅ Purchase successfully recorded via webhook");
         } catch (error) {

@@ -1,5 +1,33 @@
 # Payment Security Fixes and Recovery System
 
+## Latest Update: Credit Enforcement System
+
+A critical security vulnerability has been fixed in the payment processing system. The system now strictly enforces that users receive exactly the correct number of credits based on their subscription plan:
+
+- Basic Plan ($1): Exactly 10 credits
+- Premium Plan ($5): Exactly 100 credits
+
+### Security Issues Fixed
+
+1. **Credit Injection Vulnerability**: Previously, the system was accepting arbitrary credit values from the client side, allowing potential manipulation of credit amounts.
+
+2. **Force Update Vulnerability**: Removed the `forceUpdate` and `directUpdate` parameters from the process-purchase API, which could be exploited to add arbitrary credits.
+
+3. **Credit Value Enforcement**: Added strict validation to ensure the exact credit amounts are enforced at multiple levels:
+   - In the webhook handler
+   - In the process-purchase API
+   - In all fallback credit addition methods
+
+### Implementation Details
+
+1. **Package Definition**: Credit packages are now clearly defined with exact credit values in `paymentService.ts`.
+
+2. **Webhook Handler**: The webhook handler now determines the correct credit amount based on the package ID rather than trusting the custom data from Lemon Squeezy.
+
+3. **Process Purchase API**: All credit addition methods now enforce the exact credit amounts based on the package ID.
+
+4. **Security Hardening**: Removed potentially exploitable parameters and added validation to prevent credit manipulation.
+
 ## Overview
 
 This document outlines the comprehensive security fixes implemented to address the critical payment vulnerability where users who completed payments on Lemon Squeezy but navigated away before reaching the thank-you page would not receive their purchased credits.

@@ -142,11 +142,12 @@ export async function POST(request: NextRequest) {
       packageId,
       amount,
       credits,
-      forceUpdate,
-      directUpdate,
       isRetry,
       transactionId,
     } = body;
+    
+    // Remove forceUpdate and directUpdate options for security
+    // These could be exploited to add arbitrary credits
 
     // Generate or use transaction ID for idempotency
     const processingId =
@@ -158,8 +159,6 @@ export async function POST(request: NextRequest) {
       packageId,
       amount,
       credits,
-      forceUpdate: !!forceUpdate,
-      directUpdate: !!directUpdate,
       isRetry: !!isRetry,
       processingId,
       bodyType: typeof body,
@@ -265,12 +264,25 @@ export async function POST(request: NextRequest) {
     try {
       console.log("Attempting to record purchase via recordPurchase function");
       debug.steps.push({ step: "recordPurchase", result: "attempting" });
+      
+      // Determine the correct credit amount based on the package ID
+      let creditsToAdd = 0;
+      if (packageId === "basic") {
+        creditsToAdd = 10; // $1 plan gets exactly 10 credits
+      } else if (packageId === "premium") {
+        creditsToAdd = 100; // $5 plan gets exactly 100 credits
+      } else {
+        // Fallback to the requested credits only if it's a valid number and within reasonable limits
+        creditsToAdd = Math.min(Math.max(0, creditsNumber), 1000); // Cap at 1000 credits for safety
+      }
+      
+      console.log(`Enforcing exact credit amount: ${creditsToAdd} for package ${packageId}`);
 
       const newBalance = await recordPurchase(
         userId,
         packageId,
         amountNumber,
-        creditsNumber
+        creditsToAdd
       );
 
       debug.steps[debug.steps.length - 1].result = "success";
@@ -287,7 +299,7 @@ export async function POST(request: NextRequest) {
           userId,
           packageId,
           amountNumber,
-          creditsNumber,
+          creditsToAdd, // Use the enforced credit amount
           processingId
         );
       } catch (dbErr) {
@@ -317,7 +329,19 @@ export async function POST(request: NextRequest) {
         console.log("Attempting addCredits fallback");
         debug.steps.push({ step: "addCredits", result: "attempting" });
 
-        const newBalance = await addCredits(userId, creditsNumber);
+        // Determine the correct credit amount based on the package ID
+        let creditsToAdd = 0;
+        if (packageId === "basic") {
+          creditsToAdd = 10; // $1 plan gets exactly 10 credits
+        } else if (packageId === "premium") {
+          creditsToAdd = 100; // $5 plan gets exactly 100 credits
+        } else {
+          // Fallback to the requested credits only if it's a valid number and within reasonable limits
+          creditsToAdd = Math.min(Math.max(0, creditsNumber), 1000); // Cap at 1000 credits for safety
+        }
+        
+        console.log(`Enforcing exact credit amount (addCredits fallback): ${creditsToAdd} for package ${packageId}`);
+        const newBalance = await addCredits(userId, creditsToAdd);
 
         debug.steps[debug.steps.length - 1].result = "success";
         debug.finalResult = {
@@ -332,7 +356,7 @@ export async function POST(request: NextRequest) {
           userId,
           packageId,
           amountNumber,
-          creditsNumber,
+          creditsToAdd, // Use the enforced credit amount
           processingId
         );
 
@@ -359,7 +383,19 @@ export async function POST(request: NextRequest) {
           console.log("Attempting direct Appwrite interaction");
           debug.steps.push({ step: "directAppwrite", result: "attempting" });
 
-          const newBalance = await addCreditsDirectly(userId, creditsNumber);
+          // Determine the correct credit amount based on the package ID
+          let creditsToAdd = 0;
+          if (packageId === "basic") {
+            creditsToAdd = 10; // $1 plan gets exactly 10 credits
+          } else if (packageId === "premium") {
+            creditsToAdd = 100; // $5 plan gets exactly 100 credits
+          } else {
+            // Fallback to the requested credits only if it's a valid number and within reasonable limits
+            creditsToAdd = Math.min(Math.max(0, creditsNumber), 1000); // Cap at 1000 credits for safety
+          }
+          
+          console.log(`Enforcing exact credit amount (direct update): ${creditsToAdd} for package ${packageId}`);
+          const newBalance = await addCreditsDirectly(userId, creditsToAdd);
 
           debug.steps[debug.steps.length - 1].result = "success";
           debug.finalResult = {
@@ -374,7 +410,7 @@ export async function POST(request: NextRequest) {
             userId,
             packageId,
             amountNumber,
-            creditsNumber,
+            creditsToAdd, // Use the enforced credit amount
             processingId
           );
 

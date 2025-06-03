@@ -22,7 +22,7 @@ export const CREDIT_PACKAGES: CreditPackage[] = [
     id: "basic",
     name: "Basic Pack",
     price: 1,
-    credits: 10,
+    credits: 10, // Exactly 10 credits for $1 plan
     lemonSqueezyId: process.env.NEXT_PUBLIC_LEMON_SQUEEZY_BASIC_ID || "",
     description: "Perfect for trying out the service",
   },
@@ -30,7 +30,7 @@ export const CREDIT_PACKAGES: CreditPackage[] = [
     id: "premium",
     name: "Premium Pack",
     price: 5,
-    credits: 100,
+    credits: 100, // Exactly 100 credits for $5 plan
     lemonSqueezyId: process.env.NEXT_PUBLIC_LEMON_SQUEEZY_PREMIUM_ID || "",
     description: "Best value for frequent users",
   },
