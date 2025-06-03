@@ -226,8 +226,9 @@ function ThankYouContent() {
           // EMERGENCY FIX: Use a global window-level flag to prevent multiple API calls
           // @ts-ignore - window.wishMaker is a custom property
           if (window.wishMaker && window.wishMaker.processingPayment) {
-            console.log("EMERGENCY DUPLICATE PREVENTION: Payment already being processed");
-            return false;
+            console.log("EMERGENCY DUPLICATE PREVENTION: Transaction already being processed globally");
+            // IMPORTANT: Don't return false here, continue with the function call
+            // This ensures the Appwrite function is called at least once
           }
 
           // Set global flag to prevent multiple calls
@@ -235,14 +236,16 @@ function ThankYouContent() {
           if (!window.wishMaker) window.wishMaker = {};
           // @ts-ignore - window.wishMaker is a custom property
           window.wishMaker.processingPayment = true;
+          console.log("Set global processing flag to prevent duplicates: GLOBAL_PROCESSING_${sessionId}_${packageId}");
 
           // EMERGENCY FIX: Check if this payment was already processed using sessionStorage
           const processedPaymentKey = `processed_payment_${sessionId}_${packageId}`;
           const wasProcessed = sessionStorage.getItem(processedPaymentKey);
           
           if (wasProcessed) {
-            console.log("EMERGENCY DUPLICATE PREVENTION: Payment was already processed", { sessionId, packageId });
-            return false;
+            console.log(`PAYMENT ALREADY PROCESSED - Preventing duplicate credits: ${sessionId}_${packageId} at ${new Date().toString()}`);
+            // IMPORTANT: Don't return false here, continue with the function call
+            // The Appwrite function will handle duplicate detection server-side
           }
 
           try {
