@@ -129,15 +129,26 @@ function ThankYouContent() {
       return;
     }
 
-    // Check if this exact payment has already been processed (using the generated session ID)
-    const paymentKey = `processed_payment_${generatedSessionId}_${packageId}`;
-    if (sessionStorage.getItem(paymentKey) === "true") {
-      console.log(`Payment already processed for session: ${generatedSessionId}, package: ${packageId}`);
+    // Generate a unique payment key that includes a timestamp to allow multiple purchases
+    // Only consider it a duplicate if the exact same session was processed in the last minute
+    const uniquePaymentKey = `processed_payment_${generatedSessionId}_${packageId}`;
+    const lastProcessedTime = sessionStorage.getItem(uniquePaymentKey);
+    const currentTime = Date.now();
+    
+    // Only consider it a duplicate if processed in the last 60 seconds
+    if (lastProcessedTime && (currentTime - Number(lastProcessedTime)) < 60000) {
+      console.log(`Payment recently processed (within 60s) for session: ${generatedSessionId}, package: ${packageId}`);
       setPaymentProcessed(true);
       setProcessingStatus("Payment already processed!");
       setIsLoading(false);
       return;
     }
+    
+    console.log(`Processing new payment for session: ${generatedSessionId}, package: ${packageId}`);
+    // Clear any old payment records for this package to avoid confusion
+    Object.keys(sessionStorage)
+      .filter(key => key.includes(`_${packageId}`) && key.startsWith('processed_payment_'))
+      .forEach(key => sessionStorage.removeItem(key));
 
     console.log("Starting payment processing for session:", generatedSessionId, "package:", packageId);
     setProcessingStatus("Processing your payment...");
@@ -152,8 +163,8 @@ function ThankYouContent() {
         setPaymentProcessed(true);
         setProcessingStatus("Payment processed successfully!");
 
-        // Use the generated session ID for consistent storage key
-        sessionStorage.setItem(`processed_payment_${generatedSessionId}_${packageId}`, "true");
+        // Store the current timestamp instead of a boolean to allow multiple purchases
+        sessionStorage.setItem(`processed_payment_${generatedSessionId}_${packageId}`, Date.now().toString());
 
         await refreshUserCredits();
 
