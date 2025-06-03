@@ -96,8 +96,31 @@ function ThankYouContent() {
     }
   }, [sessionId, packageId, currentUser, router]);
 
+  // Store the generated session ID to ensure consistency across renders
+  const [generatedSessionId, setGeneratedSessionId] = useState<string | null>(null);
+
+  // Generate a consistent session ID once when component mounts
   useEffect(() => {
-    if (paymentProcessed || !sessionId || !packageId) {
+    if (!sessionId) return;
+    
+    // Only generate a new session ID if we don't have one yet
+    if (!generatedSessionId) {
+      // Check if we need to generate a new session ID
+      if (sessionId.includes('{checkout_session_id}')) {
+        // Generate a unique, stable session ID for this page load
+        const newSessionId = `manual_${Date.now()}`;
+        setGeneratedSessionId(newSessionId);
+        console.log("Generated stable session ID:", newSessionId);
+      } else {
+        // Use the actual session ID from the URL
+        setGeneratedSessionId(sessionId);
+      }
+    }
+  }, [sessionId, generatedSessionId]);
+
+  useEffect(() => {
+    // Don't proceed if we're missing any required data
+    if (paymentProcessed || !sessionId || !packageId || !generatedSessionId) {
       return;
     }
 
@@ -106,17 +129,21 @@ function ThankYouContent() {
       return;
     }
 
-    console.log("Starting payment processing for session:", sessionId, "package:", packageId);
-    setProcessingStatus("Processing your payment...");
+    // Check if this exact payment has already been processed (using the generated session ID)
+    const paymentKey = `processed_payment_${generatedSessionId}_${packageId}`;
+    if (sessionStorage.getItem(paymentKey) === "true") {
+      console.log(`Payment already processed for session: ${generatedSessionId}, package: ${packageId}`);
+      setPaymentProcessed(true);
+      setProcessingStatus("Payment already processed!");
+      setIsLoading(false);
+      return;
+    }
 
-    // Make sure we have a valid session ID (not a placeholder)
-    const actualSessionId = sessionId?.includes('{checkout_session_id}') 
-      ? `manual_${Date.now()}` // Use a timestamp if we have a placeholder
-      : sessionId;
+    console.log("Starting payment processing for session:", generatedSessionId, "package:", packageId);
+    setProcessingStatus("Processing your payment...");
     
-    const transactionId = `tx_${actualSessionId}_${packageId}`;
+    const transactionId = `tx_${generatedSessionId}_${packageId}`;
     console.log("Using consistent transaction ID:", transactionId);
-    console.log("Using actual session ID:", actualSessionId);
 
     const processPayment = async () => {
       try {
@@ -125,7 +152,8 @@ function ThankYouContent() {
         setPaymentProcessed(true);
         setProcessingStatus("Payment processed successfully!");
 
-        sessionStorage.setItem(`processed_payment_${sessionId}_${packageId}`, "true");
+        // Use the generated session ID for consistent storage key
+        sessionStorage.setItem(`processed_payment_${generatedSessionId}_${packageId}`, "true");
 
         await refreshUserCredits();
 
@@ -140,12 +168,12 @@ function ThankYouContent() {
     };
 
     processPayment();
-  }, [currentUser, sessionId, packageId, paymentProcessed, refreshUserCredits, initialCredits]);
+  }, [currentUser, sessionId, packageId, generatedSessionId, paymentProcessed, refreshUserCredits, initialCredits]);
 
   const callAppwriteFunction = async () => {
     // Ensure currentUser exists
-    if (!currentUser) {
-      throw new Error("User not authenticated");
+    if (!currentUser || !generatedSessionId) {
+      throw new Error("User not authenticated or missing session ID");
     }
     
     const selectedPackage = CREDIT_PACKAGES.find((pkg) => pkg.id === packageId);
@@ -154,16 +182,12 @@ function ThankYouContent() {
     if (initialCredits === null && currentUser.credits !== undefined) {
       setInitialCredits(currentUser.credits);
     }
-
-    // Make sure we have a valid session ID (not a placeholder)
-    const actualSessionId = sessionId?.includes('{checkout_session_id}') 
-      ? `manual_${Date.now()}` // Use a timestamp if we have a placeholder
-      : sessionId;
     
-    const transactionId = `tx_${actualSessionId}_${packageId}`;
+    // Use the consistent generated session ID
+    const transactionId = `tx_${generatedSessionId}_${packageId}`;
 
     console.log("FORCING APPWRITE FUNCTION CALL regardless of duplicate detection");
-    console.log("Using actual session ID:", actualSessionId);
+    console.log("Using generated session ID:", generatedSessionId);
 
     const { client, functions } = await import('@/utils/appwrite');
 

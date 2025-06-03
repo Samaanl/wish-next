@@ -57,33 +57,48 @@ module.exports = async function(context) {
     let userId, packageId, transactionId, amount;
     try {
       // Log the raw payload for debugging
-      context.log("Raw payload:", context.req?.payload);
+      context.log("Raw payload type:", typeof context.req?.payload);
+      context.log("Raw payload:", JSON.stringify(context.req?.payload || {}));
       
       // Handle different payload formats
       let payload;
       if (typeof context.req?.payload === 'object') {
         // Payload is already an object
         payload = context.req.payload;
+        context.log("Using payload as object");
       } else if (typeof context.req?.payload === 'string') {
         // Try to parse the payload as JSON
-        payload = JSON.parse(context.req.payload || '{}');
+        try {
+          payload = JSON.parse(context.req.payload || '{}');
+          context.log("Successfully parsed payload string as JSON");
+        } catch (e) {
+          context.error("Failed to parse payload string as JSON:", e.message);
+          payload = {};
+        }
       } else {
         // Fallback to empty object
+        context.error("Payload is neither object nor string, using empty object");
         payload = {};
       }
       
+      // Extract values with detailed logging
       userId = payload.userId;
       packageId = payload.packageId;
       transactionId = payload.transactionId;
       amount = payload.amount;
       
-      context.log("Processed payload:", { userId, packageId, transactionId, amount });
+      context.log("Extracted values from payload:");
+      context.log("- userId:", userId);
+      context.log("- packageId:", packageId);
+      context.log("- transactionId:", transactionId);
+      context.log("- amount:", amount);
     } catch (parseError) {
       context.error("Error parsing payload:", parseError);
       return context.res.json({
         success: false,
         message: "Invalid payload format",
-        error: parseError.message
+        error: parseError.message,
+        rawPayloadType: typeof context.req?.payload
       }, 400);
     }
     
