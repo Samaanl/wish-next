@@ -24,7 +24,7 @@ const account = new Account(client);
 const databases = new Databases(client);
 const storage = new Storage(client);
 
-// Appwrite Database constants
+// Appwrite Database constants test
 export const DATABASE_ID =
   process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID || "682b226d003255d5a21a";
 export const USERS_COLLECTION_ID = "682b227f003d0c77525f";
