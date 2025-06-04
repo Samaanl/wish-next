@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import Link from "next/link";
 import { CREDIT_PACKAGES } from "@/utils/paymentService";
 import { initializeCheckout } from "@/utils/paymentService";
 import { useAuth } from "@/contexts/AuthContext";
@@ -10,6 +11,30 @@ import {
   CreditCardIcon,
   GiftIcon,
 } from "@heroicons/react/24/outline";
+
+// Loading spinner component
+const LoadingSpinner = ({ size = "w-5 h-5" }: { size?: string }) => (
+  <svg
+    className={`animate-spin ${size} text-current`}
+    xmlns="http://www.w3.org/2000/svg"
+    fill="none"
+    viewBox="0 0 24 24"
+  >
+    <circle
+      className="opacity-25"
+      cx="12"
+      cy="12"
+      r="10"
+      stroke="currentColor"
+      strokeWidth="4"
+    ></circle>
+    <path
+      className="opacity-75"
+      fill="currentColor"
+      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+    ></path>
+  </svg>
+);
 
 interface PurchaseModalProps {
   isOpen: boolean;
@@ -24,6 +49,7 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
 }) => {
   const { currentUser, refreshUserCredits } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingPackageId, setLoadingPackageId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [pendingPackageId, setPendingPackageId] = useState<string | null>(null);
@@ -36,10 +62,10 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
   useEffect(() => {
     console.log("Auth modal visibility:", showAuthModal);
   }, [showAuthModal]);
-
   const processPurchase = useCallback(
     async (packageId: string) => {
       setIsLoading(true);
+      setLoadingPackageId(packageId);
       setError("");
 
       try {
@@ -68,9 +94,10 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
             : "Failed to process payment. Please try again."
         );
         setIsLoading(false);
+        setLoadingPackageId(null);
       }
     },
-    [currentUser, isGuestUser, setIsLoading, setError]
+    [currentUser, isGuestUser]
   );
 
   // Handle auth success and process purchase
@@ -96,7 +123,6 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
 
     handlePendingPurchase();
   }, [authSuccess, currentUser, pendingPackageId, onPurchase, processPurchase]);
-
   const handlePurchase = async (packageId: string) => {
     // Clear previous errors
     setError("");
@@ -113,17 +139,20 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
 
     // If parent component provided an onPurchase handler, use it
     if (onPurchase) {
-      onPurchase(packageId);
+      setLoadingPackageId(packageId);
+      await onPurchase(packageId);
+      setLoadingPackageId(null);
       return;
     }
 
     // Otherwise use the default processing
     await processPurchase(packageId);
   };
-
   const handleAuthClose = () => {
     console.log("Auth modal close triggered");
     setShowAuthModal(false);
+    setLoadingPackageId(null);
+    setPendingPackageId(null);
   };
 
   const handleAuthSuccess = async () => {
@@ -369,26 +398,35 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
                             </>
                           )}
                         </div>
-                      </div>
+                      </div>{" "}
                       {/* Button at bottom */}
-                      <button
+                      <motion.button
                         onClick={() => !isLoading && handlePurchase(pkg.id)}
                         disabled={isLoading}
-                        className={`w-full py-4 px-6 text-lg font-semibold transition-all duration-200 flex items-center justify-center space-x-3 ${
+                        whileTap={{ scale: 0.98 }}
+                        whileHover={{ scale: 1.02 }}
+                        className={`w-full py-4 px-6 text-lg font-semibold transition-all duration-200 flex items-center justify-center space-x-3 rounded-lg shadow-lg active:shadow-md transform active:scale-95 ${
                           pkg.id === "premium"
-                            ? "bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
-                            : "bg-indigo-600 hover:bg-indigo-700 text-white"
-                        } disabled:opacity-50 disabled:cursor-not-allowed`}
+                            ? "bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white shadow-purple-500/25"
+                            : "bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-500/25"
+                        } disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-lg`}
                       >
-                        <CreditCardIcon className="h-5 w-5" />
-                        <span>
-                          {isLoading
-                            ? "Processing..."
-                            : isGuestUser
-                            ? "Sign in to Purchase"
-                            : `Get ${pkg.name} Plan`}
-                        </span>
-                      </button>
+                        {loadingPackageId === pkg.id ? (
+                          <>
+                            <LoadingSpinner size="w-5 h-5" />
+                            <span>Redirecting to checkout...</span>
+                          </>
+                        ) : (
+                          <>
+                            <CreditCardIcon className="h-5 w-5" />
+                            <span>
+                              {isGuestUser
+                                ? "Sign in to Purchase"
+                                : `Get ${pkg.name} Plan`}
+                            </span>
+                          </>
+                        )}
+                      </motion.button>
                     </motion.div>
                   ))}
                 </div>
@@ -409,13 +447,26 @@ const PurchaseModal: React.FC<PurchaseModalProps> = ({
                         Powered by Lemon Squeezy
                       </span>
                     </div>
-                  </div>
-
+                  </div>{" "}
                   <p className="text-gray-500 dark:text-gray-400">
                     Your payment is processed securely through Lemon Squeezy.
                     Credits are automatically added to your account upon
                     successful payment.
                   </p>
+                  <div className="mt-4 flex justify-center space-x-6 text-sm">
+                    <Link
+                      href="/privacy"
+                      className="text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                    >
+                      Privacy Policy
+                    </Link>
+                    <Link
+                      href="/terms"
+                      className="text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                    >
+                      Terms & Conditions
+                    </Link>
+                  </div>
                 </div>
               </motion.div>
             </div>

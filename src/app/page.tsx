@@ -12,6 +12,7 @@ import NotEnoughCredits from "@/components/NotEnoughCredits";
 import CreditDisplay from "@/components/CreditDisplay";
 import SavedTextWishes from "@/components/SavedTextWishes";
 import Header from "@/components/Header";
+import Footer from "@/components/Footer";
 import FirstTimeOverlay from "@/components/FirstTimeOverlay";
 import SignInPromptOverlay from "@/components/SignInPromptOverlay";
 import { getCurrentUser } from "@/utils/authService";
@@ -274,12 +275,10 @@ export default function Home() {
                 <WishForm onSubmit={handleGenerateWish} isLoading={isLoading} />
               </div>
             </motion.div>
-          )}
+          )}{" "}
         </main>
 
-        <footer className="mt-16 text-center text-sm text-gray-500 dark:text-gray-400">
-          <p>Powered by Gemini AI • {new Date().getFullYear()}</p>
-        </footer>
+        <Footer />
       </div>
       {/* Authentication Modal */}
       <AuthModal
