@@ -6,7 +6,7 @@ thumbnail: "/blog-images/graduation-congratulations-guide.svg"
 author: "David Park"
 category: "Congratulations"
 tags: ["graduation", "congratulations", "achievement", "education", "success"]
-featured: false
+featured: true
 ---
 
 # Graduation Congratulations: Celebrating Academic Achievements with Perfect Messages
