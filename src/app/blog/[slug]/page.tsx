@@ -10,9 +10,9 @@ import {
 import RelatedPosts from "@/components/RelatedPosts";
 
 interface BlogPostPageProps {
-  params: {
+  params: Promise<{
     slug: string;
-  };
+  }>;
 }
 
 export async function generateStaticParams() {
