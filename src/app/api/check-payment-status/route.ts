@@ -22,7 +22,7 @@ interface LemonSqueezyOrder {
   };
 }
 
-// Check if payment was already processed in our database
+//tt Check if payment was already processed in our database
 async function checkPaymentProcessed(
   userId: string,
   lemonSqueezyOrderId: string
@@ -159,7 +159,7 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    
+
     console.log(`🔍 Checking payment status for user: ${userId} (${email})`);
     console.log(`🔑 Lemon Squeezy API Key exists: ${!!LEMON_SQUEEZY_API_KEY}`);
 
@@ -167,7 +167,7 @@ export async function POST(request: NextRequest) {
     const orders = await getRecentOrdersForUser(email, userId);
 
     console.log(`📊 Found ${orders.length} total orders for user`);
-    
+
     if (orders.length === 0) {
       console.log("❌ No recent orders found");
       return NextResponse.json({
@@ -184,17 +184,21 @@ export async function POST(request: NextRequest) {
         email: order.attributes.user_email,
         total: order.attributes.total,
         customData: order.attributes.custom_data,
-        createdAt: order.attributes.created_at
+        createdAt: order.attributes.created_at,
       });
     });
 
     // Process each paid order
     for (const order of orders) {
-      console.log(`🔍 Processing order ${order.id} with status: ${order.attributes.status}`);
-      
+      console.log(
+        `🔍 Processing order ${order.id} with status: ${order.attributes.status}`
+      );
+
       // Only process paid orders
       if (order.attributes.status !== "paid") {
-        console.log(`⏭️ Skipping order ${order.id} - status is ${order.attributes.status}, not 'paid'`);
+        console.log(
+          `⏭️ Skipping order ${order.id} - status is ${order.attributes.status}, not 'paid'`
+        );
         continue;
       }
 
