@@ -16,28 +16,27 @@ const RelatedPosts: React.FC<RelatedPostsProps> = ({ posts, currentSlug }) => {
   if (relatedPosts.length === 0) {
     return null;
   }
-
   return (
-    <section className="mt-16 py-16 bg-gray-50 dark:bg-gray-800/50 rounded-xl">
+    <section className="mt-12 py-12 bg-gray-50 dark:bg-gray-800/50 rounded-xl">
       <div className="max-w-4xl mx-auto px-6">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
+        <div className="text-center mb-8">
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
             Related Articles
           </h2>
-          <p className="text-lg text-gray-600 dark:text-gray-400">
+          <p className="text-gray-600 dark:text-gray-400">
             Discover more inspiration for your special occasions
           </p>
         </div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {relatedPosts.map((post) => (
-            <div key={post.slug} className="transform scale-95">
+            <div key={post.slug}>
               <BlogCard post={post} />
             </div>
           ))}
         </div>
 
-        <div className="text-center mt-12">
+        <div className="text-center mt-8">
           <Link
             href="/blog"
             className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-medium rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all duration-200"
