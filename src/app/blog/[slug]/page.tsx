@@ -110,7 +110,7 @@ const BlogPostPage = async ({ params }: BlogPostPageProps) => {
               {post.description}
             </p>
 
-            {/* Article Meta */}
+            {/* Article Meta yeah */}
             <div className="flex items-center justify-between flex-wrap gap-4 py-6 border-t border-b border-gray-200 dark:border-gray-700">
               <div className="flex items-center space-x-4">
                 <div className="w-12 h-12 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full flex items-center justify-center">
