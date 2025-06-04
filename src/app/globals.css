@@ -64,3 +64,66 @@ button,
 .animate-slide-in {
   animation: slideIn 0.15s ease-out forwards;
 }
+
+/* Blog Syntax Highlighting Styles */
+.hljs {
+  background: #1f2937 !important;
+  border-radius: 0.5rem;
+  padding: 1rem;
+  overflow-x: auto;
+}
+
+/* Dark mode syntax highlighting */
+@media (prefers-color-scheme: dark) {
+  .hljs {
+    background: #111827 !important;
+  }
+}
+
+/* Blog Content Enhancements */
+.prose img {
+  margin: 2rem auto;
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.75rem;
+  box-shadow:
+    0 10px 25px -3px rgba(0, 0, 0, 0.1),
+    0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+/* Blog Image Captions */
+.prose img + em {
+  display: block;
+  text-align: center;
+  font-style: italic;
+  margin-top: -1rem;
+  margin-bottom: 2rem;
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+/* Dark mode image captions */
+@media (prefers-color-scheme: dark) {
+  .prose img + em {
+    color: #9ca3af;
+  }
+}
+
+/* Custom scrollbar for code blocks */
+.hljs::-webkit-scrollbar {
+  height: 8px;
+}
+
+.hljs::-webkit-scrollbar-track {
+  background: #374151;
+  border-radius: 4px;
+}
+
+.hljs::-webkit-scrollbar-thumb {
+  background: #6b7280;
+  border-radius: 4px;
+}
+
+.hljs::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}

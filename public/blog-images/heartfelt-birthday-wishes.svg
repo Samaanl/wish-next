@@ -1,0 +1,51 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ff6b6b;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#ffa500;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#ff69b4;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  
+  <!-- Decorative elements -->
+  <circle cx="200" cy="150" r="60" fill="rgba(255,255,255,0.2)"/>
+  <circle cx="1000" cy="480" r="80" fill="rgba(255,255,255,0.15)"/>
+  <circle cx="100" cy="500" r="40" fill="rgba(255,255,255,0.25)"/>
+  
+  <!-- Birthday cake icon -->
+  <g transform="translate(100, 200)">
+    <rect x="0" y="40" width="120" height="80" fill="#8B4513" rx="8"/>
+    <rect x="10" y="30" width="100" height="20" fill="#FFB6C1" rx="4"/>
+    <rect x="20" y="10" width="80" height="30" fill="#FF69B4" rx="6"/>
+    
+    <!-- Candles -->
+    <rect x="30" y="0" width="4" height="15" fill="#FFD700"/>
+    <rect x="50" y="0" width="4" height="15" fill="#FFD700"/>
+    <rect x="70" y="0" width="4" height="15" fill="#FFD700"/>
+    
+    <!-- Flames -->
+    <ellipse cx="32" cy="-2" rx="3" ry="5" fill="#FF4500"/>
+    <ellipse cx="52" cy="-2" rx="3" ry="5" fill="#FF4500"/>
+    <ellipse cx="72" cy="-2" rx="3" ry="5" fill="#FF4500"/>
+  </g>
+  
+  <!-- Title -->
+  <text x="600" y="200" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="48" font-weight="bold">
+    Heartfelt Birthday Wishes
+  </text>
+  
+  <!-- Subtitle -->
+  <text x="600" y="280" text-anchor="middle" fill="rgba(255,255,255,0.9)" font-family="Arial, sans-serif" font-size="24">
+    Create meaningful messages that touch hearts
+  </text>
+  
+  <!-- Decorative stars -->
+  <g fill="rgba(255,255,255,0.6)">
+    <polygon points="800,100 810,130 840,130 818,148 828,178 800,160 772,178 782,148 760,130 790,130" />
+    <polygon points="400,400 405,415 420,415 408,425 413,440 400,432 387,440 392,425 380,415 395,415" />
+    <polygon points="950,200 955,215 970,215 958,225 963,240 950,232 937,240 942,225 930,215 945,215" />
+  </g>
+</svg>

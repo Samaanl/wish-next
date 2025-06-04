@@ -1,0 +1,54 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ff69b4;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#ff1493;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#dc143c;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  
+  <!-- Decorative hearts -->
+  <g fill="rgba(255,255,255,0.2)">
+    <path d="M150,200 C150,180 170,160 190,160 C210,160 230,180 230,200 C230,220 190,260 190,260 S150,220 150,200 Z"/>
+    <path d="M950,400 C950,385 965,370 980,370 C995,370 1010,385 1010,400 C1010,415 980,450 980,450 S950,415 950,400 Z"/>
+    <path d="M80,450 C80,440 87,430 95,430 C103,430 110,440 110,450 C110,460 95,480 95,480 S80,460 80,450 Z"/>
+  </g>
+  
+  <!-- Main heart icon -->
+  <g transform="translate(100, 150)">
+    <path d="M60,50 C60,20 80,0 110,0 C140,0 160,20 160,50 C160,80 110,140 110,140 S60,80 60,50 Z" fill="rgba(255,255,255,0.8)"/>
+    <path d="M70,45 C70,25 85,10 105,10 C125,10 140,25 140,45 C140,65 105,115 105,115 S70,65 70,45 Z" fill="#FF69B4"/>
+  </g>
+  
+  <!-- Ring icons -->
+  <g transform="translate(900, 100)">
+    <circle cx="50" cy="50" r="40" fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="6"/>
+    <circle cx="50" cy="35" r="15" fill="rgba(255,255,255,0.8)"/>
+    <circle cx="120" cy="80" r="30" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="4"/>
+    <circle cx="120" cy="70" r="10" fill="rgba(255,255,255,0.7)"/>
+  </g>
+  
+  <!-- Title -->
+  <text x="600" y="200" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="46" font-weight="bold">
+    Anniversary Messages
+  </text>
+  
+  <!-- Subtitle -->
+  <text x="600" y="280" text-anchor="middle" fill="rgba(255,255,255,0.9)" font-family="Arial, sans-serif" font-size="24">
+    Celebrating love, memories &amp; milestones
+  </text>
+  
+  <!-- Date -->
+  <text x="600" y="350" text-anchor="middle" fill="rgba(255,255,255,0.8)" font-family="Arial, sans-serif" font-size="18">
+    Perfect words for your special day
+  </text>
+  
+  <!-- Decorative swirls -->
+  <g fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="3">
+    <path d="M300,400 Q320,380 340,400 Q360,420 380,400"/>
+    <path d="M800,500 Q820,480 840,500 Q860,520 880,500"/>
+  </g>
+</svg>
