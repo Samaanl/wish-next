@@ -127,3 +127,65 @@ button,
 .hljs::-webkit-scrollbar-thumb:hover {
   background: #9ca3af;
 }
+
+/* Custom Blog Text Styling Classes */
+.blog-highlight {
+  background: linear-gradient(120deg, #a855f7 0%, #3b82f6 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-weight: 700;
+  font-size: 1.125rem;
+}
+
+.blog-quote-box {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 1.5rem;
+  border-radius: 0.75rem;
+  color: white;
+  font-size: 1.1rem;
+  line-height: 1.7;
+  margin: 1.5rem 0;
+  box-shadow: 0 10px 25px -3px rgba(0, 0, 0, 0.1);
+}
+
+.blog-emphasis {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #4338ca;
+  background: linear-gradient(90deg, #ddd6fe, #e0e7ff);
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  display: inline-block;
+  margin: 0.5rem 0;
+}
+
+.blog-large-text {
+  font-size: 1.5rem;
+  line-height: 1.4;
+  font-weight: 500;
+}
+
+.blog-small-caps {
+  font-variant: small-caps;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+}
+
+.blog-italic-bold {
+  font-style: italic;
+  font-weight: 700;
+  color: #6366f1;
+}
+
+/* Dark mode variations */
+@media (prefers-color-scheme: dark) {
+  .blog-emphasis {
+    color: #a78bfa;
+    background: linear-gradient(90deg, #1e1b4b, #312e81);
+  }
+
+  .blog-italic-bold {
+    color: #a78bfa;
+  }
+}

@@ -17,21 +17,27 @@ Birthdays are special moments that deserve more than just a generic "Happy Birth
 
 ## Why Personalized Birthday Wishes Matter
 
-In our digital age, it's easy to send a quick text or post on social media. However, taking the time to craft a thoughtful, personalized birthday message shows that you truly care. **Personalized wishes create lasting memories** and strengthen relationships.
+In our digital age, it's easy to send a quick text or post on social media. However, taking the time to craft a thoughtful, personalized birthday message shows that you truly care.
+
+<span style="font-size: 18px; font-weight: bold; color: #4338ca;">**Personalized wishes create lasting memories**</span> and strengthen relationships in ways that generic messages simply cannot.
 
 ### The Psychology Behind Meaningful Messages
 
 Research shows that personalized messages trigger emotional responses that generic ones simply can't match. When someone receives a wish that references shared memories, inside jokes, or personal achievements, it activates the brain's reward centers.
 
-## 10 Birthday Wish Categories to Inspire You
+## <span class="blog-highlight">10 Birthday Wish Categories to Inspire You</span>
 
 ### 1. **For Close Family Members**
 
-_"Another year of your amazing journey around the sun! Watching you grow, learn, and achieve your dreams has been one of life's greatest gifts. Your kindness, strength, and beautiful spirit inspire everyone around you. Here's to celebrating not just your birthday, but the incredible person you've become."_
+<div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; border-radius: 12px; color: white; font-size: 16px; line-height: 1.6; margin: 16px 0;">
+<em>"Another year of your amazing journey around the sun! Watching you grow, learn, and achieve your dreams has been one of life's greatest gifts. Your kindness, strength, and beautiful spirit inspire everyone around you. Here's to celebrating not just your birthday, but the incredible person you've become."</em>
+</div>
 
 ### 2. **For Best Friends**
 
-_"Happy birthday to the person who knows all my secrets and still chooses to be my friend! 🎉 From our crazy adventures to our deep midnight conversations, you've made life so much brighter. Can't wait to create more unforgettable memories together!"_
+<div class="blog-quote-box">
+<em>"Happy birthday to the person who knows all my secrets and still chooses to be my friend! 🎉 From our crazy adventures to our deep midnight conversations, you've made life so much brighter. Can't wait to create more unforgettable memories together!"</em>
+</div>
 
 ![Friends celebrating birthday together](/blog-images/friends-birthday.jpg)
 
