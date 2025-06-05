@@ -5,6 +5,9 @@ import {
   HeartIcon,
   PhotoIcon,
   CloudArrowUpIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  SparklesIcon,
 } from "@heroicons/react/24/outline";
 import OccasionSelector from "./OccasionSelector";
 import OptimizedImageGallery from "./OptimizedImageGallery";
@@ -14,18 +17,27 @@ import StableTransition from "./StableTransition";
 import { Occasion, OccasionImage, uploadWishImage } from "@/utils/imageService";
 
 interface WishDisplayProps {
-  wish: string;
+  wishes: string[];
+  currentWishIndex: number;
+  onWishIndexChange: (index: number) => void;
   onEdit: () => void;
+  onGenerateMoreVariants?: () => void;
+  isGeneratingVariants?: boolean;
   userId?: string; // Optional userId for authenticated users
 }
 
 export default function WishDisplay({
-  wish,
+  wishes,
+  currentWishIndex,
+  onWishIndexChange,
   onEdit,
+  onGenerateMoreVariants,
+  isGeneratingVariants = false,
   userId,
 }: WishDisplayProps) {
   const wishRef = useRef<HTMLDivElement>(null);
-  const [wishText, setWishText] = useState(wish);
+  const currentWish = wishes[currentWishIndex] || "";
+  const [wishText, setWishText] = useState(currentWish);
   const [copied, setCopied] = useState(false);
   const [isAnimated, setIsAnimated] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -49,6 +61,10 @@ export default function WishDisplay({
     if (selectedOccasion) return `gallery-${selectedOccasion.id}`;
     return "wish-view";
   }, [selectedImage, selectedOccasion]);
+  // Update wishText when currentWishIndex changes
+  useEffect(() => {
+    setWishText(wishes[currentWishIndex] || "");
+  }, [currentWishIndex, wishes]);
 
   useEffect(() => {
     // Start animation when component mounts
@@ -62,20 +78,37 @@ export default function WishDisplay({
         textarea.style.height = `${textarea.scrollHeight}px`;
       }
     }
-  }, []);
+  }, [currentWishIndex]); // Re-run when wish changes
 
   const handleCopy = () => {
     navigator.clipboard.writeText(wishText);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
-
   const handleWishChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setWishText(e.target.value);
 
     // Auto-resize as typing
     e.target.style.height = "auto";
     e.target.style.height = `${e.target.scrollHeight}px`;
+  };
+
+  const handlePrevious = () => {
+    if (currentWishIndex > 0) {
+      onWishIndexChange(currentWishIndex - 1);
+    }
+  };
+
+  const handleNext = () => {
+    if (currentWishIndex < wishes.length - 1) {
+      onWishIndexChange(currentWishIndex + 1);
+    }
+  };
+
+  const handleGenerateMore = () => {
+    if (onGenerateMoreVariants && !isGeneratingVariants) {
+      onGenerateMoreVariants();
+    }
   };
   const handleSelectOccasion = (occasion: Occasion) => {
     setSelectedOccasion(occasion);
@@ -382,6 +415,57 @@ export default function WishDisplay({
               </button>
             </div>
           </div>
+          {/* Wish Navigation - Only show if multiple wishes */}
+          {wishes.length > 1 && (
+            <div className="mb-6 flex items-center justify-between bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+              <button
+                onClick={handlePrevious}
+                disabled={currentWishIndex === 0}
+                className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors ${
+                  currentWishIndex === 0
+                    ? "text-gray-400 dark:text-gray-500 cursor-not-allowed"
+                    : "text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900"
+                }`}
+              >
+                <ChevronLeftIcon className="h-5 w-5" />
+                <span>Previous</span>
+              </button>
+
+              <div className="flex items-center space-x-4">
+                <span className="text-sm text-gray-600 dark:text-gray-400">
+                  Variant {currentWishIndex + 1} of {wishes.length}
+                </span>
+
+                {/* Dot indicators */}
+                <div className="flex space-x-2">
+                  {wishes.map((_, index) => (
+                    <button
+                      key={index}
+                      onClick={() => onWishIndexChange(index)}
+                      className={`w-2 h-2 rounded-full transition-colors ${
+                        index === currentWishIndex
+                          ? "bg-indigo-600"
+                          : "bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500"
+                      }`}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <button
+                onClick={handleNext}
+                disabled={currentWishIndex === wishes.length - 1}
+                className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors ${
+                  currentWishIndex === wishes.length - 1
+                    ? "text-gray-400 dark:text-gray-500 cursor-not-allowed"
+                    : "text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900"
+                }`}
+              >
+                <span>Next</span>
+                <ChevronRightIcon className="h-5 w-5" />
+              </button>
+            </div>
+          )}
           {copied && (
             <div className="mb-4 px-4 py-2 bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-400 text-sm rounded-lg flex items-center">
               <svg
@@ -433,7 +517,7 @@ export default function WishDisplay({
                 overflow: "hidden",
               }}
             />
-          </div>
+          </div>{" "}
           <div className="flex flex-wrap justify-center gap-3 mt-6">
             <button
               onClick={() => setIsImageMode(true)}
@@ -441,7 +525,30 @@ export default function WishDisplay({
             >
               <PhotoIcon className="h-5 w-5 mr-2" />
               Create Image with this Wish
-            </button>{" "}
+            </button>
+
+            {onGenerateMoreVariants && (
+              <button
+                onClick={handleGenerateMore}
+                disabled={isGeneratingVariants}
+                className={`px-4 py-2.5 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 transition-colors flex items-center ${
+                  isGeneratingVariants ? "opacity-70 cursor-not-allowed" : ""
+                }`}
+              >
+                {isGeneratingVariants ? (
+                  <>
+                    <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2"></div>
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <SparklesIcon className="h-5 w-5 mr-2" />
+                    Generate More Variants
+                  </>
+                )}
+              </button>
+            )}
+
             <button
               onClick={onEdit}
               className="px-4 py-2.5 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white font-medium rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"

@@ -22,7 +22,8 @@ import { WishBackground, WishEffect, Sparkle } from "@/components/Decorations";
 export default function Home() {
   const { currentUser, refreshUserCredits } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
-  const [generatedWish, setGeneratedWish] = useState<string | null>(null);
+  const [generatedWishes, setGeneratedWishes] = useState<string[]>([]);
+  const [currentWishIndex, setCurrentWishIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [insufficientCredits, setInsufficientCredits] = useState(false);
@@ -31,6 +32,7 @@ export default function Home() {
   const [showFirstTimeOverlay, setShowFirstTimeOverlay] = useState(false);
   const [showSignInPrompt, setShowSignInPrompt] = useState(false);
   const [lastFormInputs, setLastFormInputs] = useState<WishInputs | null>(null);
+  const [isGeneratingVariants, setIsGeneratingVariants] = useState(false);
 
   // Load saved form data from localStorage on mount
   useEffect(() => {
@@ -119,10 +121,16 @@ export default function Home() {
       setIsLoading(false);
       return;
     }
-
     try {
-      const result = await generateWish(inputs, currentUser.id);
-      setGeneratedWish(result.wish);
+      // Generate 3 variants of the wish
+      const promises = Array(3)
+        .fill(null)
+        .map(() => generateWish(inputs, currentUser.id));
+      const results = await Promise.all(promises);
+      const wishes = results.map((result) => result.wish);
+
+      setGeneratedWishes(wishes);
+      setCurrentWishIndex(0);
       // Refresh user credits after successful generation
       await refreshUserCredits();
       // Keep form data in case user wants to edit, don't clear it
@@ -138,14 +146,47 @@ export default function Home() {
     }
   };
   const handleStartOver = () => {
-    setGeneratedWish(null);
+    setGeneratedWishes([]);
+    setCurrentWishIndex(0);
     setError(null);
     setInsufficientCredits(false);
     // Keep lastFormInputs so user can edit their previous selections
+  };
+
+  const handleGenerateMoreVariants = async () => {
+    if (!lastFormInputs || !currentUser || isGeneratingVariants) return;
+
+    setIsGeneratingVariants(true);
+    setError(null);
+
+    try {
+      // Generate 3 more variants
+      const promises = Array(3)
+        .fill(null)
+        .map(() => generateWish(lastFormInputs, currentUser.id));
+      const results = await Promise.all(promises);
+      const newWishes = results.map((result) => result.wish);
+
+      // Add new wishes to existing ones
+      setGeneratedWishes((prev) => [...prev, ...newWishes]);
+
+      // Refresh user credits after successful generation
+      await refreshUserCredits();
+    } catch (error: unknown) {
+      console.error("Error generating more variants:", error);
+      if (error instanceof Error && error.message === "INSUFFICIENT_CREDITS") {
+        setInsufficientCredits(true);
+      } else {
+        setError("Failed to generate more variants. Please try again.");
+      }
+    } finally {
+      setIsGeneratingVariants(false);
+    }
   }; // Complete reset function to return to starting state
   const handleResetToStart = () => {
     // Reset all main states
-    setGeneratedWish(null);
+    setGeneratedWishes([]);
+    setCurrentWishIndex(0);
     setError(null);
     setInsufficientCredits(false);
     setAuthModalOpen(false);
@@ -251,10 +292,14 @@ export default function Home() {
           )}{" "}
           {insufficientCredits ? (
             <NotEnoughCredits onBuyCredits={handleBuyCredits} />
-          ) : generatedWish ? (
+          ) : generatedWishes.length > 0 ? (
             <WishDisplay
-              wish={generatedWish}
+              wishes={generatedWishes}
+              currentWishIndex={currentWishIndex}
+              onWishIndexChange={setCurrentWishIndex}
               onEdit={handleStartOver}
+              onGenerateMoreVariants={handleGenerateMoreVariants}
+              isGeneratingVariants={isGeneratingVariants}
               userId={currentUser?.id}
             />
           ) : (
