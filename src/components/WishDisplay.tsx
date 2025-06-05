@@ -199,7 +199,6 @@ export default function WishDisplay({
               >
                 Create Another Image
               </button>
-
               <button
                 onClick={() => {
                   const link = document.createElement("a");
@@ -213,7 +212,6 @@ export default function WishDisplay({
               >
                 Download Image
               </button>
-
               {userId && (
                 <button
                   onClick={handleSaveToStorage}
@@ -234,13 +232,12 @@ export default function WishDisplay({
                     </>
                   )}
                 </button>
-              )}
-
+              )}{" "}
               <button
                 onClick={onEdit}
                 className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white font-medium rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
               >
-                Start Over
+                Edit Wish Settings
               </button>
             </div>
 
@@ -358,6 +355,7 @@ export default function WishDisplay({
         </div>
 
         <div className="p-8">
+          {" "}
           <div className="mb-6 flex justify-between items-center">
             <div className="flex items-center">
               <HeartIcon className="h-6 w-6 text-pink-500 mr-2" />
@@ -365,24 +363,25 @@ export default function WishDisplay({
                 Your Special Wish
               </h3>
             </div>
-            <div className="flex space-x-2">
+            <div className="flex space-x-3">
               <button
-                className="p-2 text-gray-500 hover:text-indigo-600 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
+                className="flex items-center space-x-2 px-4 py-2 bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-300 rounded-lg hover:bg-indigo-200 dark:hover:bg-indigo-800 transition-colors duration-200 font-medium"
                 onClick={handleCopy}
                 title="Copy to clipboard"
               >
                 <ClipboardDocumentIcon className="h-5 w-5" />
+                <span>Copy</span>
               </button>
               <button
-                className="p-2 text-gray-500 hover:text-indigo-600 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
+                className="flex items-center space-x-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors duration-200 font-medium"
                 onClick={onEdit}
-                title="Start over"
+                title="Edit your wish settings"
               >
                 <PencilIcon className="h-5 w-5" />
+                <span>Edit</span>
               </button>
             </div>
           </div>
-
           {copied && (
             <div className="mb-4 px-4 py-2 bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-400 text-sm rounded-lg flex items-center">
               <svg
@@ -400,7 +399,6 @@ export default function WishDisplay({
               Copied to clipboard!
             </div>
           )}
-
           <div className="relative overflow-hidden" ref={wishRef}>
             <div className="absolute inset-0 pointer-events-none opacity-5">
               <div className="absolute top-0 left-0 transform -translate-x-1/2 -translate-y-1/2">
@@ -436,7 +434,6 @@ export default function WishDisplay({
               }}
             />
           </div>
-
           <div className="flex flex-wrap justify-center gap-3 mt-6">
             <button
               onClick={() => setIsImageMode(true)}
@@ -444,13 +441,12 @@ export default function WishDisplay({
             >
               <PhotoIcon className="h-5 w-5 mr-2" />
               Create Image with this Wish
-            </button>
-
+            </button>{" "}
             <button
               onClick={onEdit}
               className="px-4 py-2.5 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white font-medium rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
             >
-              Create Another Wish
+              Edit Wish Settings
             </button>
           </div>
         </div>

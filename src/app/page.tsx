@@ -30,6 +30,21 @@ export default function Home() {
   const [showSavedWishes, setShowSavedWishes] = useState(false);
   const [showFirstTimeOverlay, setShowFirstTimeOverlay] = useState(false);
   const [showSignInPrompt, setShowSignInPrompt] = useState(false);
+  const [lastFormInputs, setLastFormInputs] = useState<WishInputs | null>(null);
+
+  // Load saved form data from localStorage on mount
+  useEffect(() => {
+    const savedFormData = localStorage.getItem("wishFormData");
+    if (savedFormData) {
+      try {
+        const parsedData = JSON.parse(savedFormData);
+        setLastFormInputs(parsedData);
+      } catch (error) {
+        console.error("Error parsing saved form data:", error);
+        localStorage.removeItem("wishFormData");
+      }
+    }
+  }, []);
 
   // Check for first time visit
   useEffect(() => {
@@ -85,7 +100,13 @@ export default function Home() {
   const handleGenerateWish = async (inputs: WishInputs) => {
     setIsLoading(true);
     setError(null);
-    setInsufficientCredits(false); // Check if user is authenticated (not a guest user)
+    setInsufficientCredits(false);
+
+    // Store form inputs for potential editing
+    setLastFormInputs(inputs);
+    localStorage.setItem("wishFormData", JSON.stringify(inputs));
+
+    // Check if user is authenticated (not a guest user)
     if (!currentUser || currentUser.isGuest) {
       const hasSeenSignInPrompt = localStorage.getItem("hasSeenSignInPrompt");
       if (!hasSeenSignInPrompt) {
@@ -104,6 +125,7 @@ export default function Home() {
       setGeneratedWish(result.wish);
       // Refresh user credits after successful generation
       await refreshUserCredits();
+      // Keep form data in case user wants to edit, don't clear it
     } catch (error: unknown) {
       console.error("Error generating wish:", error);
       if (error instanceof Error && error.message === "INSUFFICIENT_CREDITS") {
@@ -119,8 +141,8 @@ export default function Home() {
     setGeneratedWish(null);
     setError(null);
     setInsufficientCredits(false);
-  };
-  // Complete reset function to return to starting state
+    // Keep lastFormInputs so user can edit their previous selections
+  }; // Complete reset function to return to starting state
   const handleResetToStart = () => {
     // Reset all main states
     setGeneratedWish(null);
@@ -131,6 +153,8 @@ export default function Home() {
     setShowSavedWishes(false);
     setShowSignInPrompt(false);
     setIsLoading(false);
+    setLastFormInputs(null); // Clear saved form data on complete reset
+    localStorage.removeItem("wishFormData"); // Clear from localStorage too
 
     // Clear any URL parameters
     if (typeof window !== "undefined") {
@@ -266,13 +290,17 @@ export default function Home() {
                   </div>
                   <h1 className="text-4xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400 mb-3">
                     Create Your Perfect Wish
-                  </h1>
+                  </h1>{" "}
                   <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
                     Generate personalized, heartfelt messages for any occasion
                     in seconds
                   </p>
                 </div>
-                <WishForm onSubmit={handleGenerateWish} isLoading={isLoading} />
+                <WishForm
+                  onSubmit={handleGenerateWish}
+                  isLoading={isLoading}
+                  initialValues={lastFormInputs || undefined}
+                />
               </div>
             </motion.div>
           )}{" "}

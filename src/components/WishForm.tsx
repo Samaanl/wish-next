@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { ArrowPathIcon } from "@heroicons/react/24/outline";
 import { WishInputs } from "@/utils/wishService";
 import { motion } from "framer-motion";
@@ -6,24 +6,130 @@ import { motion } from "framer-motion";
 type FormProps = {
   onSubmit: (inputs: WishInputs) => void;
   isLoading: boolean;
+  initialValues?: Partial<WishInputs>;
 };
 
-export default function WishForm({ onSubmit, isLoading }: FormProps) {
+export default function WishForm({
+  onSubmit,
+  isLoading,
+  initialValues,
+}: FormProps) {
   const [inputs, setInputs] = useState<WishInputs>({
-    occasion: "",
-    tone: "",
-    recipientName: "",
-    relationship: "",
-    memorableEvent: "",
-    hobby: "",
-    age: "",
-    messageLength: "",
-    messageFormat: "",
+    occasion: initialValues?.occasion || "",
+    tone: initialValues?.tone || "",
+    recipientName: initialValues?.recipientName || "",
+    relationship: initialValues?.relationship || "",
+    memorableEvent: initialValues?.memorableEvent || "",
+    hobby: initialValues?.hobby || "",
+    age: initialValues?.age || "",
+    messageLength: initialValues?.messageLength || "",
+    messageFormat: initialValues?.messageFormat || "",
   });
   const [currentStep, setCurrentStep] = useState(1);
   const totalSteps = 4;
-  const [customOccasion, setCustomOccasion] = useState("");
-  const [customTone, setCustomTone] = useState("");
+  const [customOccasion, setCustomOccasion] = useState(
+    initialValues?.occasion === "Other"
+      ? ""
+      : initialValues?.occasion &&
+          ![
+            "Birthday",
+            "Anniversary",
+            "New Job",
+            "Farewell",
+            "Condolence",
+            "Breakup",
+            "Apology",
+            "Graduation",
+            "Wedding",
+            "Promotion",
+            "Baby Shower",
+            "Recovery",
+          ].includes(initialValues.occasion)
+        ? initialValues.occasion
+        : ""
+  );
+  const [customTone, setCustomTone] = useState(
+    initialValues?.tone === "Other"
+      ? ""
+      : initialValues?.tone &&
+          ![
+            "Funny",
+            "Emotional",
+            "Formal",
+            "Sarcastic",
+            "Romantic",
+            "Spiritual",
+            "Inspirational",
+            "Playful",
+            "Heartfelt",
+            "Professional",
+            "Casual",
+            "Poetic",
+          ].includes(initialValues.tone)
+        ? initialValues.tone
+        : ""
+  );
+
+  // Handle initial values and determine starting step
+  useEffect(() => {
+    if (initialValues) {
+      // Update inputs with initial values
+      setInputs({
+        occasion: initialValues.occasion || "",
+        tone: initialValues.tone || "",
+        recipientName: initialValues.recipientName || "",
+        relationship: initialValues.relationship || "",
+        memorableEvent: initialValues.memorableEvent || "",
+        hobby: initialValues.hobby || "",
+        age: initialValues.age || "",
+        messageLength: initialValues.messageLength || "",
+        messageFormat: initialValues.messageFormat || "",
+      });
+
+      // Set custom values if needed
+      const occasionList = [
+        "Birthday",
+        "Anniversary",
+        "New Job",
+        "Farewell",
+        "Condolence",
+        "Breakup",
+        "Apology",
+        "Graduation",
+        "Wedding",
+        "Promotion",
+        "Baby Shower",
+        "Recovery",
+      ];
+      const toneList = [
+        "Funny",
+        "Emotional",
+        "Formal",
+        "Sarcastic",
+        "Romantic",
+        "Spiritual",
+        "Inspirational",
+        "Playful",
+        "Heartfelt",
+        "Professional",
+        "Casual",
+        "Poetic",
+      ];
+
+      if (
+        initialValues.occasion &&
+        !occasionList.includes(initialValues.occasion)
+      ) {
+        setCustomOccasion(initialValues.occasion);
+        setInputs((prev) => ({ ...prev, occasion: "Other" }));
+      }
+
+      if (initialValues.tone && !toneList.includes(initialValues.tone)) {
+        setCustomTone(initialValues.tone);
+        setInputs((prev) => ({ ...prev, tone: "Other" }));
+      }
+    }
+  }, [initialValues]);
   const occasions = [
     "Birthday",
     "Anniversary",
@@ -642,10 +748,10 @@ export default function WishForm({ onSubmit, isLoading }: FormProps) {
                     isCompleted
                       ? "bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-200 dark:hover:bg-indigo-800 cursor-pointer"
                       : isCurrent
-                      ? "bg-indigo-600 dark:bg-indigo-500 text-white"
-                      : isAccessible
-                      ? "bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-600 cursor-pointer"
-                      : "bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed"
+                        ? "bg-indigo-600 dark:bg-indigo-500 text-white"
+                        : isAccessible
+                          ? "bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-600 cursor-pointer"
+                          : "bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed"
                   } ${isAccessible ? "hover:scale-105 active:scale-95" : ""}`}
                   title={
                     isAccessible
@@ -653,10 +759,10 @@ export default function WishForm({ onSubmit, isLoading }: FormProps) {
                           step === 1
                             ? "Basic"
                             : step === 2
-                            ? "Details"
-                            : step === 3
-                            ? "Personal"
-                            : "Format"
+                              ? "Details"
+                              : step === 3
+                                ? "Personal"
+                                : "Format"
                         } section`
                       : "Complete previous steps to access"
                   }
@@ -686,10 +792,10 @@ export default function WishForm({ onSubmit, isLoading }: FormProps) {
                   {step === 1
                     ? "Basic"
                     : step === 2
-                    ? "Details"
-                    : step === 3
-                    ? "Personal"
-                    : "Format"}
+                      ? "Details"
+                      : step === 3
+                        ? "Personal"
+                        : "Format"}
                 </span>
               </div>
             );
