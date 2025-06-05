@@ -157,7 +157,7 @@ const AuthModal: React.FC<AuthModalProps> = ({
                     />
                   </svg>
                 </div>
-                <h3 className="font-semibold text-lg mb-2">Magic link sent!</h3>
+                <h3 className="font-semibold text-lg mb-2">email sent!</h3>
                 <p className="text-sm">
                   Check your email for a secure sign-in link sent to:
                 </p>
@@ -166,8 +166,8 @@ const AuthModal: React.FC<AuthModalProps> = ({
             </div>
             <div className="space-y-3">
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                Click the link in your email to complete sign-in. The link will
-                expire in 1 hour.
+                The link will expire in 1 hour <br /> Please note: it may take
+                up to 5 minutes for the email to arrive in your inbox
               </p>
               <button
                 onClick={() => {
@@ -245,7 +245,7 @@ const AuthModal: React.FC<AuthModalProps> = ({
                         d="M3 8l7.89 4.26a2 2 0 001.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
                       />
                     </svg>
-                    Magic Link
+                    Email
                   </span>
                 </button>
               </div>
@@ -375,7 +375,7 @@ const AuthModal: React.FC<AuthModalProps> = ({
                             d="M3 8l7.89 4.26a2 2 0 001.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
                           />
                         </svg>
-                        Send Magic Link
+                        Send Email
                       </>
                     )}
                   </button>
