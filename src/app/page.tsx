@@ -122,12 +122,9 @@ export default function Home() {
       return;
     }
     try {
-      // Generate 3 variants of the wish
-      const promises = Array(3)
-        .fill(null)
-        .map(() => generateWish(inputs, currentUser.id));
-      const results = await Promise.all(promises);
-      const wishes = results.map((result) => result.wish);
+      // Generate only 1 wish initially (consumes 1 credit)
+      const result = await generateWish(inputs, currentUser.id);
+      const wishes = [result.wish];
 
       setGeneratedWishes(wishes);
       setCurrentWishIndex(0);
