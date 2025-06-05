@@ -418,110 +418,38 @@ export default function WishDisplay({
           {/* Wish Navigation - Only show if multiple wishes */}
           {wishes.length > 1 && (
             <div className="mb-6 bg-gray-50 dark:bg-gray-700 rounded-lg p-3 sm:p-4">
-              {/* Mobile/Tablet Layout */}
-              <div className="block lg:hidden">
-                {/* Top row: Variant counter and dots */}
-                <div className="flex items-center justify-center mb-3">
-                  <div className="flex items-center space-x-3">
-                    <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 font-medium">
-                      {currentWishIndex + 1} of {wishes.length}
-                    </span>
-
-                    {/* Larger dot indicators for mobile */}
-                    <div className="flex space-x-1.5">
-                      {wishes.map((_, index) => (
-                        <button
-                          key={index}
-                          onClick={() => onWishIndexChange(index)}
-                          className={`w-3 h-3 sm:w-3.5 sm:h-3.5 rounded-full transition-colors touch-manipulation ${
-                            index === currentWishIndex
-                              ? "bg-indigo-600"
-                              : "bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500"
-                          }`}
-                          aria-label={`Go to variant ${index + 1}`}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Bottom row: Navigation buttons */}
-                <div className="flex justify-between items-center">
-                  <button
-                    onClick={handlePrevious}
-                    disabled={currentWishIndex === 0}
-                    className={`flex items-center space-x-1.5 px-3 py-2 rounded-lg transition-colors touch-manipulation ${
-                      currentWishIndex === 0
-                        ? "text-gray-400 dark:text-gray-500 cursor-not-allowed"
-                        : "text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900 active:bg-indigo-200 dark:active:bg-indigo-800"
-                    }`}
-                  >
-                    <ChevronLeftIcon className="h-4 w-4 sm:h-5 sm:w-5" />
-                    <span className="text-sm sm:text-base">Previous</span>
-                  </button>
-
-                  <button
-                    onClick={handleNext}
-                    disabled={currentWishIndex === wishes.length - 1}
-                    className={`flex items-center space-x-1.5 px-3 py-2 rounded-lg transition-colors touch-manipulation ${
-                      currentWishIndex === wishes.length - 1
-                        ? "text-gray-400 dark:text-gray-500 cursor-not-allowed"
-                        : "text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900 active:bg-indigo-200 dark:active:bg-indigo-800"
-                    }`}
-                  >
-                    <span className="text-sm sm:text-base">Next</span>
-                    <ChevronRightIcon className="h-4 w-4 sm:h-5 sm:w-5" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Desktop Layout */}
-              <div className="hidden lg:flex items-center justify-between">
+              {/* Simple unified layout for all screen sizes */}
+              <div className="flex justify-between items-center">
                 <button
                   onClick={handlePrevious}
                   disabled={currentWishIndex === 0}
-                  className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors ${
+                  className={`flex items-center space-x-1.5 sm:space-x-2 px-3 py-2 rounded-lg transition-colors touch-manipulation ${
                     currentWishIndex === 0
                       ? "text-gray-400 dark:text-gray-500 cursor-not-allowed"
-                      : "text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900"
+                      : "text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900 active:bg-indigo-200 dark:active:bg-indigo-800"
                   }`}
                 >
-                  <ChevronLeftIcon className="h-5 w-5" />
-                  <span>Previous</span>
+                  <ChevronLeftIcon className="h-4 w-4 sm:h-5 sm:w-5" />
+                  <span className="text-sm sm:text-base">Previous</span>
                 </button>
 
-                <div className="flex items-center space-x-4">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">
-                    Variant {currentWishIndex + 1} of {wishes.length}
+                <div className="flex items-center">
+                  <span className="text-sm sm:text-base text-gray-600 dark:text-gray-400 font-medium">
+                    {currentWishIndex + 1} / {wishes.length}
                   </span>
-
-                  {/* Dot indicators */}
-                  <div className="flex space-x-2">
-                    {wishes.map((_, index) => (
-                      <button
-                        key={index}
-                        onClick={() => onWishIndexChange(index)}
-                        className={`w-2 h-2 rounded-full transition-colors ${
-                          index === currentWishIndex
-                            ? "bg-indigo-600"
-                            : "bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500"
-                        }`}
-                      />
-                    ))}
-                  </div>
                 </div>
 
                 <button
                   onClick={handleNext}
                   disabled={currentWishIndex === wishes.length - 1}
-                  className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors ${
+                  className={`flex items-center space-x-1.5 sm:space-x-2 px-3 py-2 rounded-lg transition-colors touch-manipulation ${
                     currentWishIndex === wishes.length - 1
                       ? "text-gray-400 dark:text-gray-500 cursor-not-allowed"
-                      : "text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900"
+                      : "text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900 active:bg-indigo-200 dark:active:bg-indigo-800"
                   }`}
                 >
-                  <span>Next</span>
-                  <ChevronRightIcon className="h-5 w-5" />
+                  <span className="text-sm sm:text-base">Next</span>
+                  <ChevronRightIcon className="h-4 w-4 sm:h-5 sm:w-5" />
                 </button>
               </div>
             </div>
