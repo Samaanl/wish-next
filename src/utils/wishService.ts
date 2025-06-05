@@ -76,17 +76,22 @@ export const generateWish = async (
   userId: string
 ): Promise<WishResult> => {
   try {
-    // First check if user has enough credits
-    const hasCredits = await hasEnoughCredits(userId);
-
-    if (!hasCredits) {
-      throw new Error("INSUFFICIENT_CREDITS");
+    // For guest users, check credits on frontend since they're stored in localStorage
+    if (userId.startsWith("guest-")) {
+      const hasCredits = await hasEnoughCredits(userId);
+      if (!hasCredits) {
+        throw new Error("INSUFFICIENT_CREDITS");
+      }
     }
 
-    // Call the Appwrite function that will handle the Gemini API
+    // Call the Appwrite function that will handle the Gemini API AND credit deduction
     const execution = await functions.createExecution(
       process.env.NEXT_PUBLIC_APPWRITE_FUNCTION_ID || "682abef000096a085636",
-      JSON.stringify(inputs), // body
+      JSON.stringify({
+        ...inputs,
+        userId, // Pass userId to the function for credit management
+        creditsToDeduct: 1, // Specify how many credits this operation costs
+      }), // body
       false, // async
       "/wish-generator", // path
       ExecutionMethod.POST, // method
@@ -94,10 +99,21 @@ export const generateWish = async (
     );
 
     if (execution.status === "completed") {
-      // Deduct a credit for successful generation
-      const creditsRemaining = await deductCredits(userId);
-
       const result = JSON.parse(execution.responseBody);
+
+      // Check if the function returned an error (like insufficient credits)
+      if (!result.success) {
+        if (result.message === "INSUFFICIENT_CREDITS") {
+          throw new Error("INSUFFICIENT_CREDITS");
+        }
+        throw new Error(result.message || "Wish generation failed");
+      }
+
+      // For guest users, deduct credits on frontend
+      let finalCreditsRemaining = result.creditsRemaining;
+      if (userId.startsWith("guest-")) {
+        finalCreditsRemaining = await deductCredits(userId);
+      }
 
       // Save the wish to database if user is authenticated (not a guest user)
       if (userId && !userId.startsWith("guest_")) {
@@ -111,7 +127,7 @@ export const generateWish = async (
 
       return {
         wish: result.wish,
-        creditsRemaining,
+        creditsRemaining: finalCreditsRemaining,
       };
     } else {
       throw new Error("Wish generation failed: " + execution.status);
