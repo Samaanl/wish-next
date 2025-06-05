@@ -24,10 +24,10 @@ const BlogCard: React.FC<BlogCardProps> = ({
             </span>
           </div>
         )}{" "}
-        {/* Thumbnail */}
+        {/* Thumbnail */}{" "}
         <div
           className={`relative overflow-hidden ${
-            compact ? "h-32 md:h-36" : featured ? "h-64 lg:h-96" : "h-48"
+            compact ? "h-32" : featured ? "h-64 lg:h-96" : "h-48"
           }`}
         >
           <Image
@@ -73,7 +73,7 @@ const BlogCard: React.FC<BlogCardProps> = ({
           {/* Description */}
           <p
             className={`text-gray-600 dark:text-gray-300 ${
-              compact ? "mb-2 line-clamp-1" : "mb-3 line-clamp-2"
+              compact ? "mb-2 line-clamp-2" : "mb-3 line-clamp-2"
             } flex-grow ${
               compact
                 ? "text-xs md:text-sm"
@@ -97,6 +97,7 @@ const BlogCard: React.FC<BlogCardProps> = ({
                 </span>
               </div>
               <div>
+                {" "}
                 <p
                   className={`font-medium text-gray-900 dark:text-white ${compact ? "text-xs" : "text-xs"}`}
                 >
@@ -108,6 +109,14 @@ const BlogCard: React.FC<BlogCardProps> = ({
                       month: "short",
                       day: "numeric",
                       year: "numeric",
+                    })}
+                  </p>
+                )}
+                {compact && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    {new Date(post.date).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
                     })}
                   </p>
                 )}

@@ -13,7 +13,7 @@ tags:
     "romantic messages",
     "relationship goals",
   ]
-featured: false
+featured: true
 ---
 
 <div style="text-align: center; margin: 2rem 0;">  <h1 style="font-size: 2.5rem; font-weight: 800; background: linear-gradient(135deg, #d4af37 0%, #cd853f 50%, #daa520 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin-bottom: 1rem;">

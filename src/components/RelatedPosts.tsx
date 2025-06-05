@@ -26,16 +26,14 @@ const RelatedPosts: React.FC<RelatedPostsProps> = ({ posts, currentSlug }) => {
           <p className="text-gray-600 dark:text-gray-400">
             Discover more inspiration for your special occasions
           </p>
-        </div>
-
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+        </div>{" "}
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 items-stretch">
           {relatedPosts.map((post) => (
-            <div key={post.slug}>
-              <BlogCard post={post} />
+            <div key={post.slug} className="flex">
+              <BlogCard post={post} compact={true} />
             </div>
           ))}
         </div>
-
         <div className="text-center mt-8">
           <Link
             href="/blog"
