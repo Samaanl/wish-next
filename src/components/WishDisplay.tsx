@@ -389,81 +389,141 @@ export default function WishDisplay({
 
         <div className="p-8">
           {" "}
-          <div className="mb-6 flex justify-between items-center">
+          <div className="mb-6 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
             <div className="flex items-center">
               <HeartIcon className="h-6 w-6 text-pink-500 mr-2" />
-              <h3 className="text-xl font-bold bg-gradient-to-r from-indigo-600 to-pink-500 bg-clip-text text-transparent">
+              <h3 className="text-lg sm:text-xl font-bold bg-gradient-to-r from-indigo-600 to-pink-500 bg-clip-text text-transparent">
                 Your Special Wish
               </h3>
             </div>
-            <div className="flex space-x-3">
+            <div className="flex flex-wrap gap-2 sm:gap-3">
               <button
-                className="flex items-center space-x-2 px-4 py-2 bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-300 rounded-lg hover:bg-indigo-200 dark:hover:bg-indigo-800 transition-colors duration-200 font-medium"
+                className="flex items-center justify-center space-x-1.5 sm:space-x-2 px-3 sm:px-4 py-2 bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-300 rounded-lg hover:bg-indigo-200 dark:hover:bg-indigo-800 transition-colors duration-200 font-medium text-sm sm:text-base min-w-0 flex-1 sm:flex-initial"
                 onClick={handleCopy}
                 title="Copy to clipboard"
               >
-                <ClipboardDocumentIcon className="h-5 w-5" />
-                <span>Copy</span>
+                <ClipboardDocumentIcon className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
+                <span className="truncate">Copy</span>
               </button>
               <button
-                className="flex items-center space-x-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors duration-200 font-medium"
+                className="flex items-center justify-center space-x-1.5 sm:space-x-2 px-3 sm:px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors duration-200 font-medium text-sm sm:text-base min-w-0 flex-1 sm:flex-initial"
                 onClick={onEdit}
                 title="Edit your wish settings"
               >
-                <PencilIcon className="h-5 w-5" />
-                <span>Edit</span>
+                <PencilIcon className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
+                <span className="truncate">Edit</span>
               </button>
             </div>
-          </div>
+          </div>{" "}
           {/* Wish Navigation - Only show if multiple wishes */}
           {wishes.length > 1 && (
-            <div className="mb-6 flex items-center justify-between bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-              <button
-                onClick={handlePrevious}
-                disabled={currentWishIndex === 0}
-                className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors ${
-                  currentWishIndex === 0
-                    ? "text-gray-400 dark:text-gray-500 cursor-not-allowed"
-                    : "text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900"
-                }`}
-              >
-                <ChevronLeftIcon className="h-5 w-5" />
-                <span>Previous</span>
-              </button>
+            <div className="mb-6 bg-gray-50 dark:bg-gray-700 rounded-lg p-3 sm:p-4">
+              {/* Mobile/Tablet Layout */}
+              <div className="block lg:hidden">
+                {/* Top row: Variant counter and dots */}
+                <div className="flex items-center justify-center mb-3">
+                  <div className="flex items-center space-x-3">
+                    <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 font-medium">
+                      {currentWishIndex + 1} of {wishes.length}
+                    </span>
 
-              <div className="flex items-center space-x-4">
-                <span className="text-sm text-gray-600 dark:text-gray-400">
-                  Variant {currentWishIndex + 1} of {wishes.length}
-                </span>
+                    {/* Larger dot indicators for mobile */}
+                    <div className="flex space-x-1.5">
+                      {wishes.map((_, index) => (
+                        <button
+                          key={index}
+                          onClick={() => onWishIndexChange(index)}
+                          className={`w-3 h-3 sm:w-3.5 sm:h-3.5 rounded-full transition-colors touch-manipulation ${
+                            index === currentWishIndex
+                              ? "bg-indigo-600"
+                              : "bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500"
+                          }`}
+                          aria-label={`Go to variant ${index + 1}`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
 
-                {/* Dot indicators */}
-                <div className="flex space-x-2">
-                  {wishes.map((_, index) => (
-                    <button
-                      key={index}
-                      onClick={() => onWishIndexChange(index)}
-                      className={`w-2 h-2 rounded-full transition-colors ${
-                        index === currentWishIndex
-                          ? "bg-indigo-600"
-                          : "bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500"
-                      }`}
-                    />
-                  ))}
+                {/* Bottom row: Navigation buttons */}
+                <div className="flex justify-between items-center">
+                  <button
+                    onClick={handlePrevious}
+                    disabled={currentWishIndex === 0}
+                    className={`flex items-center space-x-1.5 px-3 py-2 rounded-lg transition-colors touch-manipulation ${
+                      currentWishIndex === 0
+                        ? "text-gray-400 dark:text-gray-500 cursor-not-allowed"
+                        : "text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900 active:bg-indigo-200 dark:active:bg-indigo-800"
+                    }`}
+                  >
+                    <ChevronLeftIcon className="h-4 w-4 sm:h-5 sm:w-5" />
+                    <span className="text-sm sm:text-base">Previous</span>
+                  </button>
+
+                  <button
+                    onClick={handleNext}
+                    disabled={currentWishIndex === wishes.length - 1}
+                    className={`flex items-center space-x-1.5 px-3 py-2 rounded-lg transition-colors touch-manipulation ${
+                      currentWishIndex === wishes.length - 1
+                        ? "text-gray-400 dark:text-gray-500 cursor-not-allowed"
+                        : "text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900 active:bg-indigo-200 dark:active:bg-indigo-800"
+                    }`}
+                  >
+                    <span className="text-sm sm:text-base">Next</span>
+                    <ChevronRightIcon className="h-4 w-4 sm:h-5 sm:w-5" />
+                  </button>
                 </div>
               </div>
 
-              <button
-                onClick={handleNext}
-                disabled={currentWishIndex === wishes.length - 1}
-                className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors ${
-                  currentWishIndex === wishes.length - 1
-                    ? "text-gray-400 dark:text-gray-500 cursor-not-allowed"
-                    : "text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900"
-                }`}
-              >
-                <span>Next</span>
-                <ChevronRightIcon className="h-5 w-5" />
-              </button>
+              {/* Desktop Layout */}
+              <div className="hidden lg:flex items-center justify-between">
+                <button
+                  onClick={handlePrevious}
+                  disabled={currentWishIndex === 0}
+                  className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors ${
+                    currentWishIndex === 0
+                      ? "text-gray-400 dark:text-gray-500 cursor-not-allowed"
+                      : "text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900"
+                  }`}
+                >
+                  <ChevronLeftIcon className="h-5 w-5" />
+                  <span>Previous</span>
+                </button>
+
+                <div className="flex items-center space-x-4">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">
+                    Variant {currentWishIndex + 1} of {wishes.length}
+                  </span>
+
+                  {/* Dot indicators */}
+                  <div className="flex space-x-2">
+                    {wishes.map((_, index) => (
+                      <button
+                        key={index}
+                        onClick={() => onWishIndexChange(index)}
+                        className={`w-2 h-2 rounded-full transition-colors ${
+                          index === currentWishIndex
+                            ? "bg-indigo-600"
+                            : "bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500"
+                        }`}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleNext}
+                  disabled={currentWishIndex === wishes.length - 1}
+                  className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors ${
+                    currentWishIndex === wishes.length - 1
+                      ? "text-gray-400 dark:text-gray-500 cursor-not-allowed"
+                      : "text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900"
+                  }`}
+                >
+                  <span>Next</span>
+                  <ChevronRightIcon className="h-5 w-5" />
+                </button>
+              </div>
             </div>
           )}
           {copied && (
