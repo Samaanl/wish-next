@@ -424,7 +424,7 @@ featured: true
     Need Help Crafting the Perfect Anniversary Wish?
   </h3>
   <p style="font-size: 1.1rem; line-height: 1.6; margin-bottom: 1.5rem;">
-    Try our <strong>AI-Powered Wish Generator</strong> to instantly create beautiful, personalized anniversary messages tailored to your unique love story.
+    Try our <strong>AI-Powered Message Create</strong> to instantly create beautiful, personalized anniversary messages tailored to your unique love story.
   </p>
   <a href="/" style="display: inline-block; background: rgba(255, 255, 255, 0.2); color: white; padding: 1rem 2rem; border-radius: 0.5rem; text-decoration: none; font-weight: 600; font-size: 1.1rem; border: 2px solid rgba(255, 255, 255, 0.3); transition: all 0.3s ease;">
     ✨ Create My Anniversary Message ✨

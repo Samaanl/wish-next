@@ -35,7 +35,7 @@ export async function generateMetadata({
   }
 
   return {
-    title: `${post.title} | Wish Generator Blog`,
+    title: `${post.title} | Message Create Blog`,
     description: post.description,
     openGraph: {
       title: post.title,
@@ -193,7 +193,7 @@ const BlogPostPage = async ({ params }: BlogPostPageProps) => {
                     {post.author}
                   </p>
                   <p className="text-gray-600 dark:text-gray-400">
-                    Content Writer at Wish Generator
+                    Content Writer at Message Create
                   </p>
                 </div>
               </div>
@@ -209,7 +209,7 @@ const BlogPostPage = async ({ params }: BlogPostPageProps) => {
                   href="/"
                   className="inline-flex items-center justify-center px-6 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all duration-200 text-center"
                 >
-                  Try Wish Generator
+                  Try Message Create
                 </Link>
               </div>
             </div>

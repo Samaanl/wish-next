@@ -26,7 +26,7 @@ export default function Banner() {
 
         {/* Title */}
         <h1 className="text-4xl md:text-6xl font-bold mb-4 text-center bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 dark:from-indigo-400 dark:via-purple-400 dark:to-pink-400">
-          Wish Generator
+          Message Create
         </h1>
 
         {/* Description */}

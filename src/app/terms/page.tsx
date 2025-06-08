@@ -2,8 +2,8 @@ import React from "react";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Terms & Conditions - Wish Generator",
-  description: "Terms and Conditions for using Wish Generator service.",
+  title: "Terms & Conditions - Message Create",
+  description: "Terms and Conditions for using Message Create service.",
 };
 
 const TermsAndConditions = () => {
@@ -25,7 +25,7 @@ const TermsAndConditions = () => {
                 1. Acceptance of Terms
               </h2>
               <p className="text-gray-600 dark:text-gray-300">
-                By accessing and using Wish Generator ("the Service"), you
+                By accessing and using Message Create ("the Service"), you
                 accept and agree to be bound by the terms and provision of this
                 agreement. If you do not agree to abide by the above, please do
                 not use this service.
@@ -37,7 +37,7 @@ const TermsAndConditions = () => {
                 2. Description of Service
               </h2>
               <p className="text-gray-600 dark:text-gray-300 mb-4">
-                Wish Generator is an AI-powered service that helps users create
+                Message Create is an AI-powered service that helps users create
                 personalized wishes for various occasions using advanced natural
                 language processing technology.
               </p>
@@ -304,7 +304,7 @@ const TermsAndConditions = () => {
                     </a>
                   </p>
                   <p className="text-gray-900 dark:text-white font-medium">
-                    <strong>Service:</strong> Wish Generator
+                    <strong>Service:</strong> Message Create
                   </p>
                   <p className="text-gray-600 dark:text-gray-300">
                     <strong>Response Time:</strong> We aim to respond within
@@ -324,7 +324,7 @@ const TermsAndConditions = () => {
             </section>
 
             <p className="text-center text-gray-500 dark:text-gray-400 text-sm mt-8 pt-8 border-t border-gray-200 dark:border-gray-700">
-              By using Wish Generator, you acknowledge that you have read,
+              By using Message Create, you acknowledge that you have read,
               understood, and agree to be bound by these Terms & Conditions.
             </p>
           </div>

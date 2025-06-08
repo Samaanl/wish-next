@@ -43,7 +43,7 @@ const FirstTimeOverlay: React.FC<FirstTimeOverlayProps> = ({
                   <SparklesIcon className="h-8 w-8" />
                 </div>
                 <div>
-                  <h2 className="text-2xl font-bold">AI Wish Generator</h2>
+                  <h2 className="text-2xl font-bold">AI Message Create</h2>
                   <p className="text-white text-opacity-90 text-sm">
                     Create perfect wishes instantly
                   </p>

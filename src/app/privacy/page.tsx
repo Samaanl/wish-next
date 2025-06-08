@@ -2,9 +2,9 @@ import React from "react";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy - Wish Generator",
+  title: "Privacy Policy - Message Create",
   description:
-    "Privacy Policy for Wish Generator - How we collect, use, and protect your data.",
+    "Privacy Policy for Message Create - How we collect, use, and protect your data.",
 };
 
 const PrivacyPolicy = () => {
@@ -191,7 +191,7 @@ const PrivacyPolicy = () => {
                   </a>
                 </p>
                 <p className="text-gray-900 dark:text-white font-medium">
-                  Service: Wish Generator
+                  Service: Message Create
                 </p>
               </div>
             </section>

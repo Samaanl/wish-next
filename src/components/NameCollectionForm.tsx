@@ -61,7 +61,7 @@ const NameCollectionForm: React.FC<NameCollectionFormProps> = ({
             </svg>
           </div>
           <h2 className="text-2xl font-semibold text-gray-900 mb-2">
-            Welcome to Wish Generator!
+            Welcome to Message Create!
           </h2>
           <p className="text-gray-600 text-sm">
             You've successfully signed in with <strong>{email}</strong>

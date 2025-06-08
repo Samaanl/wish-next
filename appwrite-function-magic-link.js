@@ -33,13 +33,13 @@ export default async ({ req, res, log, error }) => {
       const magicLinkUrl = `${url}?userId=${encodeURIComponent(userId)}&secret=${encodeURIComponent(secret)}`;
 
       // Prepare email content
-      const emailSubject = "Your Magic Link to Wish Generator";
+      const emailSubject = "Your Magic Link to Message Create";
       const emailHtml = `
         <!DOCTYPE html>
         <html>
         <head>
           <meta charset="utf-8">
-          <title>Sign in to Wish Generator</title>
+          <title>Sign in to Message Create</title>
           <style>
             body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }
             .container { max-width: 600px; margin: 0 auto; padding: 20px; }
@@ -54,15 +54,15 @@ export default async ({ req, res, log, error }) => {
         <body>
           <div class="container">
             <div class="header">
-              <div class="logo">✨ Wish Generator</div>
+              <div class="logo">✨ Message Create</div>
             </div>
             
             <div class="content">
               <h2>Sign in to your account</h2>
-              <p>Click the button below to securely sign in to Wish Generator. This link will expire in 1 hour for your security.</p>
+              <p>Click the button below to securely sign in to Message Create. This link will expire in 1 hour for your security.</p>
               
               <div style="text-align: center; margin: 30px 0;">
-                <a href="${magicLinkUrl}" class="button">Sign In to Wish Generator</a>
+                <a href="${magicLinkUrl}" class="button">Sign In to Message Create</a>
               </div>
               
               <p>If the button doesn't work, you can copy and paste this link into your browser:</p>
@@ -77,7 +77,7 @@ export default async ({ req, res, log, error }) => {
             
             <div class="footer">
               <p>This email was sent to ${email}</p>
-              <p>Wish Generator - Create personalized wishes with AI</p>
+              <p>Message Create - Create personalized messages with AI</p>
             </div>
           </div>
         </body>
@@ -85,7 +85,7 @@ export default async ({ req, res, log, error }) => {
       `;
 
       const emailText = `
-        Sign in to Wish Generator
+        Sign in to Message Create
         
         Click the link below to securely sign in to your account:
         ${magicLinkUrl}

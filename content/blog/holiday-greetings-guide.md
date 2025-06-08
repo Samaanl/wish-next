@@ -544,7 +544,7 @@ featured: false
     Want to Make Your Holiday Message Unforgettable?
   </h3>
   <p style="font-size: 1.1rem; line-height: 1.6; margin-bottom: 1.5rem;">
-    Try our <strong>AI-Powered Wish Generator</strong> and create customized, heartfelt greetings for any holiday or occasion that will touch hearts and spread joy.
+    Try our <strong>AI-Powered Message Create</strong> and create customized, heartfelt greetings for any holiday or occasion that will touch hearts and spread joy.
   </p>
   <a href="/" style="display: inline-block; background: rgba(255, 255, 255, 0.2); color: white; padding: 1rem 2rem; border-radius: 0.5rem; text-decoration: none; font-weight: 600; font-size: 1.1rem; border: 2px solid rgba(255, 255, 255, 0.3); transition: all 0.3s ease;">
     ✨ Create My Holiday Message ✨

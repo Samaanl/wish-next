@@ -15,11 +15,11 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Wish Generator - Create Beautiful Custom Wishes",
+  title: "Message Create - Create Beautiful Custom Wishes",
   description:
-    "Generate beautiful, personalized wishes for any occasion with our AI-powered wish generator. Perfect for birthdays, anniversaries, farewells, and more.",
+    "Generate beautiful, personalized messages for any occasion with our AI-powered Message Create. Perfect for birthdays, anniversaries, farewells, and more.",
   keywords:
-    "wish generator, custom wishes, AI wishes, birthday wishes, anniversary wishes, personalized messages",
+    "Message Create, custom messages, AI messages, birthday messages, anniversary messages, personalized messages",
 };
 
 export default function RootLayout({

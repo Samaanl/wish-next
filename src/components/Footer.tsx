@@ -9,7 +9,7 @@ const Footer: React.FC = () => {
           {/* Company Info */}
           <div className="space-y-4">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Wish Generator
+              Message Create
             </h3>
             <p className="text-gray-600 dark:text-gray-400 text-sm">
               Create heartfelt, personalized wishes for every special occasion
