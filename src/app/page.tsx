@@ -1,4 +1,5 @@
 "use client";
+import Image from "next/image";
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
@@ -312,23 +313,16 @@ export default function Home() {
               <div className="relative p-8 md:p-10">
                 {" "}
                 <div className="mb-8 text-center">
-                  <div className="flex justify-center mb-4">
-                    <span className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 shadow-lg">
-                      <svg
-                        className="w-8 h-8 text-white"
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-                        />
-                      </svg>
-                    </span>
+                  <div className="mb-6 flex justify-center">
+                    <div className="w-16 h-16 overflow-hidden flex items-center justify-center">
+                      <Image
+                        src="/logo/apple-touch-icon.png"
+                        alt="Wish Maker Logo"
+                        width={64}
+                        height={64}
+                        className="object-contain"
+                      />
+                    </div>
                   </div>
                   <h1 className="text-4xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400 mb-3">
                     Create Your Perfect Wish

@@ -20,6 +20,10 @@ export const metadata: Metadata = {
     "Generate beautiful, personalized messages for any occasion with our AI-powered Message Create. Perfect for birthdays, anniversaries, farewells, and more.",
   keywords:
     "Message Create, custom messages, AI messages, birthday messages, anniversary messages, personalized messages",
+  icons: {
+    icon: "/logo/favicon.ico",
+    apple: "/logo/apple-touch-icon.png",
+  },
 };
 
 export default function RootLayout({
